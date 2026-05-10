@@ -61,6 +61,9 @@ export function QuoteOverlayTrigger({
       const payload = (await response.json()) as {
         ok: boolean;
         error?: string;
+        data?: {
+          queued?: unknown;
+        };
       };
 
       if (!response.ok || !payload.ok) {
@@ -68,7 +71,7 @@ export function QuoteOverlayTrigger({
         return;
       }
 
-      setFeedback("Quote enviada para o overlay.");
+      setFeedback(payload.data?.queued ? "Quote entrou na fila do OBS." : "Quote enviada para o overlay.");
       router.refresh();
     });
   }

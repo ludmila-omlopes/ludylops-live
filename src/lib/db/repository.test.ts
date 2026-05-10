@@ -71,6 +71,7 @@ import {
   ensureViewerFromSession,
   getViewerDashboard,
   getActiveQuoteOverlay,
+  getObsOverlayAdminStatus,
   getSessionViewerState,
   getViewerLinkCodeState,
   getViewerBalanceFromChatCommand,
@@ -94,7 +95,9 @@ import {
   runStreamerbotCounterCommand,
   resolveBet,
   setActiveViewerForGoogleAccount,
+  setObsOverlayPaused,
   showQuoteOverlayForViewer,
+  cancelQueuedQuoteOverlays,
   updateGameSuggestionStatus,
 } from "@/lib/db/repository";
 import { GOOGLE_RISC_EVENT_TYPES } from "@/lib/google/risc";
@@ -1259,9 +1262,68 @@ describe("runQuoteCommandFromChat", () => {
 
     const activeOverlay = await getActiveQuoteOverlay();
     expect(activeOverlay).toMatchObject({
-      overlayId: result.overlay.overlayId,
+      overlayId: result.overlay!.overlayId,
       quoteNumber: 2,
     });
+  });
+
+  it("queues quote overlay requests while OBS calls are paused and resumes FIFO", async () => {
+    await setObsOverlayPaused({ paused: true, updatedBy: "admin@example.com" });
+
+    const result = await runQuoteCommandFromChat({
+      action: "show",
+      viewerExternalId: "yt_lia",
+      youtubeDisplayName: "Lia Pixel",
+      youtubeHandle: "@liapixel",
+      quoteId: 2,
+      source: "streamerbot_chat",
+    });
+
+    expect(result.overlay).toBeNull();
+    expect(result.queued).toMatchObject({
+      quoteNumber: 2,
+      requestedByDisplayName: "Lia Pixel",
+      status: "queued",
+      cost: 50,
+    });
+    expect(await getActiveQuoteOverlay()).toBeNull();
+
+    let status = await getObsOverlayAdminStatus();
+    expect(status.control.status).toBe("paused");
+    expect(status.pendingCount).toBe(1);
+
+    const dashboardAfterQueue = await getViewerDashboard("viewer_lia");
+    expect(dashboardAfterQueue?.balance.currentBalance).toBe(470);
+
+    status = await setObsOverlayPaused({ paused: false, updatedBy: "admin@example.com" });
+    expect(status.control.status).toBe("active");
+    expect(status.pendingCount).toBe(0);
+
+    const activeOverlay = await getActiveQuoteOverlay();
+    expect(activeOverlay).toMatchObject({
+      quoteNumber: 2,
+      requestedByDisplayName: "Lia Pixel",
+    });
+  });
+
+  it("cancels queued quote overlays and refunds the viewer", async () => {
+    await setObsOverlayPaused({ paused: true, updatedBy: "admin@example.com" });
+    await runQuoteCommandFromChat({
+      action: "show",
+      viewerExternalId: "yt_lia",
+      youtubeDisplayName: "Lia Pixel",
+      quoteId: 1,
+      source: "streamerbot_chat",
+    });
+
+    const dashboardAfterQueue = await getViewerDashboard("viewer_lia");
+    expect(dashboardAfterQueue?.balance.currentBalance).toBe(470);
+
+    const status = await cancelQueuedQuoteOverlays({ updatedBy: "admin@example.com" });
+    expect(status.pendingCount).toBe(0);
+
+    const dashboardAfterCancel = await getViewerDashboard("viewer_lia");
+    expect(dashboardAfterCancel?.balance.currentBalance).toBe(520);
   });
 
   it("rejects quote overlay requests when the viewer lacks pipetz", async () => {

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import {
   calculateBetPayouts,
@@ -20,7 +20,9 @@ import {
   googleAccounts,
   googleAccountViewers,
   googleRiscDeliveries,
+  obsOverlayControl,
   pointLedger,
+  quoteOverlayQueue,
   quoteOverlayState,
   quotes,
   productRecommendations,
@@ -75,7 +77,10 @@ import {
   GoogleAccountViewerRecord,
   GoogleRiscDeliveryRecord,
   LedgerEntryRecord,
+  ObsOverlayAdminStatusRecord,
+  ObsOverlayControlRecord,
   QuoteOverlayStateRecord,
+  QuoteOverlayQueueRecord,
   QuoteRecord,
   ProductRecommendationRecord,
   RedemptionRecord,
@@ -106,6 +111,9 @@ const QUOTE_OVERLAY_SLOT = "obs_main";
 const QUOTE_OVERLAY_COST = 50;
 const QUOTE_OVERLAY_DURATION_SECONDS = 12;
 const QUOTE_OVERLAY_LOCK_KEY = 42_001;
+const OBS_OVERLAY_CONTROL_KEY = "quotes";
+const QUOTE_OVERLAY_QUEUE_LIMIT = 20;
+const QUOTE_OVERLAY_QUEUE_TTL_MS = 2 * 60 * 60 * 1000;
 
 type StreamerbotCounterCommandAction = "increment" | "decrement" | "get" | "reset";
 type StreamerbotCounterScopeType = "global" | "game";
@@ -239,6 +247,8 @@ type DemoStore = {
   ledger: LedgerEntryRecord[];
   quotes: QuoteRecord[];
   quoteOverlayState: QuoteOverlayStateRecord | null;
+  obsOverlayControl: ObsOverlayControlRecord | null;
+  quoteOverlayQueue: QuoteOverlayQueueRecord[];
   redemptions: RedemptionRecord[];
   bets: BetRecord[];
   betOptions: BetOptionRecord[];
@@ -267,6 +277,8 @@ function getDemoStore(): DemoStore {
       ledger: structuredClone(demoLedger),
       quotes: structuredClone(demoQuotes),
       quoteOverlayState: null,
+      obsOverlayControl: null,
+      quoteOverlayQueue: [],
       redemptions: structuredClone(demoRedemptions),
       bets: structuredClone(demoBetRecords),
       betOptions: structuredClone(demoBetOptions),
@@ -1296,6 +1308,122 @@ function serializeQuoteOverlayState(
   };
 }
 
+function buildDefaultObsOverlayControl(now = new Date()): ObsOverlayControlRecord {
+  return {
+    key: OBS_OVERLAY_CONTROL_KEY,
+    status: "active",
+    pausedAt: null,
+    resumedAt: null,
+    updatedAt: now.toISOString(),
+    updatedBy: null,
+    lastError: null,
+  };
+}
+
+function isMissingObsOverlayTablesError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const maybePostgresError = error as Error & {
+    code?: string;
+    cause?: { code?: string; message?: string };
+  };
+  const message = `${error.message} ${maybePostgresError.cause?.message ?? ""}`;
+
+  return (
+    maybePostgresError.code === "42P01" ||
+    maybePostgresError.cause?.code === "42P01" ||
+    message.includes('relation "quote_overlay_queue" does not exist') ||
+    message.includes('relation "obs_overlay_control" does not exist')
+  );
+}
+
+function serializeObsOverlayControl(
+  row: typeof obsOverlayControl.$inferSelect,
+): ObsOverlayControlRecord {
+  return {
+    key: row.key,
+    status: row.status as ObsOverlayControlRecord["status"],
+    pausedAt: row.pausedAt?.toISOString() ?? null,
+    resumedAt: row.resumedAt?.toISOString() ?? null,
+    updatedAt: row.updatedAt.toISOString(),
+    updatedBy: row.updatedBy ?? null,
+    lastError: row.lastError ?? null,
+  };
+}
+
+function serializeQuoteOverlayQueue(
+  row: typeof quoteOverlayQueue.$inferSelect,
+): QuoteOverlayQueueRecord {
+  return {
+    id: row.id,
+    quoteNumber: row.quoteNumber,
+    quoteBody: row.quoteBody,
+    createdByDisplayName: row.createdByDisplayName,
+    createdByYoutubeHandle: row.createdByYoutubeHandle ?? null,
+    requestedByViewerId: row.requestedByViewerId,
+    requestedByDisplayName: row.requestedByDisplayName,
+    requestedByYoutubeHandle: row.requestedByYoutubeHandle ?? null,
+    source: row.source,
+    cost: row.cost,
+    displayDurationSeconds: row.displayDurationSeconds,
+    status: row.status as QuoteOverlayQueueRecord["status"],
+    queuedAt: row.queuedAt.toISOString(),
+    expiresAt: row.expiresAt.toISOString(),
+    processedAt: row.processedAt?.toISOString() ?? null,
+    cancelledAt: row.cancelledAt?.toISOString() ?? null,
+    failureReason: row.failureReason ?? null,
+  };
+}
+
+async function getObsOverlayControlRecord(): Promise<ObsOverlayControlRecord> {
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    store.obsOverlayControl ??= buildDefaultObsOverlayControl();
+    return store.obsOverlayControl;
+  }
+
+  const [control] = await db
+    .select()
+    .from(obsOverlayControl)
+    .where(eq(obsOverlayControl.key, OBS_OVERLAY_CONTROL_KEY))
+    .limit(1);
+
+  return control ? serializeObsOverlayControl(control) : buildDefaultObsOverlayControl();
+}
+
+function buildQuoteOverlayQueueRecord(input: {
+  quote: QuoteRecord;
+  viewer: ViewerRecord;
+  source: string;
+  cost: number;
+  displayDurationSeconds: number;
+}) {
+  const queuedAt = new Date();
+  return {
+    id: randomUUID(),
+    quoteNumber: input.quote.quoteNumber,
+    quoteBody: input.quote.body,
+    createdByDisplayName: input.quote.createdByDisplayName,
+    createdByYoutubeHandle: input.quote.createdByYoutubeHandle,
+    requestedByViewerId: input.viewer.id,
+    requestedByDisplayName: input.viewer.youtubeDisplayName,
+    requestedByYoutubeHandle: input.viewer.youtubeHandle ?? null,
+    source: input.source,
+    cost: input.cost,
+    displayDurationSeconds: input.displayDurationSeconds,
+    status: "queued",
+    queuedAt: queuedAt.toISOString(),
+    expiresAt: new Date(queuedAt.getTime() + QUOTE_OVERLAY_QUEUE_TTL_MS).toISOString(),
+    processedAt: null,
+    cancelledAt: null,
+    failureReason: null,
+  } satisfies QuoteOverlayQueueRecord;
+}
+
 function buildQuoteOverlayState(input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
@@ -1508,12 +1636,239 @@ export async function getActiveQuoteOverlay() {
   return isQuoteOverlayActive(serialized, now) ? serialized : null;
 }
 
+async function refundQueuedQuoteOverlay(
+  queueEntry: QuoteOverlayQueueRecord,
+  reason: "cancelled" | "expired" | "failed",
+) {
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const balance = getBalance(store, queueEntry.requestedByViewerId);
+    balance.currentBalance += queueEntry.cost;
+    balance.lifetimeSpent = Math.max(0, balance.lifetimeSpent - queueEntry.cost);
+    balance.lastSyncedAt = new Date().toISOString();
+    createLedgerEntry(store, {
+      viewerId: queueEntry.requestedByViewerId,
+      kind: "quote_overlay_debit",
+      amount: queueEntry.cost,
+      source: queueEntry.source,
+      externalEventId: null,
+      metadata: {
+        queueId: queueEntry.id,
+        quoteNumber: queueEntry.quoteNumber,
+        refundReason: reason,
+      },
+    });
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(viewerBalances)
+      .set({
+        currentBalance: sql`${viewerBalances.currentBalance} + ${queueEntry.cost}`,
+        lifetimeSpent: sql`greatest(${viewerBalances.lifetimeSpent} - ${queueEntry.cost}, 0)`,
+        lastSyncedAt: new Date(),
+      })
+      .where(eq(viewerBalances.viewerId, queueEntry.requestedByViewerId));
+
+    await tx.insert(pointLedger).values({
+      id: randomUUID(),
+      viewerId: queueEntry.requestedByViewerId,
+      kind: "quote_overlay_debit",
+      amount: queueEntry.cost,
+      source: queueEntry.source,
+      externalEventId: null,
+      metadata: {
+        queueId: queueEntry.id,
+        quoteNumber: queueEntry.quoteNumber,
+        refundReason: reason,
+      },
+      createdAt: new Date(),
+    });
+  });
+}
+
+async function expireQueuedQuoteOverlays() {
+  const now = new Date();
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const expired = store.quoteOverlayQueue.filter(
+      (entry) => entry.status === "queued" && new Date(entry.expiresAt).getTime() <= now.getTime(),
+    );
+    for (const entry of expired) {
+      entry.status = "expired";
+      entry.cancelledAt = now.toISOString();
+      entry.failureReason = "queue_expired";
+      await refundQueuedQuoteOverlay(entry, "expired");
+    }
+    return expired.length;
+  }
+
+  const expiredRows = await db
+    .update(quoteOverlayQueue)
+    .set({
+      status: "expired",
+      cancelledAt: now,
+      failureReason: "queue_expired",
+    })
+    .where(and(eq(quoteOverlayQueue.status, "queued"), lt(quoteOverlayQueue.expiresAt, now)))
+    .returning();
+
+  for (const row of expiredRows) {
+    await refundQueuedQuoteOverlay(serializeQuoteOverlayQueue(row), "expired");
+  }
+
+  return expiredRows.length;
+}
+
+async function enqueueQuoteOverlay(input: {
+  quote: QuoteRecord;
+  viewer: ViewerRecord;
+  source: string;
+  cost: number;
+  displayDurationSeconds: number;
+}) {
+  await requireActiveLivestream({
+    failureError: "livestream_not_live",
+  });
+  await expireQueuedQuoteOverlays();
+
+  const queued = buildQuoteOverlayQueueRecord(input);
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const pendingCount = store.quoteOverlayQueue.filter((entry) => entry.status === "queued").length;
+    if (pendingCount >= QUOTE_OVERLAY_QUEUE_LIMIT) {
+      throw new Error("quote_overlay_queue_full");
+    }
+
+    const balance = getBalance(store, input.viewer.id);
+    if (balance.currentBalance < input.cost) {
+      throw new Error("saldo_insuficiente");
+    }
+
+    balance.currentBalance -= input.cost;
+    balance.lifetimeSpent += input.cost;
+    balance.lastSyncedAt = queued.queuedAt;
+    createLedgerEntry(store, {
+      viewerId: input.viewer.id,
+      kind: "quote_overlay_debit",
+      amount: -input.cost,
+      source: input.source,
+      externalEventId: null,
+      metadata: {
+        queueId: queued.id,
+        quoteNumber: input.quote.quoteNumber,
+        queued: true,
+        durationSeconds: input.displayDurationSeconds,
+      },
+      createdAt: queued.queuedAt,
+    });
+    store.quoteOverlayQueue.push(queued);
+    return queued;
+  }
+
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY})`);
+
+    const [{ pendingCount }] = await tx
+      .select({ pendingCount: sql<number>`count(*)::int` })
+      .from(quoteOverlayQueue)
+      .where(eq(quoteOverlayQueue.status, "queued"));
+
+    if ((pendingCount ?? 0) >= QUOTE_OVERLAY_QUEUE_LIMIT) {
+      throw new Error("quote_overlay_queue_full");
+    }
+
+    const debitedBalances = await tx
+      .update(viewerBalances)
+      .set({
+        currentBalance: sql`${viewerBalances.currentBalance} - ${input.cost}`,
+        lifetimeSpent: sql`${viewerBalances.lifetimeSpent} + ${input.cost}`,
+        lastSyncedAt: new Date(queued.queuedAt),
+      })
+      .where(
+        and(
+          eq(viewerBalances.viewerId, input.viewer.id),
+          gte(viewerBalances.currentBalance, input.cost),
+        ),
+      )
+      .returning({ viewerId: viewerBalances.viewerId });
+
+    if (debitedBalances.length === 0) {
+      throw new Error("saldo_insuficiente");
+    }
+
+    await tx.insert(pointLedger).values({
+      id: randomUUID(),
+      viewerId: input.viewer.id,
+      kind: "quote_overlay_debit",
+      amount: -input.cost,
+      source: input.source,
+      externalEventId: null,
+      metadata: {
+        queueId: queued.id,
+        quoteNumber: input.quote.quoteNumber,
+        queued: true,
+        durationSeconds: input.displayDurationSeconds,
+      },
+      createdAt: new Date(queued.queuedAt),
+    });
+
+    const [created] = await tx
+      .insert(quoteOverlayQueue)
+      .values({
+        id: queued.id,
+        quoteNumber: queued.quoteNumber,
+        quoteBody: queued.quoteBody,
+        createdByDisplayName: queued.createdByDisplayName,
+        createdByYoutubeHandle: queued.createdByYoutubeHandle,
+        requestedByViewerId: queued.requestedByViewerId,
+        requestedByDisplayName: queued.requestedByDisplayName,
+        requestedByYoutubeHandle: queued.requestedByYoutubeHandle,
+        source: queued.source,
+        cost: queued.cost,
+        displayDurationSeconds: queued.displayDurationSeconds,
+        status: queued.status,
+        queuedAt: new Date(queued.queuedAt),
+        expiresAt: new Date(queued.expiresAt),
+      })
+      .returning();
+
+    return serializeQuoteOverlayQueue(created!);
+  });
+}
+
+async function hasPendingQuoteOverlayQueue() {
+  await expireQueuedQuoteOverlays();
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    return getDemoStore().quoteOverlayQueue.some((entry) => entry.status === "queued");
+  }
+
+  const [entry] = await db
+    .select({ id: quoteOverlayQueue.id })
+    .from(quoteOverlayQueue)
+    .where(eq(quoteOverlayQueue.status, "queued"))
+    .limit(1);
+
+  return Boolean(entry);
+}
+
 async function activateQuoteOverlay(input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
   cost?: number;
   durationSeconds?: number;
+  debit?: boolean;
+  queueId?: string | null;
 }) {
   await requireActiveLivestream({
     failureError: "livestream_not_live",
@@ -1529,6 +1884,7 @@ async function activateQuoteOverlay(input: {
   });
 
   const db = getDb();
+  const shouldDebit = input.debit ?? true;
   if (isDemoMode || !db) {
     const store = getDemoStore();
     const activeOverlay = store.quoteOverlayState;
@@ -1536,28 +1892,31 @@ async function activateQuoteOverlay(input: {
       throw new Error("quote_overlay_busy");
     }
 
-    const balance = getBalance(store, input.viewer.id);
-    if (balance.currentBalance < cost) {
-      throw new Error("saldo_insuficiente");
+    if (shouldDebit) {
+      const balance = getBalance(store, input.viewer.id);
+      if (balance.currentBalance < cost) {
+        throw new Error("saldo_insuficiente");
+      }
+
+      balance.currentBalance -= cost;
+      balance.lifetimeSpent += cost;
+      balance.lastSyncedAt = overlay.activatedAt;
+
+      createLedgerEntry(store, {
+        viewerId: input.viewer.id,
+        kind: "quote_overlay_debit",
+        amount: -cost,
+        source: input.source,
+        externalEventId: null,
+        metadata: {
+          overlayId: overlay.overlayId,
+          queueId: input.queueId ?? null,
+          quoteNumber: input.quote.quoteNumber,
+          durationSeconds: input.durationSeconds ?? QUOTE_OVERLAY_DURATION_SECONDS,
+        },
+        createdAt: overlay.activatedAt,
+      });
     }
-
-    balance.currentBalance -= cost;
-    balance.lifetimeSpent += cost;
-    balance.lastSyncedAt = overlay.activatedAt;
-
-    createLedgerEntry(store, {
-      viewerId: input.viewer.id,
-      kind: "quote_overlay_debit",
-      amount: -cost,
-      source: input.source,
-      externalEventId: null,
-      metadata: {
-        overlayId: overlay.overlayId,
-        quoteNumber: input.quote.quoteNumber,
-        durationSeconds: input.durationSeconds ?? QUOTE_OVERLAY_DURATION_SECONDS,
-      },
-      createdAt: overlay.activatedAt,
-    });
 
     store.quoteOverlayState = overlay;
     return overlay;
@@ -1576,39 +1935,42 @@ async function activateQuoteOverlay(input: {
       throw new Error("quote_overlay_busy");
     }
 
-    const debitedBalances = await tx
-      .update(viewerBalances)
-      .set({
-        currentBalance: sql`${viewerBalances.currentBalance} - ${cost}`,
-        lifetimeSpent: sql`${viewerBalances.lifetimeSpent} + ${cost}`,
-        lastSyncedAt: new Date(overlay.activatedAt),
-      })
-      .where(
-        and(
-          eq(viewerBalances.viewerId, input.viewer.id),
-          gte(viewerBalances.currentBalance, cost),
-        ),
-      )
-      .returning({ viewerId: viewerBalances.viewerId });
+    if (shouldDebit) {
+      const debitedBalances = await tx
+        .update(viewerBalances)
+        .set({
+          currentBalance: sql`${viewerBalances.currentBalance} - ${cost}`,
+          lifetimeSpent: sql`${viewerBalances.lifetimeSpent} + ${cost}`,
+          lastSyncedAt: new Date(overlay.activatedAt),
+        })
+        .where(
+          and(
+            eq(viewerBalances.viewerId, input.viewer.id),
+            gte(viewerBalances.currentBalance, cost),
+          ),
+        )
+        .returning({ viewerId: viewerBalances.viewerId });
 
-    if (debitedBalances.length === 0) {
-      throw new Error("saldo_insuficiente");
+      if (debitedBalances.length === 0) {
+        throw new Error("saldo_insuficiente");
+      }
+
+      await tx.insert(pointLedger).values({
+        id: randomUUID(),
+        viewerId: input.viewer.id,
+        kind: "quote_overlay_debit",
+        amount: -cost,
+        source: input.source,
+        externalEventId: null,
+        metadata: {
+          overlayId: overlay.overlayId,
+          queueId: input.queueId ?? null,
+          quoteNumber: input.quote.quoteNumber,
+          durationSeconds: input.durationSeconds ?? QUOTE_OVERLAY_DURATION_SECONDS,
+        },
+        createdAt: new Date(overlay.activatedAt),
+      });
     }
-
-    await tx.insert(pointLedger).values({
-      id: randomUUID(),
-      viewerId: input.viewer.id,
-      kind: "quote_overlay_debit",
-      amount: -cost,
-      source: input.source,
-      externalEventId: null,
-      metadata: {
-        overlayId: overlay.overlayId,
-        quoteNumber: input.quote.quoteNumber,
-        durationSeconds: input.durationSeconds ?? QUOTE_OVERLAY_DURATION_SECONDS,
-      },
-      createdAt: new Date(overlay.activatedAt),
-    });
 
     await tx
       .insert(quoteOverlayState)
@@ -1647,6 +2009,330 @@ async function activateQuoteOverlay(input: {
   });
 
   return overlay;
+}
+
+async function activateQueuedQuoteOverlay(entry: QuoteOverlayQueueRecord) {
+  const viewer = await withViewerById(entry.requestedByViewerId);
+  if (!viewer) {
+    throw new Error("viewer_not_ready");
+  }
+
+  const quote: QuoteRecord = {
+    id: `queued:${entry.id}`,
+    quoteNumber: entry.quoteNumber,
+    body: entry.quoteBody,
+    createdByViewerId: "",
+    createdByDisplayName: entry.createdByDisplayName,
+    createdByYoutubeHandle: entry.createdByYoutubeHandle,
+    source: entry.source,
+    createdAt: entry.queuedAt,
+  };
+
+  return activateQuoteOverlay({
+    quote,
+    viewer,
+    source: entry.source,
+    cost: entry.cost,
+    durationSeconds: entry.displayDurationSeconds,
+    debit: false,
+    queueId: entry.id,
+  });
+}
+
+export async function processNextQueuedQuoteOverlay() {
+  const control = await getObsOverlayControlRecord();
+  if (control.status === "paused") {
+    return null;
+  }
+
+  await expireQueuedQuoteOverlays();
+
+  const activeOverlay = await getActiveQuoteOverlay();
+  if (activeOverlay) {
+    return activeOverlay;
+  }
+
+  const db = getDb();
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const entry = [...store.quoteOverlayQueue]
+      .filter((item) => item.status === "queued")
+      .sort((left, right) => +new Date(left.queuedAt) - +new Date(right.queuedAt))[0];
+
+    if (!entry) {
+      return null;
+    }
+
+    entry.status = "processing";
+    try {
+      const overlay = await activateQueuedQuoteOverlay(entry);
+      entry.status = "completed";
+      entry.processedAt = overlay.activatedAt;
+      return overlay;
+    } catch (error) {
+      entry.status = "failed";
+      entry.cancelledAt = new Date().toISOString();
+      entry.failureReason = error instanceof Error ? error.message : "queue_processing_failed";
+      throw error;
+    }
+  }
+
+  const [claimed] = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY})`);
+
+    const [entry] = await tx
+      .select()
+      .from(quoteOverlayQueue)
+      .where(eq(quoteOverlayQueue.status, "queued"))
+      .orderBy(quoteOverlayQueue.queuedAt)
+      .limit(1);
+
+    if (!entry) {
+      return [];
+    }
+
+    return tx
+      .update(quoteOverlayQueue)
+      .set({ status: "processing" })
+      .where(eq(quoteOverlayQueue.id, entry.id))
+      .returning();
+  });
+
+  if (!claimed) {
+    return null;
+  }
+
+  const queued = serializeQuoteOverlayQueue(claimed);
+  try {
+    const overlay = await activateQueuedQuoteOverlay(queued);
+    await db
+      .update(quoteOverlayQueue)
+      .set({
+        status: "completed",
+        processedAt: new Date(overlay.activatedAt),
+      })
+      .where(eq(quoteOverlayQueue.id, queued.id));
+    return overlay;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "queue_processing_failed";
+    await db
+      .update(quoteOverlayQueue)
+      .set({
+        status: "failed",
+        cancelledAt: new Date(),
+        failureReason: message,
+      })
+      .where(eq(quoteOverlayQueue.id, queued.id));
+    await refundQueuedQuoteOverlay(queued, "failed");
+    throw error;
+  }
+}
+
+async function requestQuoteOverlay(input: {
+  quote: QuoteRecord;
+  viewer: ViewerRecord;
+  source: string;
+  durationSeconds?: number;
+}) {
+  const control = await getObsOverlayControlRecord();
+  const cost = QUOTE_OVERLAY_COST;
+  const displayDurationSeconds = input.durationSeconds ?? QUOTE_OVERLAY_DURATION_SECONDS;
+
+  if (control.status === "paused" || (await hasPendingQuoteOverlayQueue())) {
+    const queued = await enqueueQuoteOverlay({
+      quote: input.quote,
+      viewer: input.viewer,
+      source: input.source,
+      cost,
+      displayDurationSeconds,
+    });
+
+    return {
+      mode: "queued" as const,
+      queued,
+    };
+  }
+
+  const overlay = await activateQuoteOverlay({
+    quote: input.quote,
+    viewer: input.viewer,
+    source: input.source,
+    cost,
+    durationSeconds: displayDurationSeconds,
+  });
+
+  return {
+    mode: "activated" as const,
+    overlay,
+  };
+}
+
+export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusRecord> {
+  try {
+    await expireQueuedQuoteOverlays();
+    const [control, activeOverlay] = await Promise.all([
+      getObsOverlayControlRecord(),
+      getActiveQuoteOverlay(),
+    ]);
+    const db = getDb();
+
+    if (isDemoMode || !db) {
+      const queue = [...getDemoStore().quoteOverlayQueue];
+      const pending = queue
+        .filter((entry) => entry.status === "queued")
+        .sort((left, right) => +new Date(left.queuedAt) - +new Date(right.queuedAt));
+
+      return {
+        control,
+        activeOverlay,
+        pending,
+        pendingCount: pending.length,
+        processingCount: queue.filter((entry) => entry.status === "processing").length,
+        failedCount: queue.filter((entry) => entry.status === "failed").length,
+      };
+    }
+
+    const queue = (await db
+      .select()
+      .from(quoteOverlayQueue)
+      .orderBy(quoteOverlayQueue.queuedAt)
+      .limit(50)).map(serializeQuoteOverlayQueue);
+    const pending = queue.filter((entry) => entry.status === "queued");
+
+    return {
+      control,
+      activeOverlay,
+      pending,
+      pendingCount: pending.length,
+      processingCount: queue.filter((entry) => entry.status === "processing").length,
+      failedCount: queue.filter((entry) => entry.status === "failed").length,
+    };
+  } catch (error) {
+    if (!isMissingObsOverlayTablesError(error)) {
+      throw error;
+    }
+
+    return {
+      control: {
+        ...buildDefaultObsOverlayControl(),
+        status: "error",
+        lastError: "Migration pendente: crie as tabelas obs_overlay_control e quote_overlay_queue.",
+      },
+      activeOverlay: await getActiveQuoteOverlay(),
+      pending: [],
+      pendingCount: 0,
+      processingCount: 0,
+      failedCount: 0,
+    };
+  }
+}
+
+export async function setObsOverlayPaused(input: { paused: boolean; updatedBy?: string | null }) {
+  const now = new Date();
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    store.obsOverlayControl = {
+      ...(store.obsOverlayControl ?? buildDefaultObsOverlayControl(now)),
+      status: input.paused ? "paused" : "active",
+      pausedAt: input.paused ? now.toISOString() : store.obsOverlayControl?.pausedAt ?? null,
+      resumedAt: input.paused ? store.obsOverlayControl?.resumedAt ?? null : now.toISOString(),
+      updatedAt: now.toISOString(),
+      updatedBy: input.updatedBy ?? null,
+      lastError: null,
+    };
+    if (!input.paused) {
+      await processNextQueuedQuoteOverlay();
+    }
+    return getObsOverlayAdminStatus();
+  }
+
+  await db
+    .insert(obsOverlayControl)
+    .values({
+      key: OBS_OVERLAY_CONTROL_KEY,
+      status: input.paused ? "paused" : "active",
+      pausedAt: input.paused ? now : null,
+      resumedAt: input.paused ? null : now,
+      updatedAt: now,
+      updatedBy: input.updatedBy ?? null,
+      lastError: null,
+    })
+    .onConflictDoUpdate({
+      target: obsOverlayControl.key,
+      set: {
+        status: input.paused ? "paused" : "active",
+        pausedAt: input.paused ? now : sql`${obsOverlayControl.pausedAt}`,
+        resumedAt: input.paused ? sql`${obsOverlayControl.resumedAt}` : now,
+        updatedAt: now,
+        updatedBy: input.updatedBy ?? null,
+        lastError: null,
+      },
+    });
+
+  if (!input.paused) {
+    await processNextQueuedQuoteOverlay();
+  }
+
+  return getObsOverlayAdminStatus();
+}
+
+export async function cancelQueuedQuoteOverlays(input: { updatedBy?: string | null }) {
+  const now = new Date();
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const pending = store.quoteOverlayQueue.filter((entry) => entry.status === "queued");
+    for (const entry of pending) {
+      entry.status = "cancelled";
+      entry.cancelledAt = now.toISOString();
+      entry.failureReason = "cancelled_by_admin";
+      await refundQueuedQuoteOverlay(entry, "cancelled");
+    }
+    store.obsOverlayControl = {
+      ...(store.obsOverlayControl ?? buildDefaultObsOverlayControl(now)),
+      updatedAt: now.toISOString(),
+      updatedBy: input.updatedBy ?? null,
+    };
+    return getObsOverlayAdminStatus();
+  }
+
+  const cancelled = await db
+    .update(quoteOverlayQueue)
+    .set({
+      status: "cancelled",
+      cancelledAt: now,
+      failureReason: "cancelled_by_admin",
+    })
+    .where(eq(quoteOverlayQueue.status, "queued"))
+    .returning();
+
+  for (const row of cancelled) {
+    await refundQueuedQuoteOverlay(serializeQuoteOverlayQueue(row), "cancelled");
+  }
+
+  await db
+    .insert(obsOverlayControl)
+    .values({
+      key: OBS_OVERLAY_CONTROL_KEY,
+      status: "active",
+      pausedAt: null,
+      resumedAt: null,
+      updatedAt: now,
+      updatedBy: input.updatedBy ?? null,
+      lastError: null,
+    })
+    .onConflictDoUpdate({
+      target: obsOverlayControl.key,
+      set: {
+        updatedAt: now,
+        updatedBy: input.updatedBy ?? null,
+      },
+    });
+
+  return getObsOverlayAdminStatus();
 }
 
 function listDemoGameSuggestions(viewerId?: string | null) {
@@ -4169,7 +4855,7 @@ export async function runQuoteCommandFromChat(input: {
       youtubeHandle: input.youtubeHandle,
     });
     const quote = await getQuoteRecord({ quoteId: input.quoteId });
-    const overlay = await activateQuoteOverlay({
+    const request = await requestQuoteOverlay({
       quote,
       viewer,
       source: input.source,
@@ -4180,7 +4866,8 @@ export async function runQuoteCommandFromChat(input: {
       action: "show" as const,
       quote,
       viewer,
-      overlay,
+      overlay: request.mode === "activated" ? request.overlay : null,
+      queued: request.mode === "queued" ? request.queued : null,
     };
   }
 
@@ -4204,7 +4891,7 @@ export async function showQuoteOverlayForViewer(input: {
   }
 
   const quote = await getQuoteRecord({ quoteId: input.quoteId });
-  const overlay = await activateQuoteOverlay({
+  const request = await requestQuoteOverlay({
     quote,
     viewer,
     source: input.source,
@@ -4214,7 +4901,8 @@ export async function showQuoteOverlayForViewer(input: {
   return {
     quote,
     viewer,
-    overlay,
+    overlay: request.mode === "activated" ? request.overlay : null,
+    queued: request.mode === "queued" ? request.queued : null,
   };
 }
 

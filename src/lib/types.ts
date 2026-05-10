@@ -234,6 +234,49 @@ export interface QuoteOverlayStateRecord {
   expiresAt: string;
 }
 
+export type ObsOverlayControlStatus = "active" | "paused" | "processing" | "error";
+
+export type QuoteOverlayQueueStatus = "queued" | "processing" | "completed" | "cancelled" | "expired" | "failed";
+
+export interface ObsOverlayControlRecord {
+  key: string;
+  status: ObsOverlayControlStatus;
+  pausedAt: string | null;
+  resumedAt: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
+  lastError: string | null;
+}
+
+export interface QuoteOverlayQueueRecord {
+  id: string;
+  quoteNumber: number;
+  quoteBody: string;
+  createdByDisplayName: string;
+  createdByYoutubeHandle: string | null;
+  requestedByViewerId: string;
+  requestedByDisplayName: string;
+  requestedByYoutubeHandle: string | null;
+  source: string;
+  cost: number;
+  displayDurationSeconds: number;
+  status: QuoteOverlayQueueStatus;
+  queuedAt: string;
+  expiresAt: string;
+  processedAt: string | null;
+  cancelledAt: string | null;
+  failureReason: string | null;
+}
+
+export interface ObsOverlayAdminStatusRecord {
+  control: ObsOverlayControlRecord;
+  activeOverlay: QuoteOverlayStateRecord | null;
+  pending: QuoteOverlayQueueRecord[];
+  pendingCount: number;
+  processingCount: number;
+  failedCount: number;
+}
+
 export interface StreamerbotCounterRecord {
   key: string;
   scopeType: string;

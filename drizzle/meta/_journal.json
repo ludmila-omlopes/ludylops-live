@@ -43,6 +43,13 @@
       "when": 1776180764409,
       "tag": "0005_massive_yellow_claw",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776272400000,
+      "tag": "0006_obs_overlay_pause_queue",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@ import {
   getBridgeStatus,
   getCatalog,
   getLeaderboard,
+  getObsOverlayAdminStatus,
   listAdminViewerDirectory,
   listAdminGameSuggestions,
   listAdminProductRecommendations,
@@ -32,7 +33,7 @@ const statusColorMap: Record<string, string> = {
 
 export default async function AdminPage() {
   await requireAdminSession();
-  const [catalog, leaderboard, bridge, liveStatus, activeDeathCounterGame, redemptions, bets, suggestions, recommendations, viewers] = await Promise.all([
+  const [catalog, leaderboard, bridge, liveStatus, activeDeathCounterGame, redemptions, bets, suggestions, recommendations, viewers, obsOverlayStatus] = await Promise.all([
     getCatalog(),
     getLeaderboard(),
     getBridgeStatus(),
@@ -43,6 +44,7 @@ export default async function AdminPage() {
     listAdminGameSuggestions(),
     listAdminProductRecommendations(),
     listAdminViewerDirectory(),
+    getObsOverlayAdminStatus(),
   ]);
 
   return (
@@ -98,6 +100,8 @@ export default async function AdminPage() {
         </div>
       </section>
 
+      <AdminObsOverlaysPanel initialStatus={obsOverlayStatus} />
+
       <section className="landing-plane landing-divider bg-[var(--color-sky)] py-8 sm:py-10">
         <div className="mx-auto grid w-full max-w-[1500px] gap-6 px-4 sm:px-6 lg:px-10 xl:grid-cols-[1.05fr_0.95fr]">
           <div className="panel surface-section p-6">
@@ -114,7 +118,6 @@ export default async function AdminPage() {
 
       <AdminBetsPanel bets={bets} />
       <AdminViewerLinksPanel entries={viewers} />
-      <AdminObsOverlaysPanel />
       <AdminGameSuggestionsPanel suggestions={suggestions} />
       <AdminRecommendationsPanel recommendations={recommendations} />
     </div>
