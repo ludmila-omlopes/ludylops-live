@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { getActiveQuoteOverlay } from "@/lib/db/repository";
+import { processNextQueuedQuoteOverlay } from "@/lib/db/repository";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const overlay = await getActiveQuoteOverlay();
+  const overlay = await processNextQueuedQuoteOverlay();
 
   return NextResponse.json(
     {

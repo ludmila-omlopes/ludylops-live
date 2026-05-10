@@ -1,5 +1,10 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -8,6 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import type { ObsOverlayAdminStatusRecord } from "@/lib/types";
+import { formatDateTime, formatPipetz } from "@/lib/utils";
 
 const overlays = [
   {
@@ -20,7 +27,55 @@ const overlays = [
   },
 ];
 
-export function AdminObsOverlaysPanel() {
+export function AdminObsOverlaysPanel({
+  initialStatus,
+}: {
+  initialStatus: ObsOverlayAdminStatusRecord;
+}) {
+  const router = useRouter();
+  const [status, setStatus] = useState(initialStatus);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const isPaused = status.control.status === "paused";
+  const hasConfigurationError = status.control.status === "error";
+
+  function submitAction(action: "pause" | "resume" | "cancel_queue") {
+    setFeedback(null);
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/admin/obs-overlays", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ action }),
+        });
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          error?: string;
+          data?: ObsOverlayAdminStatusRecord;
+        };
+
+        if (!response.ok || !payload.ok || !payload.data) {
+          setFeedback(payload.error ?? "Falha ao atualizar chamadas do OBS.");
+          return;
+        }
+
+        setStatus(payload.data);
+        setFeedback(
+          action === "pause"
+            ? "Chamadas ao OBS pausadas."
+            : action === "resume"
+              ? "Chamadas ao OBS retomadas."
+              : "Fila pendente cancelada.",
+        );
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "Falha ao atualizar chamadas do OBS.");
+      }
+    });
+  }
+
   return (
     <section className="landing-plane landing-divider bg-[var(--color-paper)] py-8 sm:py-10">
       <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
@@ -38,6 +93,102 @@ export function AdminObsOverlaysPanel() {
             Aqui ficam os overlays hospedados pelo app. Use o link real no OBS e o link de demo
             quando quiser conferir o visual fora da live.
           </p>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="card-brutal-static surface-card-accent p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="mono text-[10px] uppercase tracking-[0.24em] text-[var(--color-ink-soft)]">
+                    chamadas ao OBS
+                  </p>
+                  <p className="mt-2 text-2xl font-black uppercase">
+                    {hasConfigurationError
+                      ? "Configurar banco"
+                      : isPaused
+                        ? "Pausadas"
+                        : status.pendingCount > 0
+                          ? "Processando fila"
+                          : "Ativas"}
+                  </p>
+                </div>
+                <span className="sticker px-3 py-1.5 text-xs">
+                  {status.pendingCount} pendente{status.pendingCount === 1 ? "" : "s"}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-[var(--color-ink-soft)]">
+                Quando pausado, novas quotes pagas entram em fila FIFO. A fila aceita ate 20 itens e
+                cada item expira em 2 horas com reembolso automatico se nao for exibido.
+              </p>
+              {status.control.lastError ? (
+                <p className="mt-3 border-2 border-[var(--color-ink)] bg-[var(--color-rose)] px-3 py-2 text-sm font-black text-[var(--color-ink)]">
+                  {status.control.lastError}
+                </p>
+              ) : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() => submitAction("pause")}
+                  disabled={isPending || isPaused || hasConfigurationError}
+                  variant="danger"
+                  size="sm"
+                >
+                  Pausar chamadas
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => submitAction("resume")}
+                  disabled={isPending || !isPaused || hasConfigurationError}
+                  variant="success"
+                  size="sm"
+                >
+                  Retomar fila
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => submitAction("cancel_queue")}
+                  disabled={isPending || status.pendingCount === 0 || hasConfigurationError}
+                  variant="neutral"
+                  size="sm"
+                >
+                  Cancelar fila
+                </Button>
+              </div>
+              <div className="mt-4 grid gap-2 text-sm text-[var(--color-ink-soft)]">
+                <p>Atualizado em {formatDateTime(status.control.updatedAt)}</p>
+                {status.control.updatedBy ? <p>Por {status.control.updatedBy}</p> : null}
+                {feedback ? <p className="font-bold text-[var(--color-ink)]">{feedback}</p> : null}
+              </div>
+            </div>
+
+            <div className="card-brutal-static surface-card p-4">
+              <p className="mono text-[10px] uppercase tracking-[0.24em] text-[var(--color-ink-soft)]">
+                fila pendente
+              </p>
+              <div className="mt-3 grid gap-3">
+                {status.pending.length > 0 ? (
+                  status.pending.slice(0, 5).map((entry, index) => (
+                    <div
+                      key={entry.id}
+                      className="grid gap-2 border-t-2 border-[var(--color-ink)] pt-3 sm:grid-cols-[auto_1fr_auto]"
+                    >
+                      <span className="mono text-xs font-black">#{index + 1}</span>
+                      <div>
+                        <p className="font-black">Quote #{entry.quoteNumber}</p>
+                        <p className="text-sm text-[var(--color-ink-soft)]">
+                          {entry.requestedByDisplayName} - {formatDateTime(entry.queuedAt)}
+                        </p>
+                      </div>
+                      <span className="mono text-xs font-black">{formatPipetz(entry.cost)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm font-bold text-[var(--color-ink-soft)]">
+                    Nenhuma chamada aguardando.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
 
           <div className="mt-6 grid gap-4">
             {overlays.map((overlay, index) => (

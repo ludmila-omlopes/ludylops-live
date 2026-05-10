@@ -337,6 +337,38 @@ export const quoteOverlayState = pgTable("quote_overlay_state", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
 
+export const obsOverlayControl = pgTable("obs_overlay_control", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  status: varchar("status", { length: 32 }).default("active").notNull(),
+  pausedAt: timestamp("paused_at", { withTimezone: true }),
+  resumedAt: timestamp("resumed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: varchar("updated_by", { length: 255 }),
+  lastError: text("last_error"),
+});
+
+export const quoteOverlayQueue = pgTable("quote_overlay_queue", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  quoteNumber: integer("quote_number").notNull(),
+  quoteBody: text("quote_body").notNull(),
+  createdByDisplayName: varchar("created_by_display_name", { length: 255 }).notNull(),
+  createdByYoutubeHandle: varchar("created_by_youtube_handle", { length: 255 }),
+  requestedByViewerId: varchar("requested_by_viewer_id", { length: 64 })
+    .references(() => users.id)
+    .notNull(),
+  requestedByDisplayName: varchar("requested_by_display_name", { length: 255 }).notNull(),
+  requestedByYoutubeHandle: varchar("requested_by_youtube_handle", { length: 255 }),
+  source: varchar("source", { length: 64 }).default("streamerbot_chat").notNull(),
+  cost: integer("cost").notNull(),
+  displayDurationSeconds: integer("display_duration_seconds").notNull(),
+  status: varchar("status", { length: 32 }).default("queued").notNull(),
+  queuedAt: timestamp("queued_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  failureReason: text("failure_reason"),
+});
+
 export const streamerbotCounters = pgTable("streamerbot_counters", {
   key: varchar("key", { length: 64 }).primaryKey(),
   value: integer("value").default(0).notNull(),

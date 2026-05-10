@@ -30,7 +30,7 @@ export async function POST(
       source: payload.source,
     });
 
-    return ok(result, { status: 201 });
+    return ok(result, { status: result.queued ? 202 : 201 });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Falha ao mostrar quote no overlay.";

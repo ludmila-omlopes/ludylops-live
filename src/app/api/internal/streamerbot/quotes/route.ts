@@ -101,12 +101,16 @@ export async function POST(request: Request) {
       result.action === "create"
         ? `Quote #${result.quote.quoteNumber} salva: "${result.quote.body}"`
         : result.action === "show"
-          ? `${payload.youtubeDisplayName ?? result.viewer?.youtubeDisplayName ?? "Viewer"} colocou a quote #${
-              result.quote.quoteNumber
-            } no OBS por ${Math.round(
-              (new Date(result.overlay.expiresAt).getTime() - new Date(result.overlay.activatedAt).getTime()) /
-                1000,
-            )}s (-${result.overlay.cost} pipetz).`
+          ? result.queued
+            ? `${payload.youtubeDisplayName ?? result.viewer?.youtubeDisplayName ?? "Viewer"}, a quote #${
+                result.quote.quoteNumber
+              } entrou na fila do OBS. Ela aparece quando a admin retomar as chamadas.`
+            : `${payload.youtubeDisplayName ?? result.viewer?.youtubeDisplayName ?? "Viewer"} colocou a quote #${
+                result.quote.quoteNumber
+              } no OBS por ${Math.round(
+                (new Date(result.overlay!.expiresAt).getTime() - new Date(result.overlay!.activatedAt).getTime()) /
+                  1000,
+              )}s (-${result.overlay!.cost} pipetz).`
           : formatQuoteReply(result.quote);
 
     console.info("[streamerbot/quotes] Processed quote command.", {
@@ -124,6 +128,7 @@ export async function POST(request: Request) {
         quoteId: result.quote.quoteNumber,
         quote: result.quote,
         overlay: result.action === "show" ? result.overlay : null,
+        queued: result.action === "show" ? result.queued : null,
         replyMessage,
       },
     });
