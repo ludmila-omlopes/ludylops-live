@@ -50,6 +50,13 @@
       "when": 1776272400000,
       "tag": "0006_obs_overlay_pause_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778428800000,
+      "tag": "0007_game_suggestion_igdb_metadata",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { GameSuggestForm } from "@/components/game-suggest-form";
 import { GameSuggestionList } from "@/components/game-suggestion-list";
 import { getViewerDashboard, listGameSuggestions } from "@/lib/db/repository";
+import { adminEmails } from "@/lib/env";
 
 export default async function JogosPage() {
   const session = await auth();
@@ -13,6 +14,7 @@ export default async function JogosPage() {
 
   const viewerBalance = dashboard?.balance.currentBalance ?? null;
   const canInteract = Boolean(activeViewerId);
+  const isAdmin = Boolean(session?.user?.email && adminEmails.has(session.user.email.toLowerCase()));
 
   return (
     <div className="flex w-full flex-col pb-20">
@@ -20,11 +22,8 @@ export default async function JogosPage() {
         <div className="bg-dots-light pointer-events-none absolute inset-0 opacity-20" />
         <div className="relative mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
           <div>
-            <p className="mono text-xs font-bold uppercase tracking-[0.32em] text-[var(--color-ink-soft)]">
-              Sugestoes de jogos
-            </p>
             <h1
-              className="mt-3 text-4xl uppercase sm:text-6xl lg:text-7xl"
+              className="text-4xl uppercase sm:text-6xl lg:text-7xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Me diz o que jogar.
@@ -36,22 +35,22 @@ export default async function JogosPage() {
         </div>
       </section>
 
-      <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-8 sm:py-10">
-        <div className="mx-auto grid w-full max-w-[1500px] gap-8 px-4 sm:px-6 lg:grid-cols-[1fr_0.8fr] lg:px-10">
+      <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-8 dark:bg-[var(--surface-card-alt)] sm:py-10">
+        <div className="mx-auto grid w-full max-w-[1500px] gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.75fr)] lg:px-10">
           <div>
             <div className="mb-4 flex items-center gap-2">
-              <span className="text-xl">Lista</span>
               <h2
                 className="text-2xl font-bold uppercase"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                Sugestoes da galera
+                Sugestões da galera
               </h2>
             </div>
             <GameSuggestionList
               suggestions={suggestions}
               loggedIn={Boolean(session?.user)}
               canInteract={canInteract}
+              isAdmin={isAdmin}
               viewerBalance={viewerBalance}
             />
           </div>

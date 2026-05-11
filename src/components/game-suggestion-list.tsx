@@ -9,11 +9,13 @@ export function GameSuggestionList({
   suggestions,
   loggedIn = false,
   canInteract = false,
+  isAdmin = false,
   viewerBalance,
 }: {
   suggestions: GameSuggestionWithMeta[];
   loggedIn?: boolean;
   canInteract?: boolean;
+  isAdmin?: boolean;
   viewerBalance?: number | null;
 }) {
   const [localSuggestions, setLocalSuggestions] = useState(suggestions);
@@ -39,6 +41,14 @@ export function GameSuggestionList({
     );
   }
 
+  function handleCatalogUpdate(updatedSuggestion: GameSuggestionWithMeta) {
+    setLocalSuggestions((current) =>
+      current.map((suggestion) =>
+        suggestion.id === updatedSuggestion.id ? updatedSuggestion : suggestion,
+      ),
+    );
+  }
+
   const sorted = [...localSuggestions].sort((a, b) => {
     if (b.totalVotes !== a.totalVotes) {
       return b.totalVotes - a.totalVotes;
@@ -57,8 +67,10 @@ export function GameSuggestionList({
           index={index}
           loggedIn={loggedIn}
           canBoost={canInteract}
+          canEditCatalog={isAdmin}
           viewerBalance={localBalance}
           onBoostSuccess={handleBoostSuccess}
+          onCatalogUpdate={handleCatalogUpdate}
         />
       ))}
     </div>
