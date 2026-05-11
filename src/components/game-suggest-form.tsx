@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { GAME_SUGGESTION_CREATION_COST } from "@/lib/game-suggestions/constants";
 import { validateGameSuggestionDraft } from "@/lib/game-suggestions/service";
 import { formatPipetz } from "@/lib/utils";
+
+type GameSearchResult = {
+  igdbId: number;
+  name: string;
+  releaseYear: number | null;
+  coverImageUrl: string | null;
+  platforms: string[];
+  genres: string[];
+};
 
 function mapSuggestionError(message: string) {
   switch (message) {
@@ -35,6 +44,10 @@ export function GameSuggestForm({
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [selectedGame, setSelectedGame] = useState<GameSearchResult | null>(null);
+  const [searchResults, setSearchResults] = useState<GameSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const hasInsufficientBalance =
@@ -42,12 +55,83 @@ export function GameSuggestForm({
   const missingBalance = hasInsufficientBalance
     ? GAME_SUGGESTION_CREATION_COST - (viewerBalance ?? 0)
     : 0;
+  const isSubmitDisabled = isPending || hasInsufficientBalance || !selectedGame;
+  const canShowSearchResults =
+    searchResults.length > 0 && !selectedGame && name.trim().length >= 2;
+
+  useEffect(() => {
+    const query = name.trim();
+    if (query.length < 2 || selectedGame?.name === query) {
+      setSearchResults([]);
+      setIsSearching(false);
+      setSearchFailed(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setIsSearching(true);
+      setSearchFailed(false);
+
+      try {
+        const response = await fetch(`/api/games/search?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as {
+          ok: boolean;
+          data?: GameSearchResult[];
+        };
+
+        if (!response.ok || !payload.ok) {
+          setSearchResults([]);
+          setSearchFailed(true);
+          return;
+        }
+
+        setSearchResults(payload.data ?? []);
+      } catch (error) {
+        if ((error as DOMException).name !== "AbortError") {
+          setSearchResults([]);
+          setSearchFailed(true);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSearching(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [name, selectedGame]);
+
+  function handleNameChange(value: string) {
+    setName(value);
+    if (selectedGame && value !== selectedGame.name) {
+      setSelectedGame(null);
+    }
+  }
+
+  function selectGame(game: GameSearchResult) {
+    setSelectedGame(game);
+    setName(game.name);
+    setSearchResults([]);
+    setSearchFailed(false);
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const validationError = validateGameSuggestionDraft({
       name,
       description,
+      igdbId: selectedGame?.igdbId,
+      canonicalName: selectedGame?.name,
+      coverImageUrl: selectedGame?.coverImageUrl ?? undefined,
+      releaseYear: selectedGame?.releaseYear,
+      platforms: selectedGame?.platforms,
+      genres: selectedGame?.genres,
     });
 
     if (validationError) {
@@ -65,6 +149,11 @@ export function GameSuggestForm({
       return;
     }
 
+    if (!selectedGame) {
+      setFeedback("Escolha um jogo reconhecido pelo IGDB antes de enviar.");
+      return;
+    }
+
     setFeedback(null);
     startTransition(async () => {
       const response = await fetch("/api/me/game-suggestions", {
@@ -75,6 +164,12 @@ export function GameSuggestForm({
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim(),
+          igdbId: selectedGame?.igdbId,
+          canonicalName: selectedGame?.name,
+          coverImageUrl: selectedGame?.coverImageUrl ?? undefined,
+          releaseYear: selectedGame?.releaseYear,
+          platforms: selectedGame?.platforms,
+          genres: selectedGame?.genres,
         }),
       });
 
@@ -86,6 +181,8 @@ export function GameSuggestForm({
 
       setName("");
       setDescription("");
+      setSelectedGame(null);
+      setSearchResults([]);
       setFeedback(`Sugestão enviada. ${formatPipetz(GAME_SUGGESTION_CREATION_COST)} debitados.`);
       router.refresh();
     });
@@ -94,7 +191,7 @@ export function GameSuggestForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="panel surface-section relative overflow-hidden p-5 text-[var(--color-ink)] sm:p-6"
+      className="panel surface-section relative overflow-hidden border-2 p-5 text-[var(--color-ink)] sm:p-6"
     >
       <div className="bg-dots-light pointer-events-none absolute inset-0 opacity-15" />
 
@@ -110,16 +207,13 @@ export function GameSuggestForm({
             <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
               Se tiver algo que você quer muito me ver jogando, manda aqui.
             </p>
-            <p className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
-              cada nova sugestão custa {formatPipetz(GAME_SUGGESTION_CREATION_COST)}. boost continua separado.
-            </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="retro-label accent-chip">
+            <span className="retro-label accent-chip !rounded-none !border !shadow-none">
               custa {formatPipetz(GAME_SUGGESTION_CREATION_COST)}
             </span>
             {typeof viewerBalance === "number" ? (
-              <span className="retro-label neutral-chip">
+              <span className="retro-label neutral-chip !rounded-none !border !shadow-none">
                 saldo {formatPipetz(viewerBalance)}
               </span>
             ) : null}
@@ -127,28 +221,92 @@ export function GameSuggestForm({
         </div>
 
         <div className="mt-4 grid gap-3">
-          <Input
-            type="text"
-            placeholder="Nome do jogo"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            minLength={2}
-            maxLength={120}
-          />
+          <div className="relative">
+            <Input
+              type="text"
+              placeholder="Nome do jogo"
+              value={name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              required
+              minLength={2}
+              maxLength={120}
+              autoComplete="off"
+              className="border-2"
+            />
+
+            {selectedGame ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[var(--radius)] border-2 border-[var(--color-ink)] bg-[var(--color-mint)] px-3 py-2 text-xs font-bold">
+                <span>
+                  IGDB #{selectedGame.igdbId}
+                  {selectedGame.releaseYear ? ` - ${selectedGame.releaseYear}` : ""}
+                </span>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="neutral"
+                  onClick={() => setSelectedGame(null)}
+                >
+                  trocar
+                </Button>
+              </div>
+            ) : null}
+
+            {isSearching ? (
+              <p className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
+                buscando no IGDB...
+              </p>
+            ) : null}
+
+            {searchFailed ? (
+              <p className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
+                busca indisponível; tente novamente antes de enviar
+              </p>
+            ) : null}
+
+            {canShowSearchResults ? (
+              <div className="absolute z-20 mt-2 grid max-h-72 w-full gap-2 overflow-auto rounded-[var(--radius)] border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-2 shadow-purple">
+                {searchResults.map((game) => (
+                  <button
+                    key={game.igdbId}
+                    type="button"
+                    onClick={() => selectGame(game)}
+                    className="flex w-full items-center gap-3 rounded-[calc(var(--radius)-2px)] border-2 border-transparent p-2 text-left hover:border-[var(--color-ink)] hover:bg-[var(--color-sky)] focus-visible:border-[var(--color-ink)] focus-visible:bg-[var(--color-sky)] focus-visible:outline-none"
+                  >
+                    {game.coverImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={game.coverImageUrl}
+                        alt=""
+                        className="h-14 w-10 shrink-0 rounded-sm border-2 border-[var(--color-ink)] object-cover"
+                      />
+                    ) : (
+                      <span className="h-14 w-10 shrink-0 rounded-sm border-2 border-[var(--color-ink)] bg-[var(--color-lavender)]" />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold">{game.name}</span>
+                      <span className="mono mt-0.5 block truncate text-[10px] uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
+                        {[game.releaseYear, ...game.platforms.slice(0, 2)].filter(Boolean).join(" / ") || "IGDB"}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
           <Textarea
             placeholder="Por que eu deveria jogar isso? (opcional)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
             maxLength={500}
-            className="min-h-28 font-medium"
+            className="min-h-28 border-2 font-medium"
           />
           <Button
             type="submit"
-            disabled={isPending || hasInsufficientBalance}
+            disabled={isSubmitDisabled}
             size="lg"
-            className="w-full sm:w-fit"
+            className="w-full disabled:opacity-100 sm:w-fit"
           >
             {isPending
               ? "Enviando..."

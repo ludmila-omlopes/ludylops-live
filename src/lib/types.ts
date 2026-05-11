@@ -376,6 +376,12 @@ export interface GameSuggestionRecord {
   name: string;
   description: string | null;
   linkUrl: string | null;
+  igdbId: number | null;
+  canonicalName: string | null;
+  coverImageUrl: string | null;
+  releaseYear: number | null;
+  platforms: string[];
+  genres: string[];
   status: GameSuggestionStatus;
   totalVotes: number;
   createdAt: string;

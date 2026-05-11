@@ -50,7 +50,7 @@
   --grad-header: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
   --grad-purple-pink: var(--grad-header);
 
-  --border-w: 3px;
+  --border-w: 1px;
   --border-strong: var(--border-w) solid var(--color-ink);
   --radius: 0px;
   --shadow: 4px 4px 0 var(--shadow-color);

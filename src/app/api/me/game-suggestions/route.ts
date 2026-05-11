@@ -34,6 +34,12 @@ export async function POST(request: Request) {
       viewerId: session.user.activeViewerId,
       name: parsed.data.name,
       description: parsed.data.description,
+      igdbId: parsed.data.igdbId,
+      canonicalName: parsed.data.canonicalName,
+      coverImageUrl: parsed.data.coverImageUrl,
+      releaseYear: parsed.data.releaseYear,
+      platforms: parsed.data.platforms,
+      genres: parsed.data.genres,
       source: "web",
     });
 

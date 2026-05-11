@@ -9,6 +9,8 @@ const envSchema = z.object({
   BRIDGE_SHARED_SECRET: z.string().optional(),
   YOUTUBE_API_KEY: z.string().optional(),
   STREAM_YOUTUBE_CHANNEL_ID: z.string().optional(),
+  IGDB_CLIENT_ID: z.string().optional(),
+  IGDB_CLIENT_SECRET: z.string().optional(),
   ADMIN_EMAILS: z.string().optional(),
   APP_URL: z.string().url().optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),

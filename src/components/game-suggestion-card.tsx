@@ -1,34 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GameSuggestionWithMeta } from "@/lib/types";
 import { formatPipetz } from "@/lib/utils";
 
-const statusLabels: Record<GameSuggestionWithMeta["status"], string> = {
-  open: "Aberta",
-  accepted: "Aceita",
-  played: "Já joguei",
-  rejected: "Fechada",
+type GameSearchResult = {
+  igdbId: number;
+  name: string;
+  releaseYear: number | null;
+  coverImageUrl: string | null;
+  platforms: string[];
+  genres: string[];
 };
-
-const statusColors: Record<GameSuggestionWithMeta["status"], string> = {
-  open: "var(--color-sky)",
-  accepted: "var(--color-mint)",
-  played: "var(--color-lavender)",
-  rejected: "var(--color-periwinkle)",
-};
-
-const cardBgCycle = [
-  "surface-card",
-  "surface-card-alt",
-  "surface-card-accent",
-  "surface-card",
-  "surface-card-alt",
-  "surface-card",
-];
 
 function mapSuggestionError(message: string) {
   switch (message) {
@@ -47,20 +33,27 @@ function mapSuggestionError(message: string) {
 
 export function GameSuggestionCard({
   suggestion,
-  index = 0,
   loggedIn = false,
   canBoost = false,
-  viewerBalance,
+  canEditCatalog = false,
   onBoostSuccess,
+  onCatalogUpdate,
 }: {
   suggestion: GameSuggestionWithMeta;
   index?: number;
   loggedIn?: boolean;
   canBoost?: boolean;
+  canEditCatalog?: boolean;
   viewerBalance?: number | null;
   onBoostSuccess?: (suggestion: GameSuggestionWithMeta, spentAmount: number) => void;
+  onCatalogUpdate?: (suggestion: GameSuggestionWithMeta) => void;
 }) {
   const [boostAmount, setBoostAmount] = useState("");
+  const [isEditingCatalog, setIsEditingCatalog] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState(suggestion.name);
+  const [catalogResults, setCatalogResults] = useState<GameSearchResult[]>([]);
+  const [selectedCatalogResult, setSelectedCatalogResult] = useState<GameSearchResult | null>(null);
+  const [isSearchingCatalog, setIsSearchingCatalog] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -107,92 +100,353 @@ export function GameSuggestionCard({
     });
   }
 
-  const bgClass = cardBgCycle[index % cardBgCycle.length];
+  useEffect(() => {
+    if (!isEditingCatalog) {
+      return;
+    }
+
+    const query = catalogQuery.trim();
+    if (query.length < 2) {
+      setCatalogResults([]);
+      setIsSearchingCatalog(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setIsSearchingCatalog(true);
+
+      try {
+        const response = await fetch(`/api/games/search?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as {
+          ok: boolean;
+          data?: GameSearchResult[];
+        };
+
+        if (!response.ok || !payload.ok) {
+          setCatalogResults([]);
+          setFeedback("Busca IGDB indisponível.");
+          return;
+        }
+
+        setCatalogResults(payload.data ?? []);
+      } catch (error) {
+        if ((error as DOMException).name !== "AbortError") {
+          setCatalogResults([]);
+          setFeedback("Busca IGDB indisponível.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSearchingCatalog(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [catalogQuery, isEditingCatalog]);
+
+  function applyCatalogResult(game: GameSearchResult) {
+    setFeedback(null);
+    startTransition(async () => {
+      const response = await fetch(`/api/admin/game-suggestions/${suggestion.id}`, {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          igdbId: game.igdbId,
+          canonicalName: game.name,
+          coverImageUrl: game.coverImageUrl,
+          releaseYear: game.releaseYear,
+          platforms: game.platforms,
+          genres: game.genres,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        ok: boolean;
+        error?: string;
+        data?: GameSuggestionWithMeta;
+      };
+
+      if (!response.ok || !payload.ok || !payload.data) {
+        setFeedback(mapSuggestionError(payload.error ?? "Falha ao atualizar jogo."));
+        return;
+      }
+
+      onCatalogUpdate?.(payload.data);
+      setCatalogQuery(payload.data.name);
+      setCatalogResults([]);
+      setSelectedCatalogResult(null);
+      setIsEditingCatalog(false);
+      setFeedback("Jogo atualizado via IGDB.");
+    });
+  }
+
+  const metadata = [
+    suggestion.releaseYear,
+    ...suggestion.platforms.slice(0, 3),
+    ...suggestion.genres.slice(0, 2),
+  ].filter(Boolean);
+  const displayName = suggestion.canonicalName ?? suggestion.name;
+  const metadataText = [
+    ...metadata.map(String),
+    suggestion.igdbId ? `IGDB #${suggestion.igdbId}` : null,
+  ]
+    .filter(Boolean)
+    .join(" / ");
 
   return (
-    <div className={`card-brutal relative overflow-hidden p-5 ${bgClass}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+    <article className="card-brutal relative overflow-hidden bg-[var(--color-paper)] p-0">
+      <div className="grid gap-0 md:grid-cols-[minmax(150px,190px)_1fr_auto]">
+        <div className="relative min-h-64 border-b-2 border-[var(--color-ink)] bg-[var(--color-paper)] md:min-h-0 md:border-b-0 md:border-r-1">
+          {suggestion.coverImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={suggestion.coverImageUrl}
+              alt={`Capa de ${displayName}`}
+              className="h-full min-h-64 w-full object-cover md:min-h-0"
+            />
+          ) : (
+            <div className="flex h-full min-h-64 w-full items-center justify-center bg-[var(--color-lavender)] px-4 text-center md:min-h-0">
+              <span
+                className="text-xl font-bold uppercase"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {displayName}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-col p-5 sm:p-6">
+          <div className="min-w-0">
             <h3
-              className="text-xl font-bold"
+              className="text-2xl font-bold leading-none sm:text-3xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              {suggestion.name}
+              {displayName}
             </h3>
-            <span
-              className="sticker micro-flat px-2 py-0.5 text-[10px] text-[var(--color-ink)]"
-              style={{ backgroundColor: statusColors[suggestion.status] }}
-            >
-              {statusLabels[suggestion.status]}
-            </span>
+            {metadataText ? (
+              <p className="mono mt-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-ink-soft)] opacity-70">
+                {metadataText}
+              </p>
+            ) : null}
           </div>
+
           {suggestion.description ? (
-            <p className="mt-1 text-sm opacity-80">
+            <p className="mt-4 max-w-3xl text-sm leading-6 opacity-85">
               {suggestion.description}
             </p>
           ) : null}
-          <p className="mono mt-2 text-xs opacity-75">
-            Sugerido por {suggestion.suggestedBy}
-          </p>
-          {suggestion.viewerBoostTotal > 0 ? (
-            <p className="mono mt-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-ink-soft)]">
-              seu boost: {formatPipetz(suggestion.viewerBoostTotal)}
+
+          <div className="mt-auto pt-5">
+            <p className="mono text-xs opacity-75">
+              Sugerido por {suggestion.suggestedBy}
             </p>
+            {suggestion.viewerBoostTotal > 0 ? (
+              <p className="mono mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--color-ink-soft)]">
+                seu boost: {formatPipetz(suggestion.viewerBoostTotal)}
+              </p>
+            ) : null}
+          </div>
+
+          {canEditCatalog ? (
+            <div className="mt-4 border-t border-[var(--color-ink)]/30 pt-4">
+              {isEditingCatalog ? (
+                <div className="grid gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      type="text"
+                      value={catalogQuery}
+                      onChange={(event) => setCatalogQuery(event.target.value)}
+                      placeholder="Buscar no IGDB"
+                      className="h-10 max-w-72 border-2 px-3 py-2 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="neutral"
+                      onClick={() => {
+                        setIsEditingCatalog(false);
+                        setCatalogResults([]);
+                        setSelectedCatalogResult(null);
+                        setCatalogQuery(suggestion.name);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                  {isSearchingCatalog ? (
+                    <p className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-ink-soft)]">
+                      Buscando no IGDB...
+                    </p>
+                  ) : null}
+                  {catalogResults.length > 0 ? (
+                    <div className="grid gap-1">
+                      {catalogResults.map((game) => (
+                        <button
+                          key={game.igdbId}
+                          type="button"
+                          onClick={() => setSelectedCatalogResult(game)}
+                          disabled={isPending}
+                          className="border border-[var(--color-ink)] bg-[var(--color-paper)] px-3 py-2 text-left text-xs font-bold hover:bg-[var(--color-sky)] focus-visible:bg-[var(--color-sky)] focus-visible:outline-none"
+                        >
+                          {game.name}
+                          {game.releaseYear ? ` (${game.releaseYear})` : ""}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="neutral"
+                  onClick={() => {
+                    setCatalogQuery(suggestion.name);
+                    setIsEditingCatalog(true);
+                  }}
+                >
+                  Corrigir IGDB
+                </Button>
+              )}
+            </div>
           ) : null}
         </div>
 
-        <div className="micro-flat rounded-[var(--radius)] border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] px-4 py-2 text-center shadow-purple">
+        <aside className="flex items-start justify-between gap-4 border-t-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-5 md:min-w-36 md:flex-col md:border-l-1 md:border-t-0">
           <p
-            className="text-2xl font-bold text-[var(--color-purple-bold)]"
+            className="text-3xl font-bold leading-none text-[var(--color-purple-bold)] sm:text-4xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {formatPipetz(suggestion.totalVotes)}
           </p>
-          <p className="mono text-[9px] uppercase tracking-[0.15em] text-[var(--color-ink-soft)]">
-            boost total
-          </p>
-          {typeof viewerBalance === "number" ? (
-            <p className="mono mt-1 text-[9px] uppercase tracking-[0.15em] text-[var(--color-ink-soft)]">
-              saldo {formatPipetz(viewerBalance)}
-            </p>
-          ) : null}
-        </div>
+        </aside>
       </div>
 
       {suggestion.status === "open" ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-[var(--radius)] border-2 border-dashed border-[var(--color-ink)] bg-[var(--color-paper)]/60 p-3">
-          <span className="text-xs font-bold uppercase text-[var(--color-ink-soft)]">Boost:</span>
-          <Input
-            type="number"
-            min="1"
-            placeholder="Pipetz"
-            value={boostAmount}
-            onChange={(e) => setBoostAmount(e.target.value)}
-            className="w-24 px-3 py-2"
-          />
-          <Button
-            type="button"
-            onClick={handleBoost}
-            disabled={isPending}
-            size="sm"
-          >
-            {isPending ? "Enviando..." : "Dar boost"}
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-dashed border-[var(--color-ink)] bg-[var(--color-paper)]/55 px-5 py-3">
+          <span className="mono text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--color-ink-soft)]">
+            Votar nessa sugestão
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              type="number"
+              min="1"
+              placeholder="Pipetz"
+              value={boostAmount}
+              onChange={(e) => setBoostAmount(e.target.value)}
+              className="h-10 w-24 border-2 px-3 py-2 text-xs"
+            />
+            <Button
+              type="button"
+              onClick={handleBoost}
+              disabled={isPending}
+              size="xs"
+              variant="accent"
+            >
+              {isPending ? "Enviando..." : "Boost"}
+            </Button>
+          </div>
         </div>
       ) : null}
 
       {!loggedIn ? (
-        <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
+        <p className="px-5 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
           faça login para sugerir e dar boost
         </p>
       ) : null}
 
       {feedback ? (
-        <div className="sticker sticker-pop accent-chip mt-3 inline-flex px-2 py-1 text-xs">
-          {feedback}
+        <div className="px-5 pb-4">
+          <div className="sticker sticker-pop accent-chip inline-flex px-2 py-1 text-xs">
+            {feedback}
+          </div>
         </div>
       ) : null}
-    </div>
+
+      {selectedCatalogResult ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-backdrop)] p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`confirm-igdb-${suggestion.id}`}
+        >
+          <div className="w-full max-w-xl border-2 border-[var(--color-ink)] bg-[var(--color-paper)] text-[var(--color-ink)] shadow-purple">
+            <div className="grid gap-0 sm:grid-cols-[150px_1fr]">
+              <div className="border-b-2 border-[var(--color-ink)] bg-[var(--color-lavender)] sm:border-b-0 sm:border-r-1">
+                {selectedCatalogResult.coverImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selectedCatalogResult.coverImageUrl}
+                    alt={`Capa de ${selectedCatalogResult.name}`}
+                    className="aspect-[3/4] h-auto w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-[3/4] w-full items-center justify-center px-4 text-center text-sm font-bold uppercase">
+                    Sem imagem
+                  </div>
+                )}
+              </div>
+
+              <div className="p-5">
+                <h3
+                  id={`confirm-igdb-${suggestion.id}`}
+                  className="text-2xl font-bold"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {selectedCatalogResult.name}
+                </h3>
+                <p className="mono mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--color-ink-soft)]">
+                  IGDB #{selectedCatalogResult.igdbId}
+                  {selectedCatalogResult.releaseYear ? ` / ${selectedCatalogResult.releaseYear}` : ""}
+                </p>
+                {selectedCatalogResult.platforms.length > 0 ? (
+                  <p className="mt-4 text-sm">
+                    <strong>Plataformas:</strong> {selectedCatalogResult.platforms.join(", ")}
+                  </p>
+                ) : null}
+                {selectedCatalogResult.genres.length > 0 ? (
+                  <p className="mt-2 text-sm">
+                    <strong>Gêneros:</strong> {selectedCatalogResult.genres.join(", ")}
+                  </p>
+                ) : null}
+                <p className="mt-4 text-xs text-[var(--color-ink-soft)]">
+                  Isso vai atualizar apenas o cadastro do jogo nesta sugestão. Quem sugeriu e o texto continuam iguais.
+                </p>
+
+                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="neutral"
+                    onClick={() => setSelectedCatalogResult(null)}
+                    disabled={isPending}
+                  >
+                    Fechar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="accent"
+                    onClick={() => applyCatalogResult(selectedCatalogResult)}
+                    disabled={isPending}
+                  >
+                    {isPending ? "Atualizando..." : "OK"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </article>
   );
 }

@@ -1249,6 +1249,9 @@ function buildBetWithOptions(params: {
 }
 
 function serializeGameSuggestion(row: typeof gameSuggestions.$inferSelect): GameSuggestionRecord {
+  const platforms = Array.isArray(row.platforms) ? row.platforms : [];
+  const genres = Array.isArray(row.genres) ? row.genres : [];
+
   return {
     id: row.id,
     viewerId: row.viewerId,
@@ -1256,6 +1259,12 @@ function serializeGameSuggestion(row: typeof gameSuggestions.$inferSelect): Game
     name: row.name,
     description: row.description ?? null,
     linkUrl: row.linkUrl ?? null,
+    igdbId: row.igdbId ?? null,
+    canonicalName: row.canonicalName ?? null,
+    coverImageUrl: row.coverImageUrl ?? null,
+    releaseYear: row.releaseYear ?? null,
+    platforms: platforms.filter((entry): entry is string => typeof entry === "string"),
+    genres: genres.filter((entry): entry is string => typeof entry === "string"),
     status: row.status as GameSuggestionRecord["status"],
     totalVotes: row.totalVotes,
     createdAt: row.createdAt.toISOString(),
@@ -4007,6 +4016,12 @@ export async function createGameSuggestion(input: {
   name: string;
   description?: string | null;
   linkUrl?: string | null;
+  igdbId?: number | null;
+  canonicalName?: string | null;
+  coverImageUrl?: string | null;
+  releaseYear?: number | null;
+  platforms?: string[] | null;
+  genres?: string[] | null;
   source?: string;
 }) {
   const viewer = await withViewerById(input.viewerId);
@@ -4015,9 +4030,14 @@ export async function createGameSuggestion(input: {
   }
 
   const name = input.name.trim();
-  const slug = slugify(name);
+  const canonicalName = input.canonicalName?.trim() || null;
+  const displayName = canonicalName ?? name;
+  const slug = slugify(displayName);
   const description = input.description?.trim() || null;
   const linkUrl = input.linkUrl?.trim() || null;
+  const coverImageUrl = input.coverImageUrl?.trim() || null;
+  const platforms = (input.platforms ?? []).map((entry) => entry.trim()).filter(Boolean).slice(0, 4);
+  const genres = (input.genres ?? []).map((entry) => entry.trim()).filter(Boolean).slice(0, 3);
   if (!slug) {
     throw new Error("invalid_name");
   }
@@ -4028,7 +4048,9 @@ export async function createGameSuggestion(input: {
   if (isDemoMode || !db) {
     const store = getDemoStore();
     const duplicate = store.gameSuggestions.find(
-      (entry) => entry.slug === slug && (entry.status === "open" || entry.status === "accepted"),
+      (entry) =>
+        (entry.slug === slug || (input.igdbId && entry.igdbId === input.igdbId)) &&
+        (entry.status === "open" || entry.status === "accepted"),
     );
     if (duplicate) {
       throw new Error("suggestion_already_exists");
@@ -4048,9 +4070,15 @@ export async function createGameSuggestion(input: {
       id: suggestionId,
       viewerId: input.viewerId,
       slug,
-      name,
+      name: displayName,
       description,
       linkUrl,
+      igdbId: input.igdbId ?? null,
+      canonicalName,
+      coverImageUrl,
+      releaseYear: input.releaseYear ?? null,
+      platforms,
+      genres,
       status: "open",
       totalVotes: 0,
       createdAt,
@@ -4076,7 +4104,14 @@ export async function createGameSuggestion(input: {
     const [existing] = await tx
       .select()
       .from(gameSuggestions)
-      .where(and(eq(gameSuggestions.slug, slug), inArray(gameSuggestions.status, ["open", "accepted"])))
+      .where(
+        and(
+          input.igdbId
+            ? sql`(${gameSuggestions.slug} = ${slug} or ${gameSuggestions.igdbId} = ${input.igdbId})`
+            : eq(gameSuggestions.slug, slug),
+          inArray(gameSuggestions.status, ["open", "accepted"]),
+        ),
+      )
       .limit(1);
     if (existing) {
       throw new Error("suggestion_already_exists");
@@ -4104,9 +4139,15 @@ export async function createGameSuggestion(input: {
       id: suggestionId,
       viewerId: input.viewerId,
       slug,
-      name,
+      name: displayName,
       description,
       linkUrl,
+      igdbId: input.igdbId ?? null,
+      canonicalName,
+      coverImageUrl,
+      releaseYear: input.releaseYear ?? null,
+      platforms,
+      genres,
       status: "open",
       totalVotes: 0,
       createdAt,
@@ -4295,6 +4336,74 @@ export async function updateGameSuggestionStatus(input: {
     })
     .where(eq(gameSuggestions.id, input.suggestionId))
     .returning();
+  if (!updated) {
+    throw new Error("suggestion_not_found");
+  }
+
+  const result = (await listAdminGameSuggestions()).find((entry) => entry.id === input.suggestionId);
+  if (!result) {
+    throw new Error("suggestion_not_found");
+  }
+  return result;
+}
+
+export async function updateGameSuggestionCatalog(input: {
+  suggestionId: string;
+  igdbId: number;
+  canonicalName: string;
+  coverImageUrl?: string | null;
+  releaseYear?: number | null;
+  platforms?: string[] | null;
+  genres?: string[] | null;
+}) {
+  const canonicalName = input.canonicalName.trim();
+  const slug = slugify(canonicalName);
+  const coverImageUrl = input.coverImageUrl?.trim() || null;
+  const platforms = (input.platforms ?? []).map((entry) => entry.trim()).filter(Boolean).slice(0, 4);
+  const genres = (input.genres ?? []).map((entry) => entry.trim()).filter(Boolean).slice(0, 3);
+
+  if (!slug) {
+    throw new Error("invalid_name");
+  }
+
+  const db = getDb();
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const suggestion = store.gameSuggestions.find((entry) => entry.id === input.suggestionId);
+    if (!suggestion) {
+      throw new Error("suggestion_not_found");
+    }
+
+    suggestion.slug = slug;
+    suggestion.name = canonicalName;
+    suggestion.igdbId = input.igdbId;
+    suggestion.canonicalName = canonicalName;
+    suggestion.coverImageUrl = coverImageUrl;
+    suggestion.releaseYear = input.releaseYear ?? null;
+    suggestion.platforms = platforms;
+    suggestion.genres = genres;
+    suggestion.updatedAt = new Date().toISOString();
+
+    const viewer = store.viewers.find((entry) => entry.id === suggestion.viewerId) ?? null;
+    return buildGameSuggestionWithMeta({ suggestion, viewer });
+  }
+
+  const [updated] = await db
+    .update(gameSuggestions)
+    .set({
+      slug,
+      name: canonicalName,
+      igdbId: input.igdbId,
+      canonicalName,
+      coverImageUrl,
+      releaseYear: input.releaseYear ?? null,
+      platforms,
+      genres,
+      updatedAt: new Date(),
+    })
+    .where(eq(gameSuggestions.id, input.suggestionId))
+    .returning();
+
   if (!updated) {
     throw new Error("suggestion_not_found");
   }
