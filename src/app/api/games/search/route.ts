@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   }
 
   if (!isIgdbConfigured()) {
-    return ok([]);
+    return fail("igdb_unavailable", 503);
   }
 
   try {

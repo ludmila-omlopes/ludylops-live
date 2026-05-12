@@ -4,6 +4,7 @@ const TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
 const IGDB_GAMES_URL = "https://api.igdb.com/v4/games";
 const IGDB_SEARCH_URL = "https://api.igdb.com/v4/search";
 const MAX_QUERY_LENGTH = 80;
+const IGDB_REQUEST_TIMEOUT_MS = 6_000;
 
 type TwitchTokenResponse = {
   access_token: string;
@@ -135,7 +136,10 @@ async function getIgdbAccessToken() {
   url.searchParams.set("client_secret", env.IGDB_CLIENT_SECRET);
   url.searchParams.set("grant_type", "client_credentials");
 
-  const response = await fetch(url, { method: "POST" });
+  const response = await fetch(url, {
+    method: "POST",
+    signal: AbortSignal.timeout(IGDB_REQUEST_TIMEOUT_MS),
+  });
   if (!response.ok) {
     throw new Error("igdb_auth_failed");
   }
@@ -167,6 +171,7 @@ async function igdbRequest<TResponse>(url: string, body: string) {
       "Client-ID": env.IGDB_CLIENT_ID,
     },
     body,
+    signal: AbortSignal.timeout(IGDB_REQUEST_TIMEOUT_MS),
   });
 
   if (!response.ok) {

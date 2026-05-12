@@ -57,7 +57,7 @@ export function GameSuggestForm({
   const missingBalance = hasInsufficientBalance
     ? creationCost - (viewerBalance ?? 0)
     : 0;
-  const isSubmitDisabled = isPending || hasInsufficientBalance || !selectedGame;
+  const isSubmitDisabled = isPending || hasInsufficientBalance;
   const canShowSearchResults =
     searchResults.length > 0 && !selectedGame && name.trim().length >= 2;
 
@@ -148,11 +148,6 @@ export function GameSuggestForm({
 
     if (hasInsufficientBalance) {
       setFeedback(`Faltam ${formatPipetz(missingBalance)} para criar uma sugestão.`);
-      return;
-    }
-
-    if (!selectedGame) {
-      setFeedback("Escolha um jogo reconhecido pelo IGDB antes de enviar.");
       return;
     }
 
@@ -261,7 +256,7 @@ export function GameSuggestForm({
 
             {searchFailed ? (
               <p className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
-                busca indisponível; tente novamente antes de enviar
+                busca indisponivel; voce ainda pode enviar pelo nome
               </p>
             ) : null}
 
