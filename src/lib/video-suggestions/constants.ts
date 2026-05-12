@@ -1,0 +1,1 @@
+export const VIDEO_SUGGESTION_CREATION_COST = 200;

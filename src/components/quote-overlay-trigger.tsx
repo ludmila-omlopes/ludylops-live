@@ -6,8 +6,6 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { formatPipetz } from "@/lib/utils";
 
-const QUOTE_OVERLAY_COST = 50;
-
 function mapError(message: string) {
   switch (message) {
     case "Unauthorized":
@@ -32,17 +30,19 @@ export function QuoteOverlayTrigger({
   loggedIn,
   canShow,
   viewerBalance,
+  quoteOverlayCost,
 }: {
   quoteId: number;
   loggedIn: boolean;
   canShow: boolean;
   viewerBalance?: number | null;
+  quoteOverlayCost: number;
 }) {
   const router = useRouter();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const hasBalance = typeof viewerBalance === "number" && viewerBalance >= QUOTE_OVERLAY_COST;
+  const hasBalance = typeof viewerBalance === "number" && viewerBalance >= quoteOverlayCost;
 
   function handleShow() {
     setFeedback(null);
@@ -101,11 +101,11 @@ export function QuoteOverlayTrigger({
         variant="info"
         size="sm"
       >
-        {isPending ? "Enviando..." : `Mostrar no OBS (-${formatPipetz(QUOTE_OVERLAY_COST)})`}
+        {isPending ? "Enviando..." : `Mostrar no OBS (-${formatPipetz(quoteOverlayCost)})`}
       </Button>
       {!hasBalance ? (
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-ink-soft)]">
-          faltam {formatPipetz(Math.max(QUOTE_OVERLAY_COST - (viewerBalance ?? 0), 0))} pipetz
+          faltam {formatPipetz(Math.max(quoteOverlayCost - (viewerBalance ?? 0), 0))} pipetz
         </p>
       ) : null}
       {feedback ? (

@@ -2,6 +2,8 @@ import { AdminObsOverlaysPanel } from "@/components/admin-obs-overlays-panel";
 import { AdminBetsPanel } from "@/components/admin-bets-panel";
 import { DeathCounterGamePanel } from "@/components/death-counter-game-panel";
 import { AdminGameSuggestionsPanel } from "@/components/admin-game-suggestions-panel";
+import { AdminVideoSuggestionsPanel } from "@/components/admin-video-suggestions-panel";
+import { AdminPipetzPricingPanel } from "@/components/admin-pipetz-pricing-panel";
 import { AdminRecommendationsPanel } from "@/components/admin-recommendations-panel";
 import { AdminViewerLinksPanel } from "@/components/admin-viewer-links-panel";
 import { RedemptionGrid } from "@/components/redemption-grid";
@@ -13,8 +15,10 @@ import {
   getCatalog,
   getLeaderboard,
   getObsOverlayAdminStatus,
+  getPipetzPricing,
   listAdminViewerDirectory,
   listAdminGameSuggestions,
+  listAdminVideoSuggestions,
   listAdminProductRecommendations,
   listAdminBets,
   listAdminRedemptions,
@@ -33,7 +37,7 @@ const statusColorMap: Record<string, string> = {
 
 export default async function AdminPage() {
   await requireAdminSession();
-  const [catalog, leaderboard, bridge, liveStatus, activeDeathCounterGame, redemptions, bets, suggestions, recommendations, viewers, obsOverlayStatus] = await Promise.all([
+  const [catalog, leaderboard, bridge, liveStatus, activeDeathCounterGame, redemptions, bets, suggestions, videoSuggestions, recommendations, viewers, obsOverlayStatus, pricing] = await Promise.all([
     getCatalog(),
     getLeaderboard(),
     getBridgeStatus(),
@@ -42,9 +46,11 @@ export default async function AdminPage() {
     listAdminRedemptions(),
     listAdminBets(),
     listAdminGameSuggestions(),
+    listAdminVideoSuggestions(),
     listAdminProductRecommendations(),
     listAdminViewerDirectory(),
     getObsOverlayAdminStatus(),
+    getPipetzPricing(),
   ]);
 
   return (
@@ -68,6 +74,7 @@ export default async function AdminPage() {
           <div className="space-y-6">
             <LiveStatusPanel bridge={bridge} initialStatus={liveStatus} />
             <DeathCounterGamePanel initialGame={activeDeathCounterGame} />
+            <AdminPipetzPricingPanel initialPricing={pricing} />
           </div>
           <div className="panel surface-section p-6">
             <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
@@ -119,6 +126,7 @@ export default async function AdminPage() {
       <AdminBetsPanel bets={bets} />
       <AdminViewerLinksPanel entries={viewers} />
       <AdminGameSuggestionsPanel suggestions={suggestions} />
+      <AdminVideoSuggestionsPanel suggestions={videoSuggestions} />
       <AdminRecommendationsPanel recommendations={recommendations} />
     </div>
   );

@@ -225,6 +225,35 @@ export const gameSuggestionBoosts = pgTable("game_suggestion_boosts", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const videoSuggestions = pgTable("video_suggestions", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  viewerId: varchar("viewer_id", { length: 64 })
+    .references(() => users.id)
+    .notNull(),
+  youtubeVideoId: varchar("youtube_video_id", { length: 32 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  creatorName: varchar("creator_name", { length: 255 }).notNull(),
+  thumbnailUrl: text("thumbnail_url").notNull(),
+  videoUrl: text("video_url").notNull(),
+  reason: text("reason"),
+  status: varchar("status", { length: 32 }).notNull(),
+  totalVotes: integer("total_votes").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const videoSuggestionBoosts = pgTable("video_suggestion_boosts", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  suggestionId: varchar("suggestion_id", { length: 64 })
+    .references(() => videoSuggestions.id)
+    .notNull(),
+  viewerId: varchar("viewer_id", { length: 64 })
+    .references(() => users.id)
+    .notNull(),
+  amount: integer("amount").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const productRecommendations = pgTable(
   "product_recommendations",
   {

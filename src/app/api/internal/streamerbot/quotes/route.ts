@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { runQuoteCommandFromChat } from "@/lib/db/repository";
+import { getPipetzPricing, runQuoteCommandFromChat } from "@/lib/db/repository";
 import { env } from "@/lib/env";
 import { streamerbotQuoteCommandSchema } from "@/lib/streamerbot/schemas";
 import { verifySignedRequest } from "@/lib/streamerbot/security";
@@ -9,7 +9,7 @@ function formatQuoteReply(input: { quoteNumber: number; body: string }) {
   return `Quote #${input.quoteNumber}: "${input.body}"`;
 }
 
-function mapChatQuoteReply(input: {
+async function mapChatQuoteReply(input: {
   message: string;
   action?: "create" | "get" | "show";
   quoteId?: number;
@@ -33,7 +33,7 @@ function mapChatQuoteReply(input: {
     case "livestream_not_live":
       return "Essa quote so pode ir para o OBS enquanto a live estiver acontecendo.";
     case "saldo_insuficiente":
-      return `${prefix}você precisa de 50 pipetz para colocar a quote no OBS.`;
+      return `${prefix}você precisa de ${(await getPipetzPricing()).quoteOverlayCost} pipetz para colocar a quote no OBS.`;
     case "quote_overlay_busy":
       return "Ja tem uma quote ocupando o overlay. Tenta de novo em alguns segundos.";
     default:
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         error: message,
-        replyMessage: mapChatQuoteReply({
+        replyMessage: await mapChatQuoteReply({
           message,
           action: context.action,
           quoteId: context.quoteId,

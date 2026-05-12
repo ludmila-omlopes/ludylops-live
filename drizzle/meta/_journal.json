@@ -57,6 +57,13 @@
       "when": 1778428800000,
       "tag": "0007_game_suggestion_igdb_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778530912160,
+      "tag": "0008_video_suggestions",
+      "breakpoints": true
     }
   ]
 }

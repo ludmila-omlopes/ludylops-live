@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getViewerDashboard, listQuotes } from "@/lib/db/repository";
+import { getPipetzPricing, getViewerDashboard, listQuotes } from "@/lib/db/repository";
 import { cn, formatDateTime, formatPipetz } from "@/lib/utils";
 
 const quoteCardBackgrounds = [
@@ -27,9 +27,10 @@ function usesPastelQuoteBackground(bgClass: string) {
 export default async function QuotesPage() {
   const session = await auth();
   const activeViewerId = session?.user?.activeViewerId ?? null;
-  const [quotes, dashboard] = await Promise.all([
+  const [quotes, dashboard, pricing] = await Promise.all([
     listQuotes(),
     activeViewerId ? getViewerDashboard(activeViewerId) : Promise.resolve(null),
+    getPipetzPricing(),
   ]);
   const canShowOnOverlay = Boolean(activeViewerId);
 
@@ -53,7 +54,7 @@ export default async function QuotesPage() {
               número da quote e quem registrou.
             </p>
             <p className="mt-3 inline-flex items-center gap-2 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[var(--color-ink)] shadow-[4px_4px_0_var(--shadow-color)]">
-              Mostrar no OBS custa {formatPipetz(50)} pipetz
+              Mostrar no OBS custa {formatPipetz(pricing.quoteOverlayCost)} pipetz
             </p>
           </div>
         </div>
@@ -121,6 +122,7 @@ export default async function QuotesPage() {
                         loggedIn={Boolean(session?.user)}
                         canShow={canShowOnOverlay}
                         viewerBalance={dashboard?.balance.currentBalance}
+                        quoteOverlayCost={pricing.quoteOverlayCost}
                       />
                     </CardFooter>
                   </Card>
