@@ -16,6 +16,8 @@ export type LedgerKind =
   | "bet_refund"
   | "game_suggestion_creation"
   | "game_suggestion_boost"
+  | "video_suggestion_creation"
+  | "video_suggestion_boost"
   | "quote_overlay_debit";
 
 export type BetStatus =
@@ -41,6 +43,12 @@ export type GameSuggestionStatus =
   | "open"
   | "accepted"
   | "played"
+  | "rejected";
+
+export type VideoSuggestionStatus =
+  | "open"
+  | "accepted"
+  | "reacted"
   | "rejected";
 
 export type ProductRecommendationCategory =
@@ -277,6 +285,14 @@ export interface ObsOverlayAdminStatusRecord {
   failedCount: number;
 }
 
+export interface PipetzPricingRecord {
+  gameSuggestionCost: number;
+  videoSuggestionCost: number;
+  quoteOverlayCost: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
 export interface StreamerbotCounterRecord {
   key: string;
   scopeType: string;
@@ -397,6 +413,35 @@ export interface GameSuggestionBoostRecord {
 }
 
 export interface GameSuggestionWithMeta extends GameSuggestionRecord {
+  suggestedBy: string;
+  suggestedByYoutubeHandle: string | null;
+  viewerBoostTotal: number;
+}
+
+export interface VideoSuggestionRecord {
+  id: string;
+  viewerId: string;
+  youtubeVideoId: string;
+  title: string;
+  creatorName: string;
+  thumbnailUrl: string;
+  videoUrl: string;
+  reason: string | null;
+  status: VideoSuggestionStatus;
+  totalVotes: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VideoSuggestionBoostRecord {
+  id: string;
+  suggestionId: string;
+  viewerId: string;
+  amount: number;
+  createdAt: string;
+}
+
+export interface VideoSuggestionWithMeta extends VideoSuggestionRecord {
   suggestedBy: string;
   suggestedByYoutubeHandle: string | null;
   viewerBoostTotal: number;

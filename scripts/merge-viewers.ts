@@ -214,7 +214,7 @@ async function main() {
     );
   }
 
-  const [ledgerCounts, redemptionCounts, betCounts, suggestionCounts, boostCounts] =
+  const [ledgerCounts, redemptionCounts, betCounts, suggestionCounts, boostCounts, videoSuggestionCounts, videoBoostCounts] =
     await Promise.all([
       sql`
         SELECT COUNT(*)::int AS count
@@ -241,6 +241,16 @@ async function main() {
         FROM game_suggestion_boosts
         WHERE viewer_id = ${sourceViewer.id}
       `,
+      sql`
+        SELECT COUNT(*)::int AS count
+        FROM video_suggestions
+        WHERE viewer_id = ${sourceViewer.id}
+      `,
+      sql`
+        SELECT COUNT(*)::int AS count
+        FROM video_suggestion_boosts
+        WHERE viewer_id = ${sourceViewer.id}
+      `,
     ]);
 
   const summary = {
@@ -260,6 +270,8 @@ async function main() {
       betEntries: betCounts[0]?.count ?? 0,
       gameSuggestions: suggestionCounts[0]?.count ?? 0,
       gameSuggestionBoosts: boostCounts[0]?.count ?? 0,
+      videoSuggestions: videoSuggestionCounts[0]?.count ?? 0,
+      videoSuggestionBoosts: videoBoostCounts[0]?.count ?? 0,
     },
   };
 
@@ -286,6 +298,8 @@ async function main() {
       txn`UPDATE bet_entries SET viewer_id = ${targetViewer.id} WHERE viewer_id = ${sourceViewer.id}`,
       txn`UPDATE game_suggestions SET viewer_id = ${targetViewer.id} WHERE viewer_id = ${sourceViewer.id}`,
       txn`UPDATE game_suggestion_boosts SET viewer_id = ${targetViewer.id} WHERE viewer_id = ${sourceViewer.id}`,
+      txn`UPDATE video_suggestions SET viewer_id = ${targetViewer.id} WHERE viewer_id = ${sourceViewer.id}`,
+      txn`UPDATE video_suggestion_boosts SET viewer_id = ${targetViewer.id} WHERE viewer_id = ${sourceViewer.id}`,
       txn`
         UPDATE google_accounts
         SET active_viewer_id = ${targetViewer.id}

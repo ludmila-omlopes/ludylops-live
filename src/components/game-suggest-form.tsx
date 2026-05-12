@@ -19,10 +19,10 @@ type GameSearchResult = {
   genres: string[];
 };
 
-function mapSuggestionError(message: string) {
+function mapSuggestionError(message: string, creationCost: number) {
   switch (message) {
     case "saldo_insuficiente":
-      return `Você precisa de ${formatPipetz(GAME_SUGGESTION_CREATION_COST)} para criar uma sugestão.`;
+      return `Você precisa de ${formatPipetz(creationCost)} para criar uma sugestão.`;
     case "suggestion_already_exists":
       return "Esse jogo já está na lista aberta.";
     case "invalid_name":
@@ -36,10 +36,12 @@ export function GameSuggestForm({
   loggedIn = false,
   canSuggest = false,
   viewerBalance,
+  creationCost = GAME_SUGGESTION_CREATION_COST,
 }: {
   loggedIn?: boolean;
   canSuggest?: boolean;
   viewerBalance?: number | null;
+  creationCost?: number;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -51,9 +53,9 @@ export function GameSuggestForm({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const hasInsufficientBalance =
-    typeof viewerBalance === "number" && viewerBalance < GAME_SUGGESTION_CREATION_COST;
+    typeof viewerBalance === "number" && viewerBalance < creationCost;
   const missingBalance = hasInsufficientBalance
-    ? GAME_SUGGESTION_CREATION_COST - (viewerBalance ?? 0)
+    ? creationCost - (viewerBalance ?? 0)
     : 0;
   const isSubmitDisabled = isPending || hasInsufficientBalance || !selectedGame;
   const canShowSearchResults =
@@ -175,7 +177,7 @@ export function GameSuggestForm({
 
       const payload = (await response.json()) as { ok: boolean; error?: string };
       if (!response.ok || !payload.ok) {
-        setFeedback(mapSuggestionError(payload.error ?? "Falha ao enviar sugestão."));
+        setFeedback(mapSuggestionError(payload.error ?? "Falha ao enviar sugestão.", creationCost));
         return;
       }
 
@@ -183,7 +185,7 @@ export function GameSuggestForm({
       setDescription("");
       setSelectedGame(null);
       setSearchResults([]);
-      setFeedback(`Sugestão enviada. ${formatPipetz(GAME_SUGGESTION_CREATION_COST)} debitados.`);
+      setFeedback(`Sugestão enviada. ${formatPipetz(creationCost)} debitados.`);
       router.refresh();
     });
   }
@@ -210,7 +212,7 @@ export function GameSuggestForm({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="retro-label accent-chip !rounded-none !border !shadow-none">
-              custa {formatPipetz(GAME_SUGGESTION_CREATION_COST)}
+              custa {formatPipetz(creationCost)}
             </span>
             {typeof viewerBalance === "number" ? (
               <span className="retro-label neutral-chip !rounded-none !border !shadow-none">
@@ -310,7 +312,7 @@ export function GameSuggestForm({
           >
             {isPending
               ? "Enviando..."
-              : `Enviar sugestão por ${formatPipetz(GAME_SUGGESTION_CREATION_COST)}`}
+              : `Enviar sugestão por ${formatPipetz(creationCost)}`}
           </Button>
         </div>
 

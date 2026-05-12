@@ -16,6 +16,9 @@ public class CPHInline
         "display",
         "displayName",
         "authorName",
+        "userName",
+        "username",
+        "userLogin",
         "targetUser",
         "user",
     };
@@ -24,6 +27,18 @@ public class CPHInline
     {
         "counterAction",
         "action",
+    };
+
+    private static readonly string[] CommandNameArgCandidates = new[]
+    {
+        "command",
+        "commandName",
+    };
+
+    private static readonly string[] CommandPatternArgCandidates = new[]
+    {
+        "command",
+        "commandName",
     };
 
     private static readonly string[] AmountArgCandidates = new[]
@@ -62,9 +77,21 @@ public class CPHInline
         string appBaseUrl = ReadRequiredGlobal("lojaneon.appBaseUrl");
         string sharedSecret = ReadRequiredGlobal("lojaneon.streamerbotSharedSecret");
         bool useBotAccount = ReadOptionalBoolGlobal("lojaneon.useBotAccount", true);
+        bool debugLogging = ReadOptionalBoolGlobal("lojaneon.debugDeathCounter", true);
 
         if (string.IsNullOrWhiteSpace(appBaseUrl) || string.IsNullOrWhiteSpace(sharedSecret))
         {
+            return false;
+        }
+
+        string endpointUrl = BuildEndpointUrl(appBaseUrl);
+        if (string.IsNullOrWhiteSpace(endpointUrl))
+        {
+            CPH.LogError(string.Format(
+                "[Loja Neon] appBaseUrl invalida para contador de mortes: {0}",
+                appBaseUrl ?? "<null>"
+            ));
+            Reply("Nao consegui atualizar o contador agora.", useBotAccount);
             return false;
         }
 
@@ -72,7 +99,11 @@ public class CPHInline
         string action = ResolveAction(rawCommand);
         if (string.IsNullOrWhiteSpace(action))
         {
-            Reply("Comando invalido. Use !morte+, !morte- ou !mortes.", useBotAccount);
+            CPH.LogWarn(string.Format(
+                "[Loja Neon] Nao foi possivel resolver a action do contador. {0}",
+                BuildDiagnosticsSummary(rawCommand, string.Empty, 0, string.Empty, string.Empty)
+            ));
+            Reply("Comando invalido. Use !death+, !death- ou !deaths.", useBotAccount);
             return false;
         }
 
@@ -84,15 +115,26 @@ public class CPHInline
         string timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
         string signature = BuildSignature(body, timestamp, sharedSecret);
 
+        if (debugLogging)
+        {
+            CPH.LogInfo(string.Format(
+                "[Loja Neon] Preparando envio do contador de mortes. endpoint={0}; {1}; body={2}",
+                endpointUrl,
+                BuildDiagnosticsSummary(rawCommand, action, amount, scopeKey, scopeLabel),
+                TruncateForLog(body, 600)
+            ));
+        }
+
         try
         {
             using (var request = new HttpRequestMessage(
                 HttpMethod.Post,
-                string.Format("{0}/api/internal/streamerbot/deaths", appBaseUrl.TrimEnd('/'))
+                endpointUrl
             ))
             {
                 request.Headers.TryAddWithoutValidation("x-timestamp", timestamp);
                 request.Headers.TryAddWithoutValidation("x-signature", signature);
+                request.Headers.TryAddWithoutValidation("x-source", "streamerbot");
                 request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
                 using (HttpResponseMessage response = Http.SendAsync(request).GetAwaiter().GetResult())
@@ -112,9 +154,20 @@ public class CPHInline
                     if (!response.IsSuccessStatusCode)
                     {
                         CPH.LogWarn(string.Format(
-                            "[Loja Neon] Falha ao chamar contador de mortes: HTTP {0} - {1}",
+                            "[Loja Neon] Falha ao chamar contador de mortes: HTTP {0}; endpoint={1}; {2}; response={3}",
                             (int)response.StatusCode,
-                            responseText
+                            endpointUrl,
+                            BuildDiagnosticsSummary(rawCommand, action, amount, scopeKey, scopeLabel),
+                            TruncateForLog(responseText, 600)
+                        ));
+                    }
+                    else if (debugLogging)
+                    {
+                        CPH.LogInfo(string.Format(
+                            "[Loja Neon] Contador de mortes processado com sucesso: HTTP {0}; endpoint={1}; response={2}",
+                            (int)response.StatusCode,
+                            endpointUrl,
+                            TruncateForLog(responseText, 600)
                         ));
                     }
 
@@ -124,7 +177,12 @@ public class CPHInline
         }
         catch (Exception ex)
         {
-            CPH.LogError(string.Format("[Loja Neon] Erro ao chamar API de contadores: {0}", ex));
+            CPH.LogError(string.Format(
+                "[Loja Neon] Erro ao chamar API de contadores. endpoint={0}; {1}; exception={2}",
+                endpointUrl,
+                BuildDiagnosticsSummary(rawCommand, action, amount, scopeKey, scopeLabel),
+                ex
+            ));
             Reply("Nao consegui atualizar o contador agora.", useBotAccount);
             return false;
         }
@@ -143,7 +201,37 @@ public class CPHInline
             return explicitAction;
         }
 
-        string commandName = GetCommandName(rawCommand);
+        string commandName = GetFirstArgString(CommandNameArgCandidates);
+        if (!string.IsNullOrWhiteSpace(commandName))
+        {
+            string actionFromCommandArg = ResolveActionFromCommandName(commandName);
+            if (!string.IsNullOrWhiteSpace(actionFromCommandArg))
+            {
+                return actionFromCommandArg;
+            }
+        }
+
+        string commandPattern = GetFirstArgString(CommandPatternArgCandidates);
+        if (!string.IsNullOrWhiteSpace(commandPattern))
+        {
+            string actionFromPattern = ResolveActionFromPattern(commandPattern);
+            if (!string.IsNullOrWhiteSpace(actionFromPattern))
+            {
+                return actionFromPattern;
+            }
+        }
+
+        commandName = GetCommandName(rawCommand);
+        return ResolveActionFromCommandName(commandName);
+    }
+
+    private string ResolveActionFromCommandName(string commandName)
+    {
+        if (string.IsNullOrWhiteSpace(commandName))
+        {
+            return string.Empty;
+        }
+
         switch (commandName)
         {
             case "!morte+":
@@ -158,6 +246,32 @@ public class CPHInline
             default:
                 return string.Empty;
         }
+    }
+
+    private string ResolveActionFromPattern(string commandPattern)
+    {
+        if (string.IsNullOrWhiteSpace(commandPattern))
+        {
+            return string.Empty;
+        }
+
+        string normalized = commandPattern.Trim().ToLowerInvariant();
+        if (ContainsCommandToken(normalized, "!death+") || ContainsCommandToken(normalized, "!morte+"))
+        {
+            return "increment";
+        }
+
+        if (ContainsCommandToken(normalized, "!death-") || ContainsCommandToken(normalized, "!morte-"))
+        {
+            return "decrement";
+        }
+
+        if (ContainsCommandToken(normalized, "!deaths") || ContainsCommandToken(normalized, "!mortes"))
+        {
+            return "get";
+        }
+
+        return string.Empty;
     }
 
     private int ResolveAmount(string rawCommand)
@@ -280,6 +394,48 @@ public class CPHInline
         return GetFirstArgString(CommandPayloadArgCandidates) ?? string.Empty;
     }
 
+    private string BuildEndpointUrl(string appBaseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(appBaseUrl))
+        {
+            return string.Empty;
+        }
+
+        string trimmed = appBaseUrl.Trim();
+        if (!trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return string.Format("{0}/api/internal/streamerbot/deaths", trimmed.TrimEnd('/'));
+    }
+
+    private string BuildDiagnosticsSummary(
+        string rawCommand,
+        string action,
+        int amount,
+        string scopeKey,
+        string scopeLabel
+    )
+    {
+        return string.Format(
+            "isTest={0}; trigger={1}; source={2}; command={3}; rawInput={4}; input0={5}; amountArg={6}; resolvedAction={7}; resolvedAmount={8}; requestedBy={9}; scopeKey={10}; scopeLabel={11}",
+            GetArgString("isTest") ?? "<null>",
+            GetArgString("triggerName") ?? "<null>",
+            GetArgString("commandSource") ?? GetArgString("source") ?? "<null>",
+            TruncateForLog(GetFirstArgString(CommandNameArgCandidates) ?? string.Empty, 120),
+            TruncateForLog(rawCommand ?? string.Empty, 120),
+            TruncateForLog(GetArgString("input0") ?? string.Empty, 120),
+            GetArgString("amount") ?? "<null>",
+            string.IsNullOrWhiteSpace(action) ? "<null>" : action,
+            amount,
+            TruncateForLog(GetFirstArgString(RequestedByArgCandidates) ?? string.Empty, 120),
+            string.IsNullOrWhiteSpace(scopeKey) ? "<global>" : scopeKey,
+            string.IsNullOrWhiteSpace(scopeLabel) ? "<null>" : TruncateForLog(scopeLabel, 120)
+        );
+    }
+
     private string GetCommandName(string rawCommand)
     {
         if (string.IsNullOrWhiteSpace(rawCommand))
@@ -337,6 +493,16 @@ public class CPHInline
         }
 
         return value.Trim().ToLowerInvariant().Replace(" ", "_");
+    }
+
+    private bool ContainsCommandToken(string haystack, string token)
+    {
+        if (string.IsNullOrWhiteSpace(haystack) || string.IsNullOrWhiteSpace(token))
+        {
+            return false;
+        }
+
+        return haystack.Contains(token) || haystack.Contains(token.Replace("+", "\\+"));
     }
 
     private string GetArgString(string argName)
@@ -524,5 +690,20 @@ public class CPHInline
             .Replace("\\r", "\r")
             .Replace("\\n", "\n")
             .Replace("\\t", "\t");
+    }
+
+    private string TruncateForLog(string value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        if (value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return value.Substring(0, maxLength) + "...";
     }
 }

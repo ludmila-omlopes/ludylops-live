@@ -58,12 +58,15 @@ import {
   viewerBalances,
 } from "@/lib/db/schema";
 import { GAME_SUGGESTION_CREATION_COST } from "@/lib/game-suggestions/constants";
+import { VIDEO_SUGGESTION_CREATION_COST } from "@/lib/video-suggestions/constants";
 import {
   adminLinkGoogleViewerToYoutubeViewer,
   boostGameSuggestion,
+  boostVideoSuggestion,
   cancelBet,
   createBet,
   createGameSuggestion,
+  createVideoSuggestion,
   createProductRecommendationFromInput,
   deleteProductRecommendation,
   applyGoogleCrossAccountProtectionEvent,
@@ -82,6 +85,7 @@ import {
   listBets,
   listGameSuggestions,
   listAdminGameSuggestions,
+  listVideoSuggestions,
   listStreamerbotCounters,
   listViewerChannelsForGoogleAccount,
   lockBet,
@@ -99,6 +103,7 @@ import {
   showQuoteOverlayForViewer,
   cancelQueuedQuoteOverlays,
   updateGameSuggestionStatus,
+  updateVideoSuggestionStatus,
 } from "@/lib/db/repository";
 import { GOOGLE_RISC_EVENT_TYPES } from "@/lib/google/risc";
 
@@ -2018,6 +2023,91 @@ describe("game suggestions", () => {
 
     const suggestions = await listAdminGameSuggestions();
     expect(suggestions.find((entry) => entry.id === "gs-4")?.status).toBe("accepted");
+  });
+});
+
+describe("video suggestions", () => {
+  beforeEach(() => {
+    getDbMock.mockReset();
+    getDbMock.mockReturnValue(null);
+    delete (globalThis as typeof globalThis & { __lojaDemoStore?: unknown }).__lojaDemoStore;
+  });
+
+  it("creates a new video suggestion in demo mode", async () => {
+    const before = await getViewerDashboard("viewer_ana");
+    expect(before).not.toBeNull();
+    const beforeBalance = before?.balance.currentBalance ?? 0;
+    const beforeSpent = before?.balance.lifetimeSpent ?? 0;
+
+    const created = await createVideoSuggestion({
+      viewerId: "viewer_ana",
+      youtubeVideoId: "abc123DEF45",
+      title: "Um video pra reagir",
+      creatorName: "Canal Legal",
+      thumbnailUrl: "https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg",
+      videoUrl: "https://www.youtube.com/watch?v=abc123DEF45",
+      reason: "Tem uma virada absurda no final.",
+      source: "web",
+    });
+
+    expect(created).toMatchObject({
+      youtubeVideoId: "abc123DEF45",
+      title: "Um video pra reagir",
+      creatorName: "Canal Legal",
+      status: "open",
+      totalVotes: 0,
+      suggestedBy: "Ana Neon",
+    });
+
+    const suggestions = await listVideoSuggestions("viewer_ana");
+    expect(suggestions.some((entry) => entry.youtubeVideoId === "abc123DEF45")).toBe(true);
+
+    const after = await getViewerDashboard("viewer_ana");
+    expect(after?.balance.currentBalance).toBe(beforeBalance - VIDEO_SUGGESTION_CREATION_COST);
+    expect(after?.balance.lifetimeSpent).toBe(beforeSpent + VIDEO_SUGGESTION_CREATION_COST);
+  });
+
+  it("rejects duplicate open video suggestions", async () => {
+    await expect(
+      createVideoSuggestion({
+        viewerId: "viewer_caio",
+        youtubeVideoId: "dQw4w9WgXcQ",
+        title: "Duplicado",
+        creatorName: "Rick Astley",
+        thumbnailUrl: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+        videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      }),
+    ).rejects.toThrow("suggestion_already_exists");
+  });
+
+  it("spends balance and increases votes when boosting", async () => {
+    const before = await getViewerDashboard("viewer_ana");
+    expect(before).not.toBeNull();
+    const beforeBalance = before?.balance.currentBalance ?? 0;
+    const beforeSpent = before?.balance.lifetimeSpent ?? 0;
+
+    const updated = await boostVideoSuggestion({
+      suggestionId: "vs-1",
+      viewerId: "viewer_ana",
+      amount: 80,
+      source: "web",
+    });
+
+    expect(updated.totalVotes).toBe(980);
+    expect(updated.viewerBoostTotal).toBe(80);
+
+    const after = await getViewerDashboard("viewer_ana");
+    expect(after?.balance.currentBalance).toBe(beforeBalance - 80);
+    expect(after?.balance.lifetimeSpent).toBe(beforeSpent + 80);
+  });
+
+  it("lets the admin update the video suggestion status", async () => {
+    const updated = await updateVideoSuggestionStatus({
+      suggestionId: "vs-1",
+      status: "reacted",
+    });
+
+    expect(updated.status).toBe("reacted");
   });
 });
 

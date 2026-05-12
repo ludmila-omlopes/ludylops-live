@@ -58,6 +58,7 @@ export function AppChrome({
     { href: "/apostas", label: "Apostas" },
     { href: "/contadores", label: "Contadores" },
     { href: "/jogos", label: "Jogos" },
+    { href: "/videos", label: "Videos" },
     { href: "/quotes", label: "Quotes" },
     { href: "/ranking", label: "Ranking" },
   ];

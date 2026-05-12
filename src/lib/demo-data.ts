@@ -13,6 +13,8 @@ import {
   QuoteRecord,
   ProductRecommendationRecord,
   RedemptionRecord,
+  VideoSuggestionBoostRecord,
+  VideoSuggestionRecord,
   ViewerBalanceRecord,
   ViewerRecord,
 } from "@/lib/types";
@@ -472,3 +474,36 @@ export const demoGameSuggestions: GameSuggestionRecord[] = [
 ];
 
 export const demoGameSuggestionBoosts: GameSuggestionBoostRecord[] = [];
+
+export const demoVideoSuggestions: VideoSuggestionRecord[] = [
+  {
+    id: "vs-1",
+    viewerId: "viewer_ana",
+    youtubeVideoId: "dQw4w9WgXcQ",
+    title: "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)",
+    creatorName: "Rick Astley",
+    thumbnailUrl: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+    videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    reason: "Classico absoluto pra reagir com o chat.",
+    totalVotes: 900,
+    status: "open",
+    createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 30).toISOString(),
+    updatedAt: new Date(now.getTime() - 1000 * 60 * 35).toISOString(),
+  },
+  {
+    id: "vs-2",
+    viewerId: "viewer_caio",
+    youtubeVideoId: "M7lc1UVf-VE",
+    title: "YouTube Developers Live: Embedded Web Player Customization",
+    creatorName: "Google for Developers",
+    thumbnailUrl: "https://i.ytimg.com/vi/M7lc1UVf-VE/hqdefault.jpg",
+    videoUrl: "https://www.youtube.com/watch?v=M7lc1UVf-VE",
+    reason: "Quero ver voce comentando o caos tecnico disso.",
+    totalVotes: 520,
+    status: "accepted",
+    createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 18).toISOString(),
+    updatedAt: new Date(now.getTime() - 1000 * 60 * 60 * 3).toISOString(),
+  },
+];
+
+export const demoVideoSuggestionBoosts: VideoSuggestionBoostRecord[] = [];
