@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircle2, Lock, Plus, XCircle } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -15,8 +16,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { validateCreateBetDraft } from "@/lib/bets/admin";
 import { evaluateBetLifecycleAction } from "@/lib/bets/service";
-import type { BetWithOptionsRecord } from "@/lib/types";
-import { formatPipetz } from "@/lib/utils";
+import type { BetStatus, BetWithOptionsRecord } from "@/lib/types";
+import { cn, formatDateTime, formatPipetz } from "@/lib/utils";
 
 function toLocalDateTimeInput(value: string) {
   const date = new Date(value);
@@ -47,7 +48,57 @@ function mapAdminBetError(message: string) {
   }
 }
 
-export function AdminBetsPanel({ bets }: { bets: BetWithOptionsRecord[] }) {
+const statusLabels: Record<BetStatus, string> = {
+  draft: "Rascunho",
+  open: "Aberta",
+  locked: "Travada",
+  resolved: "Resolvida",
+  cancelled: "Cancelada",
+};
+
+const statusTone: Record<BetStatus, string> = {
+  draft: "bg-[var(--color-paper)]",
+  open: "bg-[var(--color-mint)]",
+  locked: "bg-[var(--color-sky)]",
+  resolved: "bg-[var(--color-lavender)]",
+  cancelled: "bg-[var(--color-rose)]",
+};
+
+function lifecycleRows(bet: BetWithOptionsRecord) {
+  return [
+    { label: "Criada", value: bet.createdAt },
+    { label: "Aberta", value: bet.openedAt },
+    { label: "Fecha", value: bet.closesAt },
+    { label: "Travada", value: bet.lockedAt },
+    { label: "Resolvida", value: bet.resolvedAt },
+    { label: "Cancelada", value: bet.cancelledAt },
+  ];
+}
+
+function Metric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="card-brutal-static bg-[var(--color-paper)] p-3">
+      <p className="mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-ink-soft)]">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-black text-[var(--color-ink)]">{value}</p>
+    </div>
+  );
+}
+
+export function AdminBetsPanel({
+  bets,
+  embedded = false,
+}: {
+  bets: BetWithOptionsRecord[];
+  embedded?: boolean;
+}) {
   const router = useRouter();
   const [question, setQuestion] = useState("");
   const [closesAt, setClosesAt] = useState("");
@@ -134,7 +185,7 @@ export function AdminBetsPanel({ bets }: { bets: BetWithOptionsRecord[] }) {
     startTransition(async () => {
       try {
         await runAction(url, body);
-        setFeedback("Operacao concluida.");
+        setFeedback("Operação concluída.");
         router.refresh();
       } catch (error) {
         setFeedback(
@@ -144,29 +195,21 @@ export function AdminBetsPanel({ bets }: { bets: BetWithOptionsRecord[] }) {
     });
   }
 
-  return (
-    <section className="landing-plane landing-divider bg-[var(--color-mint)] py-8 text-[var(--color-accent-ink)] sm:py-10">
-      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-accent-ink-soft)]">
-            Apostas
-          </p>
-          <h2
-            className="mt-2 text-3xl uppercase"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Operacao da live
-          </h2>
-        </div>
-        {feedback ? (
-          <div className="retro-label neutral-chip">
-            {feedback}
-          </div>
-        ) : null}
-      </div>
+  const openCount = bets.filter((bet) => bet.status === "open").length;
+  const lockedCount = bets.filter((bet) => bet.status === "locked").length;
+  const unresolvedPool = bets
+    .filter((bet) => bet.status === "open" || bet.status === "locked")
+    .reduce((sum, bet) => sum + bet.totalPool, 0);
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+  const content = (
+    <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Metric label="Abertas" value={String(openCount)} />
+          <Metric label="Travadas" value={String(lockedCount)} />
+          <Metric label="Em jogo" value={`${formatPipetz(unresolvedPool)} pipetz`} />
+        </div>
+
         <div className="card-brutal-static p-5">
           <p className="mono text-xs uppercase tracking-[0.24em] text-[var(--color-ink-soft)]">
             Nova aposta
@@ -178,7 +221,7 @@ export function AdminBetsPanel({ bets }: { bets: BetWithOptionsRecord[] }) {
               </span>
               <Input
                 value={question}
-                onChange={(e) => setQuestion(e.target.value)}
+                onChange={(event) => setQuestion(event.target.value)}
                 placeholder="Ex.: Ela passa o boss sem morrer?"
                 minLength={6}
                 maxLength={255}
@@ -196,12 +239,12 @@ export function AdminBetsPanel({ bets }: { bets: BetWithOptionsRecord[] }) {
               <Input
                 type="datetime-local"
                 value={closesAt}
-                onChange={(e) => setClosesAt(e.target.value)}
+                onChange={(event) => setClosesAt(event.target.value)}
                 min={minLocalDateTimeInput()}
                 className="px-3 py-2"
               />
               <span className="text-xs font-bold text-[var(--color-ink-soft)]">
-                Data e hora locais em que a janela de apostas fecha. Depois desse horário, ninguém mais consegue apostar.
+                Data e hora locais em que a janela fecha. Depois desse horário, ninguém mais consegue apostar.
               </span>
             </label>
 
@@ -211,7 +254,7 @@ export function AdminBetsPanel({ bets }: { bets: BetWithOptionsRecord[] }) {
               </span>
               <Textarea
                 value={optionsText}
-                onChange={(e) => setOptionsText(e.target.value)}
+                onChange={(event) => setOptionsText(event.target.value)}
                 rows={5}
                 maxLength={1550}
                 placeholder={"Sim\nNão"}
@@ -227,123 +270,248 @@ export function AdminBetsPanel({ bets }: { bets: BetWithOptionsRecord[] }) {
               onClick={handleCreate}
               disabled={isPending}
               size="sm"
-              className="w-full sm:w-fit"
+              className="w-full gap-2 sm:w-fit"
             >
+              <Plus className="size-4" />
               {isPending ? "Enviando..." : "Criar aposta"}
             </Button>
           </div>
         </div>
+      </div>
 
-        <div className="grid gap-3">
-          {bets.length === 0 ? (
-            <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
-              Nenhuma aposta cadastrada.
-            </div>
-          ) : null}
+      <div className="grid gap-4">
+        {bets.length === 0 ? (
+          <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
+            Nenhuma aposta cadastrada.
+          </div>
+        ) : null}
 
-          {bets.map((bet) => {
-            const canLock = evaluateBetLifecycleAction({ action: "lock", status: bet.status }).canTransition;
-            const canResolve = evaluateBetLifecycleAction({
-              action: "resolve",
-              status: bet.status,
-            }).canTransition;
-            const canCancel = evaluateBetLifecycleAction({ action: "cancel", status: bet.status }).canTransition;
+        {bets.map((bet) => {
+          const canLock = evaluateBetLifecycleAction({ action: "lock", status: bet.status }).canTransition;
+          const canResolve = evaluateBetLifecycleAction({
+            action: "resolve",
+            status: bet.status,
+          }).canTransition;
+          const canCancel = evaluateBetLifecycleAction({ action: "cancel", status: bet.status }).canTransition;
+          const winningOption = bet.options.find((option) => option.id === bet.winningOptionId);
+          const summary = bet.adminSummary;
 
-            return (
-              <article key={bet.id} className="card-brutal-static p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-lg font-bold">{bet.question}</p>
-                    <p className="mono mt-1 text-[10px] uppercase tracking-[0.2em] text-[var(--color-ink-soft)]">
-                      {bet.status} . fecha {toLocalDateTimeInput(bet.closesAt).replace("T", " ")}
-                    </p>
+          return (
+            <article key={bet.id} className="card-brutal-static bg-[var(--color-paper)] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={cn(
+                        "badge-brutal px-2 py-1 text-[10px] text-[var(--color-ink)]",
+                        statusTone[bet.status],
+                      )}
+                    >
+                      {statusLabels[bet.status]}
+                    </span>
+                    <span className="mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-ink-soft)]">
+                      fecha {toLocalDateTimeInput(bet.closesAt).replace("T", " ")}
+                    </span>
                   </div>
-                  <span className="retro-label neutral-chip">
-                    {formatPipetz(bet.totalPool)}
-                  </span>
+                  <p className="mt-2 text-lg font-black leading-snug">{bet.question}</p>
                 </div>
+                <span className="retro-label neutral-chip">
+                  {formatPipetz(bet.totalPool)} pipetz
+                </span>
+              </div>
 
-                <div className="mt-3 grid gap-2">
-                  {bet.options.map((option) => (
-                    <label key={option.id} className="flex items-center justify-between gap-3 text-sm font-bold">
-                      <span>{option.label}</span>
-                      <span className="mono text-xs text-[var(--color-ink-soft)]">
-                        {formatPipetz(option.poolAmount)}
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <Metric label="Participantes" value={String(summary?.participantCount ?? 0)} />
+                <Metric label="Entradas" value={String(summary?.entryCount ?? 0)} />
+                <Metric
+                  label={bet.status === "cancelled" ? "Reembolsado" : "Pago"}
+                  value={`${formatPipetz(bet.status === "cancelled" ? (summary?.totalRefunded ?? 0) : (summary?.totalPayout ?? 0))} pipetz`}
+                />
+              </div>
+
+              <div className="mt-4 grid gap-2">
+                {bet.options.map((option) => {
+                  const isWinning = option.id === bet.winningOptionId;
+                  return (
+                    <div
+                      key={option.id}
+                      className={cn(
+                        "grid gap-2 border-t-2 border-[var(--color-ink)] pt-3 text-sm font-bold sm:grid-cols-[1fr_auto]",
+                        isWinning ? "text-[var(--color-accent-ink)]" : "text-[var(--color-ink)]",
+                      )}
+                    >
+                      <span>
+                        {option.label}
+                        {isWinning ? " · vencedora" : ""}
                       </span>
-                    </label>
-                  ))}
+                      <span className="mono text-xs text-[var(--color-ink-soft)]">
+                        {formatPipetz(option.poolAmount)} pipetz
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_0.9fr]">
+                <div className="card-brutal-static bg-[var(--color-paper-pink)] p-3">
+                  <p className="mono text-[10px] uppercase tracking-[0.24em] text-[var(--color-ink-soft)]">
+                    Linha do tempo
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {lifecycleRows(bet).map((row) => (
+                      <div key={row.label} className="text-xs">
+                        <span className="font-black uppercase text-[var(--color-ink)]">{row.label}: </span>
+                        <span className="font-bold text-[var(--color-ink-soft)]">
+                          {row.value ? formatDateTime(row.value) : "pendente"}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="text-xs sm:col-span-2">
+                      <span className="font-black uppercase text-[var(--color-ink)]">Última entrada: </span>
+                      <span className="font-bold text-[var(--color-ink-soft)]">
+                        {summary?.lastEntryAt ? formatDateTime(summary.lastEntryAt) : "sem entradas"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  {canLock ? (
-                    <Button
-                      type="button"
-                      onClick={() => submitAction(`/api/admin/bets/${bet.id}/lock`)}
-                      disabled={isPending}
-                      variant="neutral"
-                      size="sm"
-                    >
-                      Travar
-                    </Button>
-                  ) : null}
-                  {canResolve ? (
-                    <>
-                      <Select
-                        value={resolveSelections[bet.id] || null}
-                        onValueChange={(value) =>
-                          setResolveSelections((current) => ({
-                            ...current,
-                            [bet.id]: value ?? "",
-                          }))
-                        }
-                      >
-                        <SelectTrigger size="sm" className="min-w-[220px]">
-                          <SelectValue placeholder="Escolha vencedora">
-                            {(value) =>
-                              bet.options.find((option) => option.id === value)?.label ??
-                              "Escolha vencedora"
-                            }
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {bet.options.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        onClick={() =>
-                          submitAction(`/api/admin/bets/${bet.id}/resolve`, {
-                            winningOptionId: resolveSelections[bet.id],
-                          })
-                        }
-                        disabled={isPending || !resolveSelections[bet.id]}
-                        size="sm"
-                      >
-                        Resolver
-                      </Button>
-                    </>
-                  ) : null}
-                  {canCancel ? (
-                    <Button
-                      type="button"
-                      onClick={() => submitAction(`/api/admin/bets/${bet.id}/cancel`)}
-                      disabled={isPending}
-                      variant="danger"
-                      size="sm"
-                    >
-                      Cancelar
-                    </Button>
-                  ) : null}
+                <div className="card-brutal-static bg-[var(--color-sky)] p-3">
+                  <p className="mono text-[10px] uppercase tracking-[0.24em] text-[var(--color-ink-soft)]">
+                    Resultado financeiro
+                  </p>
+                  <div className="mt-3 grid gap-2 text-xs font-bold text-[var(--color-ink-soft)]">
+                    <p>
+                      Vencedora:{" "}
+                      <span className="text-[var(--color-ink)]">
+                        {winningOption?.label ?? "ainda não definida"}
+                      </span>
+                    </p>
+                    <p>Pool vencedor: {formatPipetz(summary?.winningPool ?? 0)} pipetz</p>
+                    <p>Pool perdedor: {formatPipetz(summary?.losingPool ?? 0)} pipetz</p>
+                    <p>Entradas liquidadas: {summary?.settledCount ?? 0}</p>
+                    <p>Entradas reembolsadas: {summary?.refundedCount ?? 0}</p>
+                  </div>
                 </div>
-              </article>
-            );
-          })}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {canLock ? (
+                  <Button
+                    type="button"
+                    onClick={() => submitAction(`/api/admin/bets/${bet.id}/lock`)}
+                    disabled={isPending}
+                    variant="neutral"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Lock className="size-4" />
+                    Travar
+                  </Button>
+                ) : null}
+                {canResolve ? (
+                  <>
+                    <Select
+                      value={resolveSelections[bet.id] || null}
+                      onValueChange={(value) =>
+                        setResolveSelections((current) => ({
+                          ...current,
+                          [bet.id]: value ?? "",
+                        }))
+                      }
+                    >
+                      <SelectTrigger size="sm" className="min-w-[220px]">
+                        <SelectValue placeholder="Escolha vencedora">
+                          {(value) =>
+                            bet.options.find((option) => option.id === value)?.label ??
+                            "Escolha vencedora"
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {bet.options.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      onClick={() =>
+                        submitAction(`/api/admin/bets/${bet.id}/resolve`, {
+                          winningOptionId: resolveSelections[bet.id],
+                        })
+                      }
+                      disabled={isPending || !resolveSelections[bet.id]}
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <CheckCircle2 className="size-4" />
+                      Resolver
+                    </Button>
+                  </>
+                ) : null}
+                {canCancel ? (
+                  <Button
+                    type="button"
+                    onClick={() => submitAction(`/api/admin/bets/${bet.id}/cancel`)}
+                    disabled={isPending}
+                    variant="danger"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <XCircle className="size-4" />
+                    Cancelar
+                  </Button>
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
+              Apostas
+            </p>
+            <h2
+              className="mt-2 text-3xl uppercase"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Auditoria da live
+            </h2>
+          </div>
+          {feedback ? <div className="retro-label neutral-chip">{feedback}</div> : null}
         </div>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <section className="landing-plane landing-divider bg-[var(--color-mint)] py-8 text-[var(--color-accent-ink)] sm:py-10">
+      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-accent-ink-soft)]">
+              Apostas
+            </p>
+            <h2
+              className="mt-2 text-3xl uppercase"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Auditoria da live
+            </h2>
+          </div>
+          {feedback ? <div className="retro-label neutral-chip">{feedback}</div> : null}
         </div>
+        <div className="mt-6">{content}</div>
       </div>
     </section>
   );

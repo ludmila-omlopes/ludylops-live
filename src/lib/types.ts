@@ -394,10 +394,24 @@ export interface BetViewerPositionRecord {
   isWinner: boolean | null;
 }
 
+export interface BetAdminSummaryRecord {
+  entryCount: number;
+  participantCount: number;
+  settledCount: number;
+  refundedCount: number;
+  totalStake: number;
+  totalPayout: number;
+  totalRefunded: number;
+  winningPool: number;
+  losingPool: number;
+  lastEntryAt: string | null;
+}
+
 export interface BetWithOptionsRecord extends BetRecord {
   totalPool: number;
   options: BetOptionRecord[];
   viewerPosition: BetViewerPositionRecord | null;
+  adminSummary?: BetAdminSummaryRecord;
 }
 
 export interface GameSuggestionRecord {
