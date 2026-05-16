@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Session } from "next-auth";
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { AuthButtons } from "@/components/auth-buttons";
 import { LivestreamIndicator } from "@/components/livestream-indicator";
@@ -11,6 +12,16 @@ import { hasUsableAppSession } from "@/lib/auth/session-state";
 import type { ThemeMode } from "@/lib/theme";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+
+type NavLink = {
+  href: string;
+  label: string;
+};
+
+type NavGroup = {
+  label: string;
+  links: NavLink[];
+};
 
 export function AppChrome({
   children,
@@ -53,23 +64,42 @@ export function AppChrome({
     return undefined;
   }, [isObsView]);
 
-  const navLinks = [
-    { href: "/indicacoes", label: "Indicações" },
+  const primaryLinks: NavLink[] = [
     { href: "/apostas", label: "Apostas" },
-    { href: "/contadores", label: "Contadores" },
-    { href: "/jogos", label: "Jogos" },
-    { href: "/videos", label: "Videos" },
-    { href: "/quotes", label: "Quotes" },
     { href: "/ranking", label: "Ranking" },
   ];
 
-  const authedLinks = [{ href: "/me", label: "Meus Pipetz" }];
-  const adminLinks = isAdmin ? [{ href: "/admin", label: "Admin" }] : [];
+  const navGroups: NavGroup[] = [
+    {
+      label: "Comunidade",
+      links: [
+        { href: "/indicacoes", label: "Indicações" },
+        { href: "/jogos", label: "Jogos" },
+        { href: "/videos", label: "Videos" },
+      ],
+    },
+    {
+      label: "Ao vivo",
+      links: [
+        { href: "/contadores", label: "Contadores" },
+        { href: "/quotes", label: "Quotes" },
+      ],
+    },
+  ];
+
+  const authedLinks: NavLink[] = [{ href: "/me", label: "Meus Pipetz" }];
+  const adminLinks: NavLink[] = isAdmin ? [{ href: "/admin", label: "Admin" }] : [];
   const hasUsableSession = hasUsableAppSession(session);
 
-  const allLinks = [...navLinks, ...(hasUsableSession ? authedLinks : []), ...adminLinks];
+  const accountLinks = [...(hasUsableSession ? authedLinks : []), ...adminLinks];
+  const mobileNavSections: NavGroup[] = [
+    { label: "Principais", links: primaryLinks },
+    ...navGroups,
+    ...(accountLinks.length > 0 ? [{ label: "Conta", links: accountLinks }] : []),
+  ];
+  const isActiveLink = (href: string) => pathname === href;
+  const isActiveGroup = (links: NavLink[]) => links.some((link) => isActiveLink(link.href));
   const showTicker = pathname === "/";
-
   if (isObsView) {
     return <>{children}</>;
   }
@@ -100,12 +130,69 @@ export function AppChrome({
 
           <div className="hidden flex-1 justify-center md:flex">
             <nav className="flex items-center gap-1">
-              {allLinks.map((link) => (
+              {primaryLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   className={`rounded-[var(--radius)] border px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-[0.1em] transition-colors duration-[var(--snap)] ${
-                    pathname === link.href
+                    isActiveLink(link.href)
+                      ? "pastel-action border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
+                      : "border-transparent text-[var(--color-ink-soft)] hover:border-[var(--color-ink)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)]"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+              {navGroups.map((group) => {
+                const groupActive = isActiveGroup(group.links);
+
+                return (
+                  <div key={group.label} className="group/nav relative">
+                    <button
+                      type="button"
+                      className={`flex items-center gap-1 rounded-[var(--radius)] border px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-[0.1em] transition-colors duration-[var(--snap)] ${
+                        groupActive
+                          ? "pastel-action border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
+                          : "border-transparent text-[var(--color-ink-soft)] hover:border-[var(--color-ink)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)]"
+                      }`}
+                      aria-haspopup="menu"
+                    >
+                      <span>{group.label}</span>
+                      <ChevronDown
+                        className="h-3.5 w-3.5 transition-transform group-hover/nav:rotate-180 group-focus-within/nav:rotate-180"
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <div
+                      className="invisible absolute left-0 top-full z-50 min-w-52 pt-2 opacity-0 transition-opacity duration-[var(--snap)] group-hover/nav:visible group-hover/nav:opacity-100 group-focus-within/nav:visible group-focus-within/nav:opacity-100"
+                      role="menu"
+                    >
+                      <div className="border-[2px] border-[var(--color-ink)] bg-[var(--color-paper)] p-2 shadow-[4px_4px_0_var(--shadow-color)]">
+                        {group.links.map((link) => (
+                          <Link
+                            key={link.href}
+                            href={link.href}
+                            className={`block rounded-[var(--radius)] border px-3 py-2 text-xs font-extrabold uppercase tracking-[0.1em] transition-colors duration-[var(--snap)] ${
+                              isActiveLink(link.href)
+                                ? "pastel-action border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)]"
+                                : "border-transparent text-[var(--color-ink-soft)] hover:border-[var(--color-ink)] hover:bg-[var(--color-lavender)] hover:text-[var(--color-ink)]"
+                            }`}
+                            role="menuitem"
+                          >
+                            {link.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {accountLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`rounded-[var(--radius)] border px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-[0.1em] transition-colors duration-[var(--snap)] ${
+                    isActiveLink(link.href)
                       ? "pastel-action border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
                       : "border-transparent text-[var(--color-ink-soft)] hover:border-[var(--color-ink)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)]"
                   }`}
@@ -115,7 +202,6 @@ export function AppChrome({
               ))}
             </nav>
           </div>
-
           <div className="ml-auto flex shrink-0 items-center gap-3 md:justify-end">
             <div className="hidden md:block">
               <LivestreamIndicator isLive={isLive} compact />
@@ -144,20 +230,27 @@ export function AppChrome({
             <div className="mb-4">
               <LivestreamIndicator isLive={isLive} />
             </div>
-            <nav className="flex flex-col gap-1.5" aria-label="Navegação principal">
-              {allLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={`rounded-[var(--radius)] border px-4 py-3 text-sm font-extrabold uppercase tracking-[0.1em] transition-colors duration-[var(--snap)] ${
-                    pathname === link.href
-                      ? "pastel-action border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
-                      : "border-[2px] border-transparent text-[var(--color-ink-soft)] hover:border-[var(--color-ink)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)] active:border-[var(--color-ink)] active:bg-[var(--color-paper)] active:text-[var(--color-ink)]"
-                  }`}
-                >
-                  {link.label}
-                </Link>
+            <nav className="flex flex-col gap-4" aria-label="Navegação principal">
+              {mobileNavSections.map((section) => (
+                <div key={section.label} className="flex flex-col gap-1.5">
+                  <p className="px-1 text-[0.65rem] font-black uppercase tracking-[0.16em] text-[var(--color-ink-soft)]">
+                    {section.label}
+                  </p>
+                  {section.links.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={`rounded-[var(--radius)] border px-4 py-3 text-sm font-extrabold uppercase tracking-[0.1em] transition-colors duration-[var(--snap)] ${
+                        isActiveLink(link.href)
+                          ? "pastel-action border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
+                          : "border-[2px] border-transparent text-[var(--color-ink-soft)] hover:border-[var(--color-ink)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)] active:border-[var(--color-ink)] active:bg-[var(--color-paper)] active:text-[var(--color-ink)]"
+                      }`}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
               ))}
             </nav>
             <div className="mt-4 border-t-[2px] border-[var(--color-ink)] pt-4">
