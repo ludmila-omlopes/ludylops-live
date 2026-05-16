@@ -1445,13 +1445,42 @@ function buildBetWithOptions(params: {
   bet: BetRecord;
   options: BetOptionRecord[];
   viewerEntry?: BetEntryRecord | null;
+  entries?: BetEntryRecord[];
 }): BetWithOptionsRecord {
   const options = [...params.options].sort((a, b) => a.sortOrder - b.sortOrder);
+  const entries = params.entries ?? [];
+  const winningPool = params.bet.winningOptionId
+    ? entries
+        .filter((entry) => entry.optionId === params.bet.winningOptionId)
+        .reduce((sum, entry) => sum + entry.amount, 0)
+    : 0;
+  const totalStake = entries.reduce((sum, entry) => sum + entry.amount, 0);
+
   return {
     ...params.bet,
     totalPool: options.reduce((sum, option) => sum + option.poolAmount, 0),
     options,
     viewerPosition: buildViewerPosition(params.bet, params.viewerEntry ?? null),
+    adminSummary:
+      params.entries === undefined
+        ? undefined
+        : {
+            entryCount: entries.length,
+            participantCount: new Set(entries.map((entry) => entry.viewerId)).size,
+            settledCount: entries.filter((entry) => entry.settledAt).length,
+            refundedCount: entries.filter((entry) => entry.refundedAt).length,
+            totalStake,
+            totalPayout: entries.reduce((sum, entry) => sum + (entry.payoutAmount ?? 0), 0),
+            totalRefunded: entries
+              .filter((entry) => entry.refundedAt)
+              .reduce((sum, entry) => sum + entry.amount, 0),
+            winningPool,
+            losingPool: params.bet.winningOptionId ? totalStake - winningPool : 0,
+            lastEntryAt:
+              entries
+                .map((entry) => entry.createdAt)
+                .sort((a, b) => b.localeCompare(a))[0] ?? null,
+          },
   };
 }
 
@@ -4202,7 +4231,53 @@ export async function listBets(viewerId?: string | null) {
 }
 
 export async function listAdminBets() {
-  return listBets();
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    return listDemoBets(null).map((bet) =>
+      buildBetWithOptions({
+        bet,
+        options: bet.options,
+        viewerEntry: null,
+        entries: store.betEntries.filter((entry) => entry.betId === bet.id),
+      }),
+    );
+  }
+
+  try {
+    const [betRows, optionRows, entryRows] = await Promise.all([
+      db.select().from(bets).orderBy(desc(bets.createdAt)),
+      db.select().from(betOptions),
+      db.select().from(betEntries),
+    ]);
+
+    const options = optionRows.map(serializeBetOption);
+    const entries = entryRows.map(serializeBetEntry);
+
+    return betRows.map((row) => {
+      const bet = serializeBet(row);
+      return buildBetWithOptions({
+        bet,
+        options: options.filter((option) => option.betId === bet.id),
+        viewerEntry: null,
+        entries: entries.filter((entry) => entry.betId === bet.id),
+      });
+    });
+  } catch (error) {
+    if (isMissingBetSchemaError(error)) {
+      const store = getDemoStore();
+      return listDemoBets(null).map((bet) =>
+        buildBetWithOptions({
+          bet,
+          options: bet.options,
+          viewerEntry: null,
+          entries: store.betEntries.filter((entry) => entry.betId === bet.id),
+        }),
+      );
+    }
+    throw error;
+  }
 }
 
 export async function listAdminViewerDirectory() {
