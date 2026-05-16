@@ -8,6 +8,7 @@ export type CatalogItemType =
 export type LedgerKind =
   | "presence_tick"
   | "chat_bonus"
+  | "admin_airdrop"
   | "manual_adjustment"
   | "redemption_debit"
   | "redemption_refund"

@@ -4,6 +4,7 @@ import { DeathCounterGamePanel } from "@/components/death-counter-game-panel";
 import { AdminGameSuggestionsPanel } from "@/components/admin-game-suggestions-panel";
 import { AdminVideoSuggestionsPanel } from "@/components/admin-video-suggestions-panel";
 import { AdminPipetzPricingPanel } from "@/components/admin-pipetz-pricing-panel";
+import { AdminPipetzAirdropPanel } from "@/components/admin-pipetz-airdrop-panel";
 import { AdminRecommendationsPanel } from "@/components/admin-recommendations-panel";
 import { AdminViewerLinksPanel } from "@/components/admin-viewer-links-panel";
 import { RedemptionGrid } from "@/components/redemption-grid";
@@ -119,6 +120,7 @@ export default async function AdminPage() {
               <LeaderboardTable entries={leaderboard.slice(0, 10)} />
             </div>
           </div>
+          <AdminPipetzAirdropPanel viewers={viewers} />
           <RedemptionGrid items={catalog} expanded staticCards />
         </div>
       </section>
