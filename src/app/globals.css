@@ -33,6 +33,7 @@
   --surface-card: #ffffff;
   --surface-card-alt: #f0e8f8;
   --surface-card-accent: #ffd7ef;
+  --surface-community-cta: var(--color-sky);
   --color-header-surface: #f9f9f9;
   --color-ticker-bg: #000000;
   --color-window-bar: #c7a2e9;
@@ -131,6 +132,7 @@ html[data-theme="dark"] {
   --surface-card: #111111;
   --surface-card-alt: #1a1a1a;
   --surface-card-accent: #101d25;
+  --surface-community-cta: #1a1a1a;
   --color-header-surface: rgba(0, 0, 0, 0.94);
   --color-ticker-bg: #000000;
   --color-window-bar: #131313;
@@ -282,7 +284,7 @@ button {
 }
 
 .panel-soft:hover {
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .btn-brutal {
@@ -458,6 +460,10 @@ button {
   background: var(--surface-card-accent);
 }
 
+.surface-community-cta {
+  background: var(--surface-community-cta);
+}
+
 .badge-brutal {
   display: inline-flex;
   align-items: center;
@@ -473,9 +479,9 @@ button {
   align-items: center;
   gap: 0.35rem;
   border: 2px solid var(--color-ink);
-  border-radius: 999px;
+  border-radius: 0;
   padding: 0.45rem 0.8rem;
-  box-shadow: 3px 3px 0 var(--shadow-soft-color);
+  box-shadow: none;
   font-size: 0.68rem;
   font-weight: 800;
   line-height: 1;
@@ -486,29 +492,29 @@ button {
 .accent-chip {
   background: var(--color-purple);
   color: var(--color-accent-ink);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .accent-chip-strong {
   background: var(--color-blue);
   color: var(--color-accent-ink);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .neutral-chip {
   background: var(--surface-card);
   color: var(--color-ink);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .meta-pill {
   display: inline-flex;
   align-items: center;
   border: 2px solid var(--color-ink);
-  border-radius: 999px;
+  border-radius: 0;
   padding: 0.35rem 0.8rem;
   background: var(--surface-card);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   font-size: 0.66rem;
   font-weight: 700;
   line-height: 1;
@@ -526,10 +532,10 @@ button {
   justify-content: center;
   min-width: 2.35rem;
   border: 2px solid var(--color-ink);
-  border-radius: 999px;
+  border-radius: 0;
   padding: 0.2rem 0.55rem;
   background: var(--color-paper);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   font-family: var(--font-mono), monospace;
   font-size: 0.62rem;
   font-weight: 700;
@@ -556,12 +562,12 @@ button {
   align-items: center;
   justify-content: center;
   border: var(--border-strong);
-  border-radius: var(--radius);
+  border-radius: 0;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   transform: rotate(-3deg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   transition: transform 200ms ease;
 }
 

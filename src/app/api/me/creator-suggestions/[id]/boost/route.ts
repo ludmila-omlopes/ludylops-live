@@ -1,0 +1,58 @@
+import { ZodError } from "zod";
+
+import { fail, isTrustedAppMutationRequest, ok, requireApiSession } from "@/lib/api";
+import { boostCreatorSuggestion } from "@/lib/db/repository";
+import {
+  boostCreatorSuggestionSchema,
+  formatCreatorSuggestionSchemaError,
+  validateCreatorSuggestionBoostAmount,
+} from "@/lib/creator-suggestions/service";
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!isTrustedAppMutationRequest(request)) {
+    return fail("Forbidden", 403);
+  }
+
+  const session = await requireApiSession();
+  if (!session?.user?.activeViewerId) {
+    return fail("Unauthorized", 401);
+  }
+
+  const { id } = await params;
+
+  try {
+    const json = await request.json();
+    const parsed = boostCreatorSuggestionSchema.safeParse(json);
+    if (!parsed.success) {
+      return fail(formatCreatorSuggestionSchemaError(parsed.error), 400);
+    }
+
+    const validationError = validateCreatorSuggestionBoostAmount(parsed.data.amount);
+    if (validationError) {
+      return fail(validationError, 400);
+    }
+
+    const suggestion = await boostCreatorSuggestion({
+      suggestionId: id,
+      viewerId: session.user.activeViewerId,
+      amount: parsed.data.amount,
+      source: "web",
+    });
+
+    return ok(suggestion, { status: 201 });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return fail(formatCreatorSuggestionSchemaError(error), 400);
+    }
+
+    if (error instanceof SyntaxError) {
+      return fail("Payload invalido.", 400);
+    }
+
+    const message = error instanceof Error ? error.message : "Falha ao dar boost.";
+    return fail(message, 400);
+  }
+}

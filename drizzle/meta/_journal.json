@@ -64,6 +64,20 @@
       "when": 1778530912160,
       "tag": "0008_video_suggestions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778563200000,
+      "tag": "0009_creator_suggestions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778616000000,
+      "tag": "0010_video_suggestion_reacted_status",
+      "breakpoints": true
     }
   ]
 }

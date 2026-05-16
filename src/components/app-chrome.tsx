@@ -73,7 +73,8 @@ export function AppChrome({
     {
       label: "Comunidade",
       links: [
-        { href: "/indicacoes", label: "Indicações" },
+        { href: "/indicacoes", label: "Canais que me inspiram" },
+        { href: "/produtinhos", label: "Produtinhos que indico" },
         { href: "/jogos", label: "Jogos" },
         { href: "/videos", label: "Videos" },
       ],
