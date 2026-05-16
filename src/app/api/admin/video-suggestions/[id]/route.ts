@@ -41,10 +41,10 @@ export async function POST(
     }
 
     if (error instanceof SyntaxError) {
-      return fail("Payload invalido.", 400);
+      return fail("Payload inválido.", 400);
     }
 
-    const message = error instanceof Error ? error.message : "Falha ao atualizar sugestao.";
+    const message = error instanceof Error ? error.message : "Falha ao atualizar sugestão.";
     return fail(message, 400);
   }
 }

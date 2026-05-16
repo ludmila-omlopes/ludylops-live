@@ -9,6 +9,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Avoid round-tripping UTF-8 source files through PowerShell `Get-Content` / `Set-Content`, especially for `.ts`, `.tsx`, `.md`, and Portuguese copy with accents. On this machine that can turn `você` into `vocÃª` and `à` into `Ã `.
 - Prefer `apply_patch` for manual edits. For scripted rewrites, use .NET file APIs with explicit UTF-8 read/write settings instead of `Get-Content` / `Set-Content`.
 
+## Brazilian Portuguese Copy
+
+- Public-facing copy in Portuguese must use correct Brazilian Portuguese accents and spelling. Do not intentionally omit accents in UI text, metadata, validation messages, seeds, demo data, or documentation meant for users.
+- Before finishing changes that add or edit Portuguese copy, review the touched text for missing accents and common words such as `indicação`, `indicações`, `você`, `página`, `conteúdo`, `índole`, `análise`, `inspirações`, `comunidade`, `prioridade`, `visível`, `próprio`, `inválido`, `sugestão`, and `recomendação`.
+- If a file already contains mojibake such as `IndicaÃ§Ãµes`, `vocÃª`, or `Ã¡`, fix the affected copy instead of copying the corrupted text forward.
+- When using `apply_patch`, write Portuguese copy with the intended accents directly in the patch and verify the rendered page or relevant source after editing.
+
 # GitHub PR Linking
 
 When creating a GitHub PR, explicitly state which issue it closes in the PR description so GitHub links it automatically.

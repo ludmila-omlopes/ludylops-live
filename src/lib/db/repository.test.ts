@@ -2109,6 +2109,45 @@ describe("video suggestions", () => {
 
     expect(updated.status).toBe("reacted");
   });
+
+  it("covers video admin button status transitions and undo paths", async () => {
+    await expect(listVideoSuggestions()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "vs-1", status: "open" }),
+        expect.objectContaining({ id: "vs-2", status: "reacted" }),
+      ]),
+    );
+
+    await expect(
+      updateVideoSuggestionStatus({ suggestionId: "vs-1", status: "reacted" }),
+    ).resolves.toMatchObject({ id: "vs-1", status: "reacted" });
+    await expect(
+      updateVideoSuggestionStatus({ suggestionId: "vs-1", status: "open" }),
+    ).resolves.toMatchObject({ id: "vs-1", status: "open" });
+
+    await expect(
+      updateVideoSuggestionStatus({ suggestionId: "vs-1", status: "rejected" }),
+    ).resolves.toMatchObject({ id: "vs-1", status: "rejected" });
+    await expect(
+      updateVideoSuggestionStatus({ suggestionId: "vs-1", status: "open" }),
+    ).resolves.toMatchObject({ id: "vs-1", status: "open" });
+
+    await expect(
+      updateVideoSuggestionStatus({ suggestionId: "vs-1", status: "rejected" }),
+    ).resolves.toMatchObject({ id: "vs-1", status: "rejected" });
+    await expect(
+      updateVideoSuggestionStatus({ suggestionId: "vs-1", status: "reacted" }),
+    ).resolves.toMatchObject({ id: "vs-1", status: "reacted" });
+
+    await expect(
+      updateVideoSuggestionStatus({ suggestionId: "vs-1", status: "rejected" }),
+    ).resolves.toMatchObject({ id: "vs-1", status: "rejected" });
+
+    const finalSuggestions = await listVideoSuggestions();
+    expect(finalSuggestions.find((entry) => entry.id === "vs-1")).toMatchObject({
+      status: "rejected",
+    });
+  });
 });
 
 describe("ensureViewerFromSession", () => {

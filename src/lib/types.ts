@@ -19,6 +19,8 @@ export type LedgerKind =
   | "game_suggestion_boost"
   | "video_suggestion_creation"
   | "video_suggestion_boost"
+  | "creator_suggestion_creation"
+  | "creator_suggestion_boost"
   | "quote_overlay_debit";
 
 export type BetStatus =
@@ -51,6 +53,18 @@ export type VideoSuggestionStatus =
   | "accepted"
   | "reacted"
   | "rejected";
+
+export type CreatorSuggestionStatus =
+  | "open"
+  | "accepted"
+  | "featured"
+  | "rejected";
+
+export type CreatorPlatform =
+  | "youtube"
+  | "twitch"
+  | "kick"
+  | "other";
 
 export type ProductRecommendationCategory =
   | "videogames"
@@ -443,6 +457,35 @@ export interface VideoSuggestionBoostRecord {
 }
 
 export interface VideoSuggestionWithMeta extends VideoSuggestionRecord {
+  suggestedBy: string;
+  suggestedByYoutubeHandle: string | null;
+  viewerBoostTotal: number;
+}
+
+export interface CreatorSuggestionRecord {
+  id: string;
+  viewerId: string;
+  slug: string;
+  name: string;
+  channelUrl: string;
+  platform: CreatorPlatform;
+  category: string | null;
+  reason: string | null;
+  status: CreatorSuggestionStatus;
+  totalVotes: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatorSuggestionBoostRecord {
+  id: string;
+  suggestionId: string;
+  viewerId: string;
+  amount: number;
+  createdAt: string;
+}
+
+export interface CreatorSuggestionWithMeta extends CreatorSuggestionRecord {
   suggestedBy: string;
   suggestedByYoutubeHandle: string | null;
   viewerBoostTotal: number;

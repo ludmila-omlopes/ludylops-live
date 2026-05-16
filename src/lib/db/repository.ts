@@ -15,6 +15,8 @@ import {
   bets,
   bridgeClients,
   catalogItems,
+  creatorSuggestionBoosts,
+  creatorSuggestions,
   gameSuggestionBoosts,
   gameSuggestions,
   googleAccounts,
@@ -42,6 +44,8 @@ import {
   demoBetRecords,
   demoBridgeClients,
   demoCatalog,
+  demoCreatorSuggestionBoosts,
+  demoCreatorSuggestions,
   demoGameSuggestionBoosts,
   demoGameSuggestions,
   demoGoogleAccounts,
@@ -56,8 +60,10 @@ import {
   demoViewers,
 } from "@/lib/demo-data";
 import { adminEmails, isDemoMode } from "@/lib/env";
+import { CREATOR_SUGGESTION_CREATION_COST } from "@/lib/creator-suggestions/constants";
 import { GAME_SUGGESTION_CREATION_COST } from "@/lib/game-suggestions/constants";
 import { VIDEO_SUGGESTION_CREATION_COST } from "@/lib/video-suggestions/constants";
+import { normalizeVideoSuggestionStatus } from "@/lib/video-suggestions/admin-actions";
 import {
   eventRequiresActiveLivestream,
   requireActiveLivestream,
@@ -75,6 +81,9 @@ import {
   BetViewerPositionRecord,
   BridgeClientRecord,
   CatalogItemRecord,
+  CreatorSuggestionBoostRecord,
+  CreatorSuggestionRecord,
+  CreatorSuggestionWithMeta,
   GameSuggestionBoostRecord,
   GameSuggestionRecord,
   GameSuggestionWithMeta,
@@ -279,6 +288,8 @@ type DemoStore = {
   betEntries: BetEntryRecord[];
   gameSuggestions: GameSuggestionRecord[];
   gameSuggestionBoosts: GameSuggestionBoostRecord[];
+  creatorSuggestions: CreatorSuggestionRecord[];
+  creatorSuggestionBoosts: CreatorSuggestionBoostRecord[];
   videoSuggestions: VideoSuggestionRecord[];
   videoSuggestionBoosts: VideoSuggestionBoostRecord[];
   productRecommendations: ProductRecommendationRecord[];
@@ -311,6 +322,8 @@ function getDemoStore(): DemoStore {
       betEntries: structuredClone(demoBetEntries),
       gameSuggestions: structuredClone(demoGameSuggestions),
       gameSuggestionBoosts: structuredClone(demoGameSuggestionBoosts),
+      creatorSuggestions: structuredClone(demoCreatorSuggestions),
+      creatorSuggestionBoosts: structuredClone(demoCreatorSuggestionBoosts),
       videoSuggestions: structuredClone(demoVideoSuggestions),
       videoSuggestionBoosts: structuredClone(demoVideoSuggestionBoosts),
       productRecommendations: structuredClone(demoProductRecommendations),
@@ -1488,7 +1501,7 @@ function serializeVideoSuggestion(row: typeof videoSuggestions.$inferSelect): Vi
     thumbnailUrl: row.thumbnailUrl,
     videoUrl: row.videoUrl,
     reason: row.reason ?? null,
-    status: row.status as VideoSuggestionRecord["status"],
+    status: (row.status === "accepted" ? "reacted" : row.status) as VideoSuggestionRecord["status"],
     totalVotes: row.totalVotes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -1498,6 +1511,35 @@ function serializeVideoSuggestion(row: typeof videoSuggestions.$inferSelect): Vi
 function serializeVideoSuggestionBoost(
   row: typeof videoSuggestionBoosts.$inferSelect,
 ): VideoSuggestionBoostRecord {
+  return {
+    id: row.id,
+    suggestionId: row.suggestionId,
+    viewerId: row.viewerId,
+    amount: row.amount,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function serializeCreatorSuggestion(row: typeof creatorSuggestions.$inferSelect): CreatorSuggestionRecord {
+  return {
+    id: row.id,
+    viewerId: row.viewerId,
+    slug: row.slug,
+    name: row.name,
+    channelUrl: row.channelUrl,
+    platform: row.platform as CreatorSuggestionRecord["platform"],
+    category: row.category ?? null,
+    reason: row.reason ?? null,
+    status: row.status as CreatorSuggestionRecord["status"],
+    totalVotes: row.totalVotes,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function serializeCreatorSuggestionBoost(
+  row: typeof creatorSuggestionBoosts.$inferSelect,
+): CreatorSuggestionBoostRecord {
   return {
     id: row.id,
     suggestionId: row.suggestionId,
@@ -1732,6 +1774,21 @@ function buildVideoSuggestionWithMeta(params: {
   viewer: ViewerRecord | null;
   boosts?: VideoSuggestionBoostRecord[];
 }): VideoSuggestionWithMeta {
+  const boosts = params.boosts ?? [];
+  return {
+    ...params.suggestion,
+    status: normalizeVideoSuggestionStatus(params.suggestion.status),
+    suggestedBy: params.viewer?.youtubeDisplayName ?? "Viewer",
+    suggestedByYoutubeHandle: params.viewer?.youtubeHandle ?? null,
+    viewerBoostTotal: boosts.reduce((sum, entry) => sum + entry.amount, 0),
+  };
+}
+
+function buildCreatorSuggestionWithMeta(params: {
+  suggestion: CreatorSuggestionRecord;
+  viewer: ViewerRecord | null;
+  boosts?: CreatorSuggestionBoostRecord[];
+}): CreatorSuggestionWithMeta {
   const boosts = params.boosts ?? [];
   return {
     ...params.suggestion,
@@ -2627,6 +2684,29 @@ function listDemoVideoSuggestions(viewerId?: string | null) {
     );
 }
 
+function listDemoCreatorSuggestions(viewerId?: string | null) {
+  const store = getDemoStore();
+  const viewerBoosts = viewerId
+    ? store.creatorSuggestionBoosts.filter((entry) => entry.viewerId === viewerId)
+    : [];
+
+  return [...store.creatorSuggestions]
+    .sort((a, b) => {
+      if (b.totalVotes !== a.totalVotes) {
+        return b.totalVotes - a.totalVotes;
+      }
+
+      return +new Date(b.createdAt) - +new Date(a.createdAt);
+    })
+    .map((suggestion) =>
+      buildCreatorSuggestionWithMeta({
+        suggestion,
+        viewer: getDemoViewerById(store, suggestion.viewerId),
+        boosts: viewerBoosts.filter((entry) => entry.suggestionId === suggestion.id),
+      }),
+    );
+}
+
 function resolveChatTargetBet(input: {
   bets: BetWithOptionsRecord[];
   betId?: string | null;
@@ -2806,6 +2886,45 @@ function isMissingVideoSuggestionSchemaError(error: unknown) {
     '"video_suggestion_boosts"',
     "video_suggestions",
     "video_suggestion_boosts",
+  ];
+  const queue: unknown[] = [error];
+  const visited = new Set<unknown>();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+
+    const message =
+      current instanceof Error ? current.message : typeof current === "string" ? current : "";
+    const normalized = message.toLowerCase();
+    const mentionsTables = tableNames.some((tableName) => normalized.includes(tableName));
+    if (
+      mentionsTables &&
+      (normalized.includes("does not exist") ||
+        normalized.includes("relation") ||
+        normalized.includes("table") ||
+        normalized.includes("failed query"))
+    ) {
+      return true;
+    }
+
+    if (typeof current === "object" && current && "cause" in current) {
+      queue.push((current as { cause?: unknown }).cause);
+    }
+  }
+
+  return false;
+}
+
+function isMissingCreatorSuggestionSchemaError(error: unknown) {
+  const tableNames = [
+    '"creator_suggestions"',
+    '"creator_suggestion_boosts"',
+    "creator_suggestions",
+    "creator_suggestion_boosts",
   ];
   const queue: unknown[] = [error];
   const visited = new Set<unknown>();
@@ -4279,6 +4398,51 @@ export async function listAdminVideoSuggestions() {
   return listVideoSuggestions();
 }
 
+export async function listCreatorSuggestions(viewerId?: string | null) {
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    return listDemoCreatorSuggestions(viewerId);
+  }
+
+  let suggestionRows: Array<typeof creatorSuggestions.$inferSelect>;
+  let boostRows: Array<typeof creatorSuggestionBoosts.$inferSelect>;
+
+  try {
+    [suggestionRows, boostRows] = await Promise.all([
+      db.select().from(creatorSuggestions).orderBy(desc(creatorSuggestions.totalVotes), desc(creatorSuggestions.createdAt)),
+      viewerId
+        ? db.select().from(creatorSuggestionBoosts).where(eq(creatorSuggestionBoosts.viewerId, viewerId))
+        : Promise.resolve([]),
+    ]);
+  } catch (error) {
+    if (isMissingCreatorSuggestionSchemaError(error)) {
+      return listDemoCreatorSuggestions(viewerId);
+    }
+    throw error;
+  }
+
+  const serializedSuggestions = suggestionRows.map(serializeCreatorSuggestion);
+  const viewerIds = [...new Set(serializedSuggestions.map((entry) => entry.viewerId))];
+  const suggestionViewers = viewerIds.length
+    ? await db.select().from(users).where(inArray(users.id, viewerIds))
+    : [];
+  const viewerMap = new Map(suggestionViewers.map((row) => [row.id, serializeViewer(row)]));
+  const serializedBoosts = boostRows.map(serializeCreatorSuggestionBoost);
+
+  return serializedSuggestions.map((suggestion) =>
+    buildCreatorSuggestionWithMeta({
+      suggestion,
+      viewer: viewerMap.get(suggestion.viewerId) ?? null,
+      boosts: serializedBoosts.filter((entry) => entry.suggestionId === suggestion.id),
+    }),
+  );
+}
+
+export async function listAdminCreatorSuggestions() {
+  return listCreatorSuggestions();
+}
+
 export async function listStreamerbotCounters() {
   const db = getDb();
 
@@ -4760,6 +4924,286 @@ export async function updateGameSuggestionCatalog(input: {
   return result;
 }
 
+export async function createCreatorSuggestion(input: {
+  viewerId: string;
+  name: string;
+  channelUrl: string;
+  platform: CreatorSuggestionRecord["platform"];
+  category?: string | null;
+  reason?: string | null;
+  source?: string;
+}) {
+  const viewer = await withViewerById(input.viewerId);
+  if (!viewer) {
+    throw new Error("Viewer nao encontrado.");
+  }
+
+  const name = input.name.trim();
+  const channelUrl = input.channelUrl.trim();
+  const platform = input.platform;
+  const category = input.category?.trim() || null;
+  const reason = input.reason?.trim() || null;
+  const slug = slugify(name);
+  if (!slug || !channelUrl) {
+    throw new Error("invalid_creator");
+  }
+
+  const source = input.source ?? "web";
+  const suggestionId = randomUUID();
+  const creationCost = CREATOR_SUGGESTION_CREATION_COST;
+  const db = getDb();
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const duplicate = store.creatorSuggestions.find(
+      (entry) =>
+        (entry.slug === slug || entry.channelUrl.toLowerCase() === channelUrl.toLowerCase()) &&
+        (entry.status === "open" || entry.status === "accepted"),
+    );
+    if (duplicate) {
+      throw new Error("suggestion_already_exists");
+    }
+
+    const balance = getBalance(store, input.viewerId);
+    if (balance.currentBalance < creationCost) {
+      throw new Error("saldo_insuficiente");
+    }
+
+    const createdAt = new Date().toISOString();
+    balance.currentBalance -= creationCost;
+    balance.lifetimeSpent += creationCost;
+    balance.lastSyncedAt = createdAt;
+
+    const suggestion: CreatorSuggestionRecord = {
+      id: suggestionId,
+      viewerId: input.viewerId,
+      slug,
+      name,
+      channelUrl,
+      platform,
+      category,
+      reason,
+      status: "open",
+      totalVotes: 0,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    store.creatorSuggestions.unshift(suggestion);
+
+    createLedgerEntry(store, {
+      viewerId: input.viewerId,
+      kind: "creator_suggestion_creation",
+      amount: -creationCost,
+      source,
+      externalEventId: null,
+      metadata: { suggestionId, slug, channelUrl, cost: creationCost },
+      createdAt,
+    });
+
+    return buildCreatorSuggestionWithMeta({ suggestion, viewer, boosts: [] });
+  }
+
+  const createdAt = new Date();
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(creatorSuggestions)
+      .where(
+        and(
+          sql`(${creatorSuggestions.slug} = ${slug} or lower(${creatorSuggestions.channelUrl}) = ${channelUrl.toLowerCase()})`,
+          inArray(creatorSuggestions.status, ["open", "accepted"]),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      throw new Error("suggestion_already_exists");
+    }
+
+    const [debited] = await tx
+      .update(viewerBalances)
+      .set({
+        currentBalance: sql`${viewerBalances.currentBalance} - ${creationCost}`,
+        lifetimeSpent: sql`${viewerBalances.lifetimeSpent} + ${creationCost}`,
+        lastSyncedAt: createdAt,
+      })
+      .where(
+        and(
+          eq(viewerBalances.viewerId, input.viewerId),
+          gte(viewerBalances.currentBalance, creationCost),
+        ),
+      )
+      .returning({ viewerId: viewerBalances.viewerId });
+    if (!debited) {
+      throw new Error("saldo_insuficiente");
+    }
+
+    await tx.insert(creatorSuggestions).values({
+      id: suggestionId,
+      viewerId: input.viewerId,
+      slug,
+      name,
+      channelUrl,
+      platform,
+      category,
+      reason,
+      status: "open",
+      totalVotes: 0,
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    await tx.insert(pointLedger).values({
+      id: randomUUID(),
+      viewerId: input.viewerId,
+      kind: "creator_suggestion_creation",
+      amount: -creationCost,
+      source,
+      externalEventId: null,
+      metadata: { suggestionId, slug, channelUrl, cost: creationCost },
+      createdAt,
+    });
+  });
+
+  const created = (await listCreatorSuggestions(input.viewerId)).find((entry) => entry.id === suggestionId);
+  if (!created) {
+    throw new Error("Falha ao criar indicacao.");
+  }
+  return created;
+}
+
+export async function boostCreatorSuggestion(input: {
+  suggestionId: string;
+  viewerId: string;
+  amount: number;
+  source: string;
+}) {
+  if (!Number.isInteger(input.amount) || input.amount <= 0) {
+    throw new Error("invalid_amount");
+  }
+
+  const viewer = await withViewerById(input.viewerId);
+  if (!viewer) {
+    throw new Error("Viewer nao encontrado.");
+  }
+
+  const db = getDb();
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const suggestion = store.creatorSuggestions.find((entry) => entry.id === input.suggestionId);
+    if (!suggestion) {
+      throw new Error("suggestion_not_found");
+    }
+    if (suggestion.status === "rejected") {
+      throw new Error("suggestion_not_open");
+    }
+
+    const balance = getBalance(store, input.viewerId);
+    if (balance.currentBalance < input.amount) {
+      throw new Error("saldo_insuficiente");
+    }
+
+    const now = new Date().toISOString();
+    balance.currentBalance -= input.amount;
+    balance.lifetimeSpent += input.amount;
+    balance.lastSyncedAt = now;
+
+    suggestion.totalVotes += input.amount;
+    suggestion.updatedAt = now;
+
+    const boost: CreatorSuggestionBoostRecord = {
+      id: randomUUID(),
+      suggestionId: suggestion.id,
+      viewerId: input.viewerId,
+      amount: input.amount,
+      createdAt: now,
+    };
+    store.creatorSuggestionBoosts.unshift(boost);
+
+    createLedgerEntry(store, {
+      viewerId: input.viewerId,
+      kind: "creator_suggestion_boost",
+      amount: -input.amount,
+      source: input.source,
+      externalEventId: null,
+      metadata: { suggestionId: suggestion.id },
+      createdAt: now,
+    });
+
+    return buildCreatorSuggestionWithMeta({
+      suggestion,
+      viewer: getDemoViewerById(store, suggestion.viewerId),
+      boosts: store.creatorSuggestionBoosts.filter(
+        (entry) => entry.viewerId === input.viewerId && entry.suggestionId === suggestion.id,
+      ),
+    });
+  }
+
+  await db.transaction(async (tx) => {
+    const [suggestion] = await tx
+      .select()
+      .from(creatorSuggestions)
+      .where(eq(creatorSuggestions.id, input.suggestionId))
+      .limit(1);
+    if (!suggestion) {
+      throw new Error("suggestion_not_found");
+    }
+    if (suggestion.status === "rejected") {
+      throw new Error("suggestion_not_open");
+    }
+
+    const now = new Date();
+    const [debited] = await tx
+      .update(viewerBalances)
+      .set({
+        currentBalance: sql`${viewerBalances.currentBalance} - ${input.amount}`,
+        lifetimeSpent: sql`${viewerBalances.lifetimeSpent} + ${input.amount}`,
+        lastSyncedAt: now,
+      })
+      .where(
+        and(
+          eq(viewerBalances.viewerId, input.viewerId),
+          gte(viewerBalances.currentBalance, input.amount),
+        ),
+      )
+      .returning({ viewerId: viewerBalances.viewerId });
+    if (!debited) {
+      throw new Error("saldo_insuficiente");
+    }
+
+    await tx.insert(creatorSuggestionBoosts).values({
+      id: randomUUID(),
+      suggestionId: input.suggestionId,
+      viewerId: input.viewerId,
+      amount: input.amount,
+      createdAt: now,
+    });
+
+    await tx
+      .update(creatorSuggestions)
+      .set({
+        totalVotes: sql`${creatorSuggestions.totalVotes} + ${input.amount}`,
+        updatedAt: now,
+      })
+      .where(eq(creatorSuggestions.id, input.suggestionId));
+
+    await tx.insert(pointLedger).values({
+      id: randomUUID(),
+      viewerId: input.viewerId,
+      kind: "creator_suggestion_boost",
+      amount: -input.amount,
+      source: input.source,
+      externalEventId: null,
+      metadata: { suggestionId: input.suggestionId },
+      createdAt: now,
+    });
+  });
+
+  const updated = (await listCreatorSuggestions(input.viewerId)).find((entry) => entry.id === input.suggestionId);
+  if (!updated) {
+    throw new Error("suggestion_not_found");
+  }
+  return updated;
+}
+
 export async function createVideoSuggestion(input: {
   viewerId: string;
   youtubeVideoId: string;
@@ -5055,14 +5499,32 @@ export async function updateVideoSuggestionStatus(input: {
   }
 
   const updatedAt = new Date();
-  const [updated] = await db
-    .update(videoSuggestions)
-    .set({
-      status: input.status,
-      updatedAt,
-    })
-    .where(eq(videoSuggestions.id, input.suggestionId))
-    .returning();
+  let updated: typeof videoSuggestions.$inferSelect | undefined;
+
+  try {
+    [updated] = await db
+      .update(videoSuggestions)
+      .set({
+        status: input.status,
+        updatedAt,
+      })
+      .where(eq(videoSuggestions.id, input.suggestionId))
+      .returning();
+  } catch (error) {
+    if (input.status !== "reacted") {
+      throw error;
+    }
+
+    [updated] = await db
+      .update(videoSuggestions)
+      .set({
+        status: "accepted",
+        updatedAt,
+      })
+      .where(eq(videoSuggestions.id, input.suggestionId))
+      .returning();
+  }
+
   if (!updated) {
     throw new Error("suggestion_not_found");
   }

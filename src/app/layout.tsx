@@ -77,6 +77,7 @@ export default async function RootLayout({
       lang="pt-BR"
       suppressHydrationWarning
       data-theme={initialTheme ?? undefined}
+      data-scroll-behavior="smooth"
       className={cn("h-full", "antialiased", display.variable, body.variable, mono.variable, "font-sans", geist.variable)}
       style={initialTheme ? { colorScheme: initialTheme } : undefined}
     >

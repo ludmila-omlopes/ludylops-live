@@ -1,13 +1,14 @@
 import { z } from "zod";
 
 export const videoSuggestionStatusSchema = z.enum(["open", "accepted", "reacted", "rejected"]);
+export const adminVideoSuggestionStatusSchema = z.enum(["open", "reacted", "rejected"]);
 
 export const createVideoSuggestionSchema = z.object({
   videoUrl: z.string().trim().min(1, "Cole o link do YouTube.").max(500, "Link muito longo."),
   reason: z
     .string()
     .trim()
-    .max(500, "Use no maximo 500 caracteres.")
+    .max(500, "Use no máximo 500 caracteres.")
     .optional()
     .transform((value) => (value ? value : undefined)),
 });
@@ -17,7 +18,7 @@ export const boostVideoSuggestionSchema = z.object({
 });
 
 export const updateVideoSuggestionStatusSchema = z.object({
-  status: videoSuggestionStatusSchema,
+  status: adminVideoSuggestionStatusSchema,
 });
 
 export type YoutubeVideoMetadata = {
@@ -75,11 +76,11 @@ export function validateVideoSuggestionDraft(input: {
   });
 
   if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Sugestao invalida.";
+    return parsed.error.issues[0]?.message ?? "Sugestão inválida.";
   }
 
   if (!extractYoutubeVideoId(parsed.data.videoUrl)) {
-    return "Cole um link valido de video do YouTube.";
+    return "Cole um link válido de vídeo do YouTube.";
   }
 
   return null;
@@ -88,7 +89,7 @@ export function validateVideoSuggestionDraft(input: {
 export function validateVideoSuggestionBoostAmount(amount: number) {
   const parsed = boostVideoSuggestionSchema.safeParse({ amount });
   if (!parsed.success) {
-    return parsed.error.issues[0]?.message ?? "Valor invalido.";
+    return parsed.error.issues[0]?.message ?? "Valor inválido.";
   }
   return null;
 }
@@ -132,7 +133,7 @@ export async function resolveYoutubeVideoMetadata(rawUrl: string): Promise<Youtu
 }
 
 export function formatVideoSuggestionSchemaError(error: z.ZodError) {
-  return error.issues[0]?.message ?? "Payload invalido.";
+  return error.issues[0]?.message ?? "Payload inválido.";
 }
 
 function normalizeVideoId(value: string) {

@@ -1,7 +1,30 @@
 import { z } from "zod";
 
+const placeholderDatabaseUrl = "sua-url-do-neon-ou-postgres";
+
+function normalizeDatabaseUrl(value: unknown) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return undefined;
+  }
+
+  if (trimmedValue === placeholderDatabaseUrl) {
+    throw new Error(
+      "[env] DATABASE_URL is still the migration placeholder. " +
+        "Clear it from the current terminal session and restart the dev server so Next.js can load the real value from .env.",
+    );
+  }
+
+  return trimmedValue;
+}
+
 const envSchema = z.object({
-  DATABASE_URL: z.string().url().optional(),
+  DATABASE_URL: z.preprocess(normalizeDatabaseUrl, z.string().url().optional()),
   AUTH_GOOGLE_ID: z.string().optional(),
   AUTH_GOOGLE_SECRET: z.string().optional(),
   NEXTAUTH_SECRET: z.string().optional(),

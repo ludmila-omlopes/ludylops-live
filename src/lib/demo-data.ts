@@ -4,6 +4,8 @@ import {
   BetRecord,
   BridgeClientRecord,
   CatalogItemRecord,
+  CreatorSuggestionBoostRecord,
+  CreatorSuggestionRecord,
   GameSuggestionBoostRecord,
   GameSuggestionRecord,
   GoogleAccountRecord,
@@ -474,6 +476,39 @@ export const demoGameSuggestions: GameSuggestionRecord[] = [
 ];
 
 export const demoGameSuggestionBoosts: GameSuggestionBoostRecord[] = [];
+
+export const demoCreatorSuggestions: CreatorSuggestionRecord[] = [
+  {
+    id: "cs-1",
+    viewerId: "viewer_lia",
+    slug: "canal-pequena-grande-ideia",
+    name: "Pequena Grande Ideia",
+    channelUrl: "https://www.youtube.com/@pequenagrandeideia",
+    platform: "youtube",
+    category: "ensaios e cultura pop",
+    reason: "Canal bom para descobrir videos longos, bem editados e cheios de pauta para live.",
+    totalVotes: 700,
+    status: "open",
+    createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 40).toISOString(),
+    updatedAt: new Date(now.getTime() - 1000 * 60 * 60 * 8).toISOString(),
+  },
+  {
+    id: "cs-2",
+    viewerId: "viewer_caio",
+    slug: "streamer-cozy-games-br",
+    name: "Cozy Games BR",
+    channelUrl: "https://www.twitch.tv/cozygamesbr",
+    platform: "twitch",
+    category: "indies e cozy games",
+    reason: "Lives tranquilas e com bastante jogo indie para conhecer.",
+    totalVotes: 420,
+    status: "accepted",
+    createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 22).toISOString(),
+    updatedAt: new Date(now.getTime() - 1000 * 60 * 60 * 3).toISOString(),
+  },
+];
+
+export const demoCreatorSuggestionBoosts: CreatorSuggestionBoostRecord[] = [];
 
 export const demoVideoSuggestions: VideoSuggestionRecord[] = [
   {
