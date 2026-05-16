@@ -6758,15 +6758,23 @@ export async function adjustViewerBalance({
   viewerId,
   amount,
   reason,
+  kind = "manual_adjustment",
+  source = "admin",
 }: {
   viewerId: string;
   amount: number;
   reason: string;
+  kind?: LedgerEntryRecord["kind"];
+  source?: string;
 }) {
   const db = getDb();
 
   if (isDemoMode || !db) {
     const store = getDemoStore();
+    const viewer = getDemoViewerById(store, viewerId);
+    if (!viewer) {
+      throw new Error("viewer_not_found");
+    }
     const balance = getBalance(store, viewerId);
     balance.currentBalance += amount;
     if (amount > 0) {
@@ -6778,15 +6786,20 @@ export async function adjustViewerBalance({
 
     return createLedgerEntry(store, {
       viewerId,
-      kind: "manual_adjustment",
+      kind,
       amount,
-      source: "admin",
+      source,
       externalEventId: null,
       metadata: { reason },
     });
   }
 
-  await db
+  const viewer = await withViewerById(viewerId);
+  if (!viewer) {
+    throw new Error("viewer_not_found");
+  }
+
+  const updated = await db
     .update(viewerBalances)
     .set({
       currentBalance: sql`${viewerBalances.currentBalance} + ${amount}`,
@@ -6794,14 +6807,24 @@ export async function adjustViewerBalance({
       lifetimeSpent: amount < 0 ? sql`${viewerBalances.lifetimeSpent} + ${Math.abs(amount)}` : viewerBalances.lifetimeSpent,
       lastSyncedAt: new Date(),
     })
-    .where(eq(viewerBalances.viewerId, viewerId));
+    .where(eq(viewerBalances.viewerId, viewerId))
+    .returning({ viewerId: viewerBalances.viewerId });
+
+  if (updated.length === 0) {
+    await db.insert(viewerBalances).values({
+      viewerId,
+      currentBalance: amount,
+      lifetimeEarned: amount > 0 ? amount : 0,
+      lifetimeSpent: amount < 0 ? Math.abs(amount) : 0,
+    });
+  }
 
   await db.insert(pointLedger).values({
     id: randomUUID(),
     viewerId,
-    kind: "manual_adjustment",
+    kind,
     amount,
-    source: "admin",
+    source,
     externalEventId: null,
     metadata: { reason },
   });

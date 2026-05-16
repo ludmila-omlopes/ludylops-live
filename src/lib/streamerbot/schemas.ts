@@ -190,6 +190,19 @@ export const manualAdjustSchema = z.object({
   reason: z.string().min(3).max(255),
 });
 
+export const adminAirdropSchema = z.object({
+  amount: z.number().int().min(1).max(100000),
+  reason: z.string().trim().min(3).max(255),
+  viewerIds: z.array(z.string().min(1)).min(1).max(100).optional(),
+  confirmationText: z
+    .string()
+    .trim()
+    .transform((value) => value.toUpperCase())
+    .refine((value) => value === "AIRDROP", {
+      message: "Confirmation text must be AIRDROP.",
+    }),
+});
+
 export const streamerbotEventSchema = z.object({
   eventId: z.string().min(3),
   eventType: z.enum(["presence_tick", "chat_bonus", "manual_adjustment"]),
