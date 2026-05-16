@@ -2697,6 +2697,10 @@ function listDemoCreatorSuggestions(
   return [...store.creatorSuggestions]
     .filter((entry) => (featured ? entry.status === "featured" : entry.status !== "featured"))
     .sort((a, b) => {
+      if (featured) {
+        return b.name.localeCompare(a.name, "pt-BR", { sensitivity: "base" });
+      }
+
       if (b.totalVotes !== a.totalVotes) {
         return b.totalVotes - a.totalVotes;
       }
@@ -4462,7 +4466,7 @@ export async function listFeaturedCreatorSuggestions() {
       .select()
       .from(creatorSuggestions)
       .where(eq(creatorSuggestions.status, "featured"))
-      .orderBy(desc(creatorSuggestions.totalVotes), desc(creatorSuggestions.createdAt));
+      .orderBy(desc(creatorSuggestions.name));
   } catch (error) {
     if (isMissingCreatorSuggestionSchemaError(error)) {
       return listDemoCreatorSuggestions(null, { featured: true });

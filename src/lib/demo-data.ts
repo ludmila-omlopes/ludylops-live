@@ -684,7 +684,7 @@ export const demoCreatorSuggestions: CreatorSuggestionRecord[] = [
     category: "indies e cozy games",
     reason: "Lives tranquilas e com bastante jogo indie para conhecer.",
     totalVotes: 420,
-    status: "accepted",
+    status: "featured",
     createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 22).toISOString(),
     updatedAt: new Date(now.getTime() - 1000 * 60 * 60 * 3).toISOString(),
   },
