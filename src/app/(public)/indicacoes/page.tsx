@@ -8,54 +8,45 @@ import { CreatorSuggestionList } from "@/components/creator-suggestion-list";
 import {
   getViewerDashboard,
   listCreatorSuggestions,
+  listFeaturedCreatorSuggestions,
 } from "@/lib/db/repository";
+import type { CreatorSuggestionWithMeta } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Inspirações da comunidade | Pipetz",
   description: "YouTubers e streamers recomendados para a comunidade.",
 };
 
-const adminCreatorRecommendations = [
-  {
-    name: "Nerdologia",
-    href: "https://www.youtube.com/@nerdologia",
-    avatarUrl: "https://unavatar.io/youtube/nerdologia",
-    platform: "YouTube",
-    category: "ciência e cultura pop",
-    context:
-      "Vídeos bem pesquisados para quando a live precisa de pauta curiosa e nerd.",
-  },
-  {
-    name: "Jogabilidade",
-    href: "https://www.youtube.com/@Jogabilidade",
-    avatarUrl: "https://unavatar.io/youtube/Jogabilidade",
-    platform: "YouTube",
-    category: "games",
-    context:
-      "Conversas, reviews e contexto de jogos com um ritmo bom para descobrir coisa nova.",
-  },
-  {
-    name: "Alanzoka",
-    href: "https://www.twitch.tv/alanzoka",
-    avatarUrl: "https://unavatar.io/twitch/alanzoka",
-    platform: "Twitch",
-    category: "variedades e gameplay",
-    context:
-      "Referência brasileira de live variada, caótica na medida e cheia de repertório.",
-  },
-];
+function getCreatorAvatarUrl(creator: CreatorSuggestionWithMeta) {
+  const url = new URL(creator.channelUrl);
+  const handle = url.pathname.split("/").filter(Boolean).at(-1)?.replace(/^@/, "");
+
+  if (!handle) {
+    return "https://unavatar.io/pipetz";
+  }
+
+  if (creator.platform === "twitch") {
+    return `https://unavatar.io/twitch/${handle}`;
+  }
+
+  if (creator.platform === "youtube") {
+    return `https://unavatar.io/youtube/${handle}`;
+  }
+
+  return `https://unavatar.io/${handle}`;
+}
 
 function AdminCreatorCard({
   creator,
 }: {
-  creator: (typeof adminCreatorRecommendations)[number];
+  creator: CreatorSuggestionWithMeta;
 }) {
   return (
     <article className="card-brutal flex h-full flex-col bg-[var(--color-paper)] p-4">
       <div className="flex flex-1 flex-col gap-4">
         <div className="flex items-center gap-3">
           <img
-            src={creator.avatarUrl}
+            src={getCreatorAvatarUrl(creator)}
             alt={`Foto de perfil de ${creator.name}`}
             className="size-16 shrink-0 border-2 border-[var(--color-ink)] object-cover"
           />
@@ -74,10 +65,10 @@ function AdminCreatorCard({
             {creator.name}
           </h3>
           <p className="text-sm leading-6 text-[var(--color-ink-soft)]">
-            {creator.context}
+            {creator.reason}
           </p>
           <a
-            href={creator.href}
+            href={creator.channelUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-brutal inline-flex items-center justify-center gap-2 bg-[var(--color-paper)] px-4 py-2 text-xs text-[var(--color-ink)]"
@@ -94,7 +85,8 @@ function AdminCreatorCard({
 export default async function IndicacoesPage() {
   const session = await auth();
   const activeViewerId = session?.user?.activeViewerId ?? null;
-  const [creatorSuggestions, dashboard] = await Promise.all([
+  const [featuredCreators, creatorSuggestions, dashboard] = await Promise.all([
+    listFeaturedCreatorSuggestions(),
     listCreatorSuggestions(activeViewerId),
     activeViewerId ? getViewerDashboard(activeViewerId) : Promise.resolve(null),
   ]);
@@ -135,8 +127,8 @@ export default async function IndicacoesPage() {
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {adminCreatorRecommendations.map((creator) => (
-                <AdminCreatorCard key={creator.href} creator={creator} />
+              {featuredCreators.map((creator) => (
+                <AdminCreatorCard key={creator.id} creator={creator} />
               ))}
             </div>
           </section>

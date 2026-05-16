@@ -2713,14 +2713,23 @@ function listDemoVideoSuggestions(viewerId?: string | null) {
     );
 }
 
-function listDemoCreatorSuggestions(viewerId?: string | null) {
+function listDemoCreatorSuggestions(
+  viewerId?: string | null,
+  options?: { featured?: boolean },
+) {
   const store = getDemoStore();
   const viewerBoosts = viewerId
     ? store.creatorSuggestionBoosts.filter((entry) => entry.viewerId === viewerId)
     : [];
+  const featured = options?.featured ?? false;
 
   return [...store.creatorSuggestions]
+    .filter((entry) => (featured ? entry.status === "featured" : entry.status !== "featured"))
     .sort((a, b) => {
+      if (featured) {
+        return b.name.localeCompare(a.name, "pt-BR", { sensitivity: "base" });
+      }
+
       if (b.totalVotes !== a.totalVotes) {
         return b.totalVotes - a.totalVotes;
       }
@@ -4477,7 +4486,7 @@ export async function listCreatorSuggestions(viewerId?: string | null) {
   const db = getDb();
 
   if (isDemoMode || !db) {
-    return listDemoCreatorSuggestions(viewerId);
+    return listDemoCreatorSuggestions(viewerId, { featured: false });
   }
 
   let suggestionRows: Array<typeof creatorSuggestions.$inferSelect>;
@@ -4485,14 +4494,18 @@ export async function listCreatorSuggestions(viewerId?: string | null) {
 
   try {
     [suggestionRows, boostRows] = await Promise.all([
-      db.select().from(creatorSuggestions).orderBy(desc(creatorSuggestions.totalVotes), desc(creatorSuggestions.createdAt)),
+      db
+        .select()
+        .from(creatorSuggestions)
+        .where(sql`${creatorSuggestions.status} <> 'featured'`)
+        .orderBy(desc(creatorSuggestions.totalVotes), desc(creatorSuggestions.createdAt)),
       viewerId
         ? db.select().from(creatorSuggestionBoosts).where(eq(creatorSuggestionBoosts.viewerId, viewerId))
         : Promise.resolve([]),
     ]);
   } catch (error) {
     if (isMissingCreatorSuggestionSchemaError(error)) {
-      return listDemoCreatorSuggestions(viewerId);
+      return listDemoCreatorSuggestions(viewerId, { featured: false });
     }
     throw error;
   }
@@ -4510,6 +4523,44 @@ export async function listCreatorSuggestions(viewerId?: string | null) {
       suggestion,
       viewer: viewerMap.get(suggestion.viewerId) ?? null,
       boosts: serializedBoosts.filter((entry) => entry.suggestionId === suggestion.id),
+    }),
+  );
+}
+
+export async function listFeaturedCreatorSuggestions() {
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    return listDemoCreatorSuggestions(null, { featured: true });
+  }
+
+  let suggestionRows: Array<typeof creatorSuggestions.$inferSelect>;
+
+  try {
+    suggestionRows = await db
+      .select()
+      .from(creatorSuggestions)
+      .where(eq(creatorSuggestions.status, "featured"))
+      .orderBy(desc(creatorSuggestions.name));
+  } catch (error) {
+    if (isMissingCreatorSuggestionSchemaError(error)) {
+      return listDemoCreatorSuggestions(null, { featured: true });
+    }
+    throw error;
+  }
+
+  const serializedSuggestions = suggestionRows.map(serializeCreatorSuggestion);
+  const viewerIds = [...new Set(serializedSuggestions.map((entry) => entry.viewerId))];
+  const suggestionViewers = viewerIds.length
+    ? await db.select().from(users).where(inArray(users.id, viewerIds))
+    : [];
+  const viewerMap = new Map(suggestionViewers.map((row) => [row.id, serializeViewer(row)]));
+
+  return serializedSuggestions.map((suggestion) =>
+    buildCreatorSuggestionWithMeta({
+      suggestion,
+      viewer: viewerMap.get(suggestion.viewerId) ?? null,
+      boosts: [],
     }),
   );
 }
