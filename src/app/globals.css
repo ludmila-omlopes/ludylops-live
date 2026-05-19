@@ -14,6 +14,9 @@
   --color-pink-hot: #ff59b7;
   --color-blue: #40a9ff;
   --color-yellow: #40a9ff;
+  --color-admin: #ffd44d;
+  --color-admin-hover: #ffe27a;
+  --color-admin-ink: #000000;
   --color-lavender: #f0e8f8;
   --color-sky: #d8efff;
   --color-mint: #00beae;
@@ -113,6 +116,9 @@ html[data-theme="dark"] {
   --color-pink-hot: #ff5fa8;
   --color-blue: #54c7ff;
   --color-yellow: #ffd44d;
+  --color-admin: #ffd44d;
+  --color-admin-hover: #ffe27a;
+  --color-admin-ink: #000000;
   --color-lavender: #151515;
   --color-sky: #101d25;
   --color-mint: #00beae;
@@ -611,6 +617,16 @@ button {
   box-shadow: var(--shadow);
 }
 
+.admin-action {
+  background: var(--color-admin);
+  color: var(--color-admin-ink);
+  box-shadow: var(--shadow);
+}
+
+.admin-action:hover {
+  background: var(--color-admin-hover);
+}
+
 /* Pastel action surfaces should keep dark ink in both light and dark themes. */
 .pastel-action {
   color: var(--color-accent-ink);
@@ -620,8 +636,6 @@ button {
 .btn-brutal[class*="bg-[var(--color-purple)]"],
 .btn-brutal[class*="bg-[var(--color-pink)]"],
 .btn-brutal[class*="bg-[var(--color-yellow)]"],
-.btn-brutal[class*="bg-[var(--color-sky)]"],
-.btn-brutal[class*="bg-[var(--color-lavender)]"],
 .btn-brutal[class*="bg-[var(--color-mint)]"] {
   color: var(--color-accent-ink);
 }

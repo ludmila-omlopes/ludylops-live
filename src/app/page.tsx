@@ -1,9 +1,10 @@
-﻿import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
 import { auth } from "@/auth";
 import { AuthButtons } from "@/components/auth-buttons";
+import { CurrentGameSpotlight } from "@/components/current-game-spotlight";
 import { LivestreamIndicator } from "@/components/livestream-indicator";
 import { QuickNavGrid } from "@/components/quick-nav-grid";
 import { StickerBadge } from "@/components/sticker-badge";
@@ -24,6 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCatalog, getLeaderboard, getViewerDashboard, listBets } from "@/lib/db/repository";
+import { getCurrentGame } from "@/lib/current-game";
 import { isStreamerbotLivestreamActive } from "@/lib/streamerbot/live-status";
 import type { BetWithOptionsRecord } from "@/lib/types";
 import { cn, formatPipetz } from "@/lib/utils";
@@ -444,10 +446,10 @@ function FeatureShowcase({
             className="max-w-xl text-4xl uppercase leading-[0.9] sm:text-5xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Voce participa da minha live de verdade.
+            Você participa da minha live de verdade.
           </h2>
           <p className="mt-4 max-w-xl text-base leading-7 text-[var(--color-ink-soft)]">
-            Eu abro a live, voce junta pipetz, entra nas apostas e ainda solta resgates
+            Eu abro a live, você junta pipetz, entra nas apostas e ainda solta resgates
             que aparecem comigo ao vivo.
           </p>
 
@@ -478,7 +480,7 @@ function LiveThermometerSection({
           className="max-w-md text-3xl uppercase leading-[0.92] sm:text-4xl"
           style={{ fontFamily: "var(--font-display)" }}
         >
-          O que voces estao aprontando comigo agora.
+          O que vocês estão aprontando comigo agora.
         </h2>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -616,11 +618,12 @@ export default async function Home({ searchParams }: HomePageProps) {
     getSessionAccountProtectionStatus(session) ?? getAccountProtectionStatusFromSearchParams(resolvedSearchParams);
   const hasUsableSession = hasUsableAppSession(session) && !accountProtectionStatus;
   const activeViewerId = hasUsableSession ? session?.user?.activeViewerId ?? null : null;
-  const [catalog, leaderboard, bets, isLive] = await Promise.all([
+  const [catalog, leaderboard, bets, isLive, currentGame] = await Promise.all([
     getCatalog(),
     getLeaderboard(),
     listBets(activeViewerId),
     isStreamerbotLivestreamActive(),
+    getCurrentGame(),
   ]);
   const activeBets = bets.filter((bet) => bet.status === "open");
 
@@ -673,13 +676,13 @@ export default async function Home({ searchParams }: HomePageProps) {
     {
       label: "seu ranking",
       value: viewerRank ? `#${viewerRank}` : "--",
-      note: viewerRank ? "posicao atual na disputa" : "sincronize sua conta",
+      note: viewerRank ? "posição atual na disputa" : "sincronize sua conta",
       bg: "bg-[var(--color-blue)]",
     },
     {
       label: "ganhos",
       value: dashboard ? formatPipetz(dashboard.balance.lifetimeEarned) : "--",
-      note: "pipetz que ja passaram pela conta",
+      note: "pipetz que já passaram pela conta",
       bg: "bg-[var(--color-pink)]",
     },
     {
@@ -743,8 +746,8 @@ export default async function Home({ searchParams }: HomePageProps) {
   const heroPosterHeading = hasUsableSession ? dashboard?.viewer.youtubeDisplayName ?? "Conta conectada" : "LUDYLOPS";
 
   const heroPosterDescription = hasUsableSession
-    ? "Esse e o seu cantinho para acompanhar saldo, ranking e o que esta rolando comigo ao vivo."
-    : "Esse painel e o cantinho da minha live para o chat apostar, resgatar e acompanhar o ranking.";
+    ? "Esse é o seu cantinho para acompanhar saldo, ranking e o que está rolando comigo ao vivo."
+    : "Esse painel é o cantinho da minha live para o chat apostar, resgatar e acompanhar o ranking.";
 
   const metrics = hasUsableSession ? authedMetrics : publicMetrics;
   const shouldShowViewerLinkingNotice = Boolean(hasUsableSession && !session?.user?.isLinked);
@@ -834,6 +837,8 @@ export default async function Home({ searchParams }: HomePageProps) {
 
       <FeatureShowcase features={features} />
 
+      <CurrentGameSpotlight game={currentGame} />
+
       <LiveThermometerSection metrics={metrics} loggedIn={hasUsableSession} />
 
       {false ? (
@@ -850,7 +855,7 @@ export default async function Home({ searchParams }: HomePageProps) {
             {
               href: "/jogos",
               label: "Jogos",
-              value: "Sugira proximos",
+              value: "Sugira próximos",
               sublabel: "Me empurre pro proximo caos",
               emoji: "PLAY",
               bg: "bg-[var(--color-blue)]",

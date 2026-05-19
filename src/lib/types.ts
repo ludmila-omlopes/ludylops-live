@@ -346,6 +346,17 @@ export interface ActiveDeathCounterGameRecord {
   updatedBy: string | null;
 }
 
+export interface CurrentGameRecord {
+  igdbId: number;
+  name: string;
+  releaseYear: number | null;
+  coverImageUrl: string | null;
+  platforms: string[];
+  genres: string[];
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
 export interface LivestreamStatusRecord {
   isLive: boolean;
   source: "automatic" | "manual";

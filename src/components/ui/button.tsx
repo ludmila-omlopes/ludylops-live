@@ -17,6 +17,7 @@ const buttonVariants = cva(
         info: "bg-[var(--color-sky)] text-[var(--color-ink)]",
         danger: "bg-[var(--color-rose)] text-[var(--color-ink)]",
         pink: "bg-[var(--color-pink)] text-[var(--color-accent-ink)]",
+        admin: "admin-action text-[var(--color-admin-ink)]",
       },
       size: {
         xs: "px-3 py-2 text-[11px]",

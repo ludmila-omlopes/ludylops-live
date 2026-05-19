@@ -257,7 +257,10 @@ export function GameSuggestionCard({
           </div>
 
           {canEditCatalog ? (
-            <div className="mt-4 border-t border-[var(--color-ink)]/30 pt-4">
+            <div className="mt-4 border-t-2 border-[var(--color-admin)] bg-[var(--color-admin)]/15 p-3">
+              <p className="mono mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--color-admin)]">
+                Ação admin
+              </p>
               {isEditingCatalog ? (
                 <div className="grid gap-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -295,7 +298,7 @@ export function GameSuggestionCard({
                           type="button"
                           onClick={() => setSelectedCatalogResult(game)}
                           disabled={isPending}
-                          className="border border-[var(--color-ink)] bg-[var(--color-paper)] px-3 py-2 text-left text-xs font-bold hover:bg-[var(--color-sky)] focus-visible:bg-[var(--color-sky)] focus-visible:outline-none"
+                          className="border border-[var(--color-admin)] bg-[var(--color-paper)] px-3 py-2 text-left text-xs font-bold hover:bg-[var(--color-admin)] hover:text-[var(--color-admin-ink)] focus-visible:bg-[var(--color-admin)] focus-visible:text-[var(--color-admin-ink)] focus-visible:outline-none"
                         >
                           {game.name}
                           {game.releaseYear ? ` (${game.releaseYear})` : ""}
@@ -308,7 +311,7 @@ export function GameSuggestionCard({
                 <Button
                   type="button"
                   size="xs"
-                  variant="neutral"
+                  variant="admin"
                   onClick={() => {
                     setCatalogQuery(suggestion.name);
                     setIsEditingCatalog(true);
@@ -435,7 +438,7 @@ export function GameSuggestionCard({
                   <Button
                     type="button"
                     size="sm"
-                    variant="accent"
+                    variant="admin"
                     onClick={() => applyCatalogResult(selectedCatalogResult)}
                     disabled={isPending}
                   >
