@@ -23,7 +23,11 @@ function formatExpiry(value: string) {
   }).format(new Date(value));
 }
 
-export function ViewerLinkCard() {
+export function ViewerLinkCard({
+  alreadyLinked = false,
+}: {
+  alreadyLinked?: boolean;
+}) {
   const [link, setLink] = useState<ViewerLinkPayload | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,7 +85,7 @@ export function ViewerLinkCard() {
       }
 
       setLink(payload.data.link);
-      setFeedback("Código atualizado.");
+      setFeedback(link ? "Código substituído." : "Código atualizado.");
     });
   }
 
@@ -93,12 +97,16 @@ export function ViewerLinkCard() {
             Vínculo da live
           </p>
           <h2 className="mt-3 text-3xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
-            Vincule seu canal do YouTube.
+            {alreadyLinked ? "Adicionar outro canal do YouTube." : "Vincule seu canal do YouTube."}
           </h2>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--color-ink-soft)] sm:text-base">
-            Para interagir com a live usando seus pipetz, gere um código aqui durante a live e envie{" "}
-            <span className="font-black">!link CÓDIGO</span> no chat do YouTube. O vínculo só pode
-            ser confirmado enquanto a live está acontecendo.
+            {alreadyLinked
+              ? "Gere um código e envie pelo chat do outro canal. Ele será adicionado a esta mesma conta Google sem remover os canais já vinculados."
+              : "Para interagir com a live usando seus pipetz, gere um código aqui durante a live e envie"}{" "}
+            <span className="font-black">!link CÓDIGO</span>
+            {alreadyLinked
+              ? " durante a live."
+              : " no chat do YouTube. O vínculo só pode ser confirmado enquanto a live está acontecendo."}
           </p>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
@@ -111,7 +119,7 @@ export function ViewerLinkCard() {
               </p>
               <p className="mt-3 text-sm leading-6 text-[var(--color-ink-soft)]">
                 {link
-                  ? `Expira em ${formatExpiry(link.expiresAt)}.`
+                  ? `Expira em ${formatExpiry(link.expiresAt)}. Gerar outro código substitui este código não usado.`
                   : "Gere um código novo para fazer o vínculo pelo chat."}
               </p>
             </div>
@@ -130,13 +138,13 @@ export function ViewerLinkCard() {
 
           <div className="mt-6 grid gap-3 text-sm text-[var(--color-ink-soft)] sm:grid-cols-3">
             <div className="card-flat bg-[var(--color-mint)] p-4 text-[var(--color-accent-ink)]">
-              1. Entre no site com o login que você preferir.
+              1. Entre no site com a conta Google que vai gerenciar os canais.
             </div>
             <div className="card-flat bg-[var(--color-yellow)] p-4 text-[var(--color-accent-ink)]">
               2. Durante a live, gere o código e mande <span className="font-black">!link CÓDIGO</span> no chat.
             </div>
             <div className="card-flat bg-[var(--color-pink)] p-4 text-[var(--color-accent-ink)]">
-              3. O bot vincula seu viewer e seu saldo passa a seguir esse canal.
+              3. O canal fica disponível nesta conta sem apagar vínculos existentes.
             </div>
           </div>
         </div>

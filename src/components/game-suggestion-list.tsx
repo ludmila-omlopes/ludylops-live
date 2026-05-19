@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { GameSuggestionCard } from "@/components/game-suggestion-card";
+import { getVisibleGameSuggestionSections } from "@/lib/game-suggestions/sections";
 import type { GameSuggestionWithMeta } from "@/lib/types";
 
 export function GameSuggestionList({
@@ -49,18 +50,18 @@ export function GameSuggestionList({
     );
   }
 
-  const sorted = [...localSuggestions].sort((a, b) => {
-    if (b.totalVotes !== a.totalVotes) {
-      return b.totalVotes - a.totalVotes;
-    }
-
-    return +new Date(b.createdAt) - +new Date(a.createdAt);
-  });
-  const visibleSuggestions = sorted.filter((suggestion) => suggestion.status !== "rejected");
+  const { recommendedSuggestions, playedSuggestions, visibleCount } =
+    getVisibleGameSuggestionSections(localSuggestions);
 
   return (
     <div className="grid gap-4">
-      {visibleSuggestions.map((suggestion, index) => (
+      {visibleCount === 0 ? (
+        <div className="card-brutal-static bg-[var(--color-paper)] p-4 text-sm font-bold text-[var(--color-ink-soft)]">
+          Nenhuma sugestão disponível no momento.
+        </div>
+      ) : null}
+
+      {recommendedSuggestions.map((suggestion, index) => (
         <GameSuggestionCard
           key={suggestion.id}
           suggestion={suggestion}
@@ -73,6 +74,33 @@ export function GameSuggestionList({
           onCatalogUpdate={handleCatalogUpdate}
         />
       ))}
+
+      {playedSuggestions.length > 0 ? (
+        <section className="mt-6 grid gap-4 border-t-2 border-dashed border-[var(--color-ink)] pt-6">
+          <div>
+            <h3
+              className="text-xl font-bold uppercase"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Jogos já jogados
+            </h3>
+          </div>
+
+          {playedSuggestions.map((suggestion, index) => (
+            <GameSuggestionCard
+              key={suggestion.id}
+              suggestion={suggestion}
+              index={recommendedSuggestions.length + index}
+              loggedIn={loggedIn}
+              canBoost={canInteract}
+              canEditCatalog={isAdmin}
+              viewerBalance={localBalance}
+              onBoostSuccess={handleBoostSuccess}
+              onCatalogUpdate={handleCatalogUpdate}
+            />
+          ))}
+        </section>
+      ) : null}
     </div>
   );
 }

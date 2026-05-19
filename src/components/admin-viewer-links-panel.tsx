@@ -59,6 +59,21 @@ function buildYoutubeCandidateLabel(entry: AdminViewerDirectoryRecord) {
   return [entry.youtubeDisplayName, entry.youtubeHandle, maskEmail(entry.email)].filter(Boolean).join(" . ");
 }
 
+type LinkedGoogleAccountSummary = {
+  googleAccountId: string;
+  email: string | null;
+  displayName: string | null;
+  channelNames: string[];
+};
+
+function buildLinkedAccountLabel(account: LinkedGoogleAccountSummary) {
+  const emailMask = maskEmail(account.email);
+  const visibleChannels = account.channelNames.slice(0, 3).join(", ");
+  const extras = account.channelNames.length > 3 ? ` (+${account.channelNames.length - 3})` : "";
+  const channelText = visibleChannels ? `${visibleChannels}${extras}` : "";
+  return [emailMask, channelText].filter(Boolean).join(" . ");
+}
+
 function maskEmail(email: string | null | undefined) {
   if (!email) {
     return null;
@@ -85,6 +100,12 @@ export function AdminViewerLinksPanel({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const [extraGoogleAccountId, setExtraGoogleAccountId] = useState("");
+  const [extraViewerId, setExtraViewerId] = useState("");
+  const [extraConfirmationText, setExtraConfirmationText] = useState("");
+  const [extraFeedback, setExtraFeedback] = useState<string | null>(null);
+  const [isExtraPending, startExtraTransition] = useTransition();
+
   const googleCandidates = useMemo(
     () => entries.filter((entry) => entry.googleAccountId && entry.isSyntheticYoutubeChannel),
     [entries],
@@ -94,8 +115,40 @@ export function AdminViewerLinksPanel({
     [entries],
   );
 
+  const linkedGoogleAccounts = useMemo<LinkedGoogleAccountSummary[]>(() => {
+    const byId = new Map<string, LinkedGoogleAccountSummary>();
+    for (const entry of entries) {
+      if (!entry.googleAccountId || entry.isSyntheticYoutubeChannel) {
+        continue;
+      }
+      const existing = byId.get(entry.googleAccountId);
+      if (existing) {
+        existing.channelNames.push(entry.youtubeDisplayName);
+        continue;
+      }
+      byId.set(entry.googleAccountId, {
+        googleAccountId: entry.googleAccountId,
+        email: entry.googleAccountEmail,
+        displayName: entry.googleAccountDisplayName,
+        channelNames: [entry.youtubeDisplayName],
+      });
+    }
+    return Array.from(byId.values()).sort((left, right) =>
+      (left.email ?? "").localeCompare(right.email ?? ""),
+    );
+  }, [entries]);
+
+  const unlinkedYoutubeChannels = useMemo(
+    () => entries.filter((entry) => !entry.isSyntheticYoutubeChannel && !entry.googleAccountId),
+    [entries],
+  );
+
   const selectedGoogleViewer = entries.find((entry) => entry.id === googleViewerId) ?? null;
   const selectedYoutubeViewer = entries.find((entry) => entry.id === youtubeViewerId) ?? null;
+  const selectedExtraAccount =
+    linkedGoogleAccounts.find((entry) => entry.googleAccountId === extraGoogleAccountId) ?? null;
+  const selectedExtraViewer = entries.find((entry) => entry.id === extraViewerId) ?? null;
+  const isExtraConfirmationValid = extraConfirmationText.trim().toUpperCase() === "VINCULAR";
   const totalLinked = entries.filter((entry) => entry.isLinked).length;
   const totalGoogleOnly = entries.filter((entry) => entry.googleAccountId && entry.isSyntheticYoutubeChannel).length;
   const totalYoutubeOnly = entries.filter((entry) => !entry.googleAccountId && !entry.isSyntheticYoutubeChannel).length;
@@ -139,6 +192,48 @@ export function AdminViewerLinksPanel({
         router.refresh();
       } catch (error) {
         setFeedback(error instanceof Error ? error.message : "Falha ao vincular usuários.");
+      }
+    });
+  }
+
+  function submitAttachChannel() {
+    if (!extraGoogleAccountId || !extraViewerId) {
+      setExtraFeedback("Escolha uma conta Google e um canal do YouTube.");
+      return;
+    }
+    if (!isExtraConfirmationValid) {
+      setExtraFeedback('Digite "VINCULAR" para liberar a operação.');
+      return;
+    }
+
+    setExtraFeedback(null);
+    startExtraTransition(async () => {
+      try {
+        const response = await fetch("/api/admin/viewers/attach-channel", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            googleAccountId: extraGoogleAccountId,
+            viewerId: extraViewerId,
+            confirmationText: extraConfirmationText.trim(),
+          }),
+        });
+
+        const payload = (await response.json()) as { ok?: boolean; error?: string };
+        if (!response.ok || !payload.ok) {
+          setExtraFeedback(payload.error ?? "Falha ao adicionar canal.");
+          return;
+        }
+
+        setExtraFeedback("Canal adicionado com sucesso.");
+        setExtraGoogleAccountId("");
+        setExtraViewerId("");
+        setExtraConfirmationText("");
+        router.refresh();
+      } catch (error) {
+        setExtraFeedback(error instanceof Error ? error.message : "Falha ao adicionar canal.");
       }
     });
   }
@@ -312,6 +407,141 @@ export function AdminViewerLinksPanel({
               <p className="mt-2 text-sm text-[var(--color-ink-soft)]">Google ou YouTube sem pareamento</p>
             </div>
           </div>
+        </div>
+
+        <div className="mt-6 card-brutal-static p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="mono text-xs uppercase tracking-[0.24em] text-[var(--color-ink-soft)]">
+                Adicionar canal extra
+              </p>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-ink-soft)]">
+                Use este fluxo quando uma conta Google já tem um canal vinculado e você precisa
+                associar outro canal do YouTube à mesma conta. O canal extra mantém saldo e
+                histórico próprios.
+              </p>
+            </div>
+            {extraFeedback ? <div className="retro-label neutral-chip">{extraFeedback}</div> : null}
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="text-sm font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">
+                Conta Google
+              </span>
+              <Select
+                value={extraGoogleAccountId || null}
+                onValueChange={(value) => setExtraGoogleAccountId(value ?? "")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Escolha a conta Google">
+                    {(value) => {
+                      const account = linkedGoogleAccounts.find(
+                        (entry) => entry.googleAccountId === value,
+                      );
+                      return account ? buildLinkedAccountLabel(account) : "Escolha a conta Google";
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {linkedGoogleAccounts.map((account) => (
+                    <SelectItem key={account.googleAccountId} value={account.googleAccountId}>
+                      {buildLinkedAccountLabel(account)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs font-bold text-[var(--color-ink-soft)]">
+                Mostro aqui contas Google que já têm ao menos um canal vinculado.
+              </span>
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-sm font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">
+                Canal do YouTube
+              </span>
+              <Select
+                value={extraViewerId || null}
+                onValueChange={(value) => setExtraViewerId(value ?? "")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Escolha um canal sem conta Google">
+                    {(value) => {
+                      const entry = unlinkedYoutubeChannels.find((item) => item.id === value);
+                      return entry
+                        ? buildYoutubeCandidateLabel(entry)
+                        : "Escolha um canal sem conta Google";
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {unlinkedYoutubeChannels.map((entry) => (
+                    <SelectItem key={entry.id} value={entry.id}>
+                      {buildYoutubeCandidateLabel(entry)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs font-bold text-[var(--color-ink-soft)]">
+                Só listo canais reais do YouTube que ainda não foram vinculados a nenhuma conta.
+              </span>
+            </label>
+          </div>
+
+          <div className="mt-4 card-flat bg-[var(--color-paper)] p-4">
+            <p className="mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-ink-soft)]">
+              Revisão da operação
+            </p>
+            <div className="mt-3 grid gap-3 text-sm text-[var(--color-ink-soft)]">
+              <p>
+                <span className="font-black text-[var(--color-ink)]">Conta Google:</span>{" "}
+                {selectedExtraAccount
+                  ? buildLinkedAccountLabel(selectedExtraAccount)
+                  : "Escolha uma conta Google"}
+              </p>
+              <p>
+                <span className="font-black text-[var(--color-ink)]">Canal a adicionar:</span>{" "}
+                {selectedExtraViewer
+                  ? buildYoutubeCandidateLabel(selectedExtraViewer)
+                  : "Escolha um canal"}
+              </p>
+              <p>
+                Essa ação apenas cria o vínculo: o canal passa a aparecer como canal adicional da
+                conta Google, sem mesclar saldo, histórico ou sugestões. Se o canal já pertencer a
+                outra conta Google, eu bloqueio a operação.
+              </p>
+            </div>
+          </div>
+
+          <label className="mt-4 grid gap-2">
+            <span className="text-sm font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">
+              Confirmação
+            </span>
+            <Input
+              value={extraConfirmationText}
+              onChange={(event) => setExtraConfirmationText(event.target.value)}
+              placeholder='Digite "VINCULAR"'
+              className="px-3 py-2"
+            />
+            <span className="text-xs font-bold text-[var(--color-ink-soft)]">
+              Essa confirmação existe para evitar vínculos acidentais.
+            </span>
+          </label>
+
+          <Button
+            type="button"
+            onClick={submitAttachChannel}
+            disabled={
+              isExtraPending ||
+              !extraGoogleAccountId ||
+              !extraViewerId ||
+              !isExtraConfirmationValid
+            }
+            size="sm"
+            className="mt-4 w-full sm:w-fit"
+          >
+            {isExtraPending ? "Adicionando..." : "Adicionar canal"}
+          </Button>
         </div>
 
         <div className="mt-6 overflow-hidden rounded-[var(--radius)] border-[3px] border-[var(--color-ink)] shadow-[4px_4px_0_var(--shadow-color)]">

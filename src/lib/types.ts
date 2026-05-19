@@ -178,6 +178,12 @@ export interface AdminViewerLinkResult {
   viewer: AdminViewerDirectoryRecord;
 }
 
+export interface AdminViewerChannelAttachResult {
+  googleAccountId: string;
+  viewerId: string;
+  viewer: AdminViewerDirectoryRecord;
+}
+
 export interface CatalogItemRecord {
   id: string;
   slug: string;
