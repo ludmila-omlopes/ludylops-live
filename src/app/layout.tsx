@@ -89,6 +89,7 @@ export default async function RootLayout({
             isAdmin={isAdmin}
             isLive={isLive}
             initialTheme={initialTheme}
+            showViewerLinkingAlert={Boolean(session?.user?.email && session.user.isLinked === false)}
           >
             {children}
           </AppChrome>

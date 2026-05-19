@@ -25,7 +25,7 @@ export default async function MePage() {
         currentBalance={dashboard.balance.currentBalance}
       />
 
-      <ViewerLinkCard isLinked={dashboard.viewer.isLinked} />
+      {dashboard.viewer.isLinked ? null : <ViewerLinkCard />}
 
       <RedemptionGrid
         items={catalog}

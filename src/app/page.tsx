@@ -14,7 +14,6 @@ import {
   hasUsableAppSession,
   type AccountProtectionStatus,
 } from "@/lib/auth/session-state";
-import { env } from "@/lib/env";
 import {
   Card,
   CardContent,
@@ -48,77 +47,12 @@ type FeatureCard = {
   bg: string;
 };
 
-const DEFAULT_GITHUB_ISSUES_URL =
-  "https://github.com/ludmila-omlopes/ludylops-live/issues/new";
 const LUDYLOPS_PROFILE_IMAGE =
   "/selfie2.png";
 
 function usesPastelSurface(bgClass: string) {
   return ["--color-blue", "--color-purple", "--color-pink", "--color-yellow", "--color-mint"].some((token) =>
     bgClass.includes(token),
-  );
-}
-
-function buildViewerLinkingIssueUrl(input: {
-  isLinked: boolean;
-  hasActiveViewer: boolean;
-}) {
-  const title = "[Linking] Conta logada sem viewer confirmado no chat";
-  const body = [
-    "## O que aconteceu",
-    "O login entrou no site, mas a conta ainda não foi vinculada ao viewer do chat via código.",
-    "",
-    "## Diagnóstico técnico",
-    `- hasActiveViewer: ${input.hasActiveViewer ? "yes" : "no"}`,
-    `- isLinked: ${input.isLinked ? "yes" : "no"}`,
-    `- horário (UTC): ${new Date().toISOString()}`,
-    "",
-    "## O que eu esperava",
-    "- Descreva qual canal deveria ser vinculado e o que apareceu no chat ao usar !link.",
-    "",
-    "## Observações",
-    "- Não inclua token, email privado, cookie nem segredo nesta issue.",
-  ].join("\n");
-
-  const url = new URL(env.NEXT_PUBLIC_GITHUB_ISSUES_URL ?? DEFAULT_GITHUB_ISSUES_URL);
-  url.searchParams.set("title", title);
-  url.searchParams.set("body", body);
-  return url.toString();
-}
-
-function ViewerLinkingNotice({ issueUrl }: { issueUrl: string }) {
-  return (
-    <div className="card-poster mt-6 border-[3px] border-[var(--color-ink)] bg-[var(--color-pink)] p-4 text-[var(--color-accent-ink)]">
-      <p className="mono text-[10px] uppercase tracking-[0.24em]">linking da live</p>
-      <p className="mt-2 text-lg font-black uppercase leading-tight">
-        Falta confirmar seu canal pelo chat.
-      </p>
-      <p className="mt-3 text-sm font-bold leading-6">
-        O login do site entrou, mas o viewer da live agora é vinculado por código no chat do
-        YouTube.
-      </p>
-      <p className="mt-3 text-sm font-medium leading-6">
-        Abra sua área, gere um código curto e envie <span className="font-black">!link CÓDIGO</span>{" "}
-        no chat. Assim eu consigo unir sua conta do site ao viewer que chega pelo Streamer.bot sem
-        depender da API do YouTube.
-      </p>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <Link
-          href="/me"
-          className="btn-brutal bg-[var(--color-paper)] px-4 py-2 text-xs text-[var(--color-ink)]"
-        >
-          Abrir minha área
-        </Link>
-        <a
-          href={issueUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="btn-brutal bg-[var(--color-paper)] px-4 py-2 text-xs text-[var(--color-ink)]"
-        >
-          Abrir issue no GitHub {"->"}
-        </a>
-      </div>
-    </div>
   );
 }
 
@@ -747,14 +681,6 @@ export default async function Home({ searchParams }: HomePageProps) {
     : "Esse painel e o cantinho da minha live para o chat apostar, resgatar e acompanhar o ranking.";
 
   const metrics = hasUsableSession ? authedMetrics : publicMetrics;
-  const shouldShowViewerLinkingNotice = Boolean(hasUsableSession && !session?.user?.isLinked);
-  const viewerLinkingIssueUrl = shouldShowViewerLinkingNotice
-    ? buildViewerLinkingIssueUrl({
-        isLinked: Boolean(session?.user?.isLinked),
-        hasActiveViewer: Boolean(session?.user?.activeViewerId),
-      })
-    : null;
-
   return (
     <div className="flex w-full flex-col pb-20">
       <section className="landing-plane surface-hero relative py-8 sm:py-10 lg:py-12">
@@ -788,10 +714,6 @@ export default async function Home({ searchParams }: HomePageProps) {
             </p>
 
             {accountProtectionStatus ? <AccountProtectionNotice status={accountProtectionStatus} /> : null}
-
-            {shouldShowViewerLinkingNotice ? (
-              <ViewerLinkingNotice issueUrl={viewerLinkingIssueUrl!} />
-            ) : null}
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
               {hasUsableSession ? (

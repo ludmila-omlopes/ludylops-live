@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Session } from "next-auth";
 import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { AlertTriangle, ChevronDown } from "lucide-react";
 
 import { AuthButtons } from "@/components/auth-buttons";
 import { LivestreamIndicator } from "@/components/livestream-indicator";
@@ -29,12 +29,14 @@ export function AppChrome({
   isAdmin = false,
   isLive = false,
   session,
+  showViewerLinkingAlert = false,
 }: {
   children: React.ReactNode;
   initialTheme?: ThemeMode | null;
   isAdmin?: boolean;
   isLive?: boolean;
   session: Session | null;
+  showViewerLinkingAlert?: boolean;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -76,7 +78,7 @@ export function AppChrome({
         { href: "/indicacoes", label: "Canais que me inspiram" },
         { href: "/produtinhos", label: "Produtinhos que indico" },
         { href: "/jogos", label: "Jogos" },
-        { href: "/videos", label: "Videos" },
+        { href: "/videos", label: "Vídeos" },
       ],
     },
     {
@@ -260,6 +262,21 @@ export function AppChrome({
           </div>
         ) : null}
       </header>
+
+      {showViewerLinkingAlert ? (
+        <Link
+          href="/me"
+          className="sticky top-[75px] z-30 border-b-[3px] border-[var(--color-ink)] bg-[var(--color-yellow)] text-[var(--color-accent-ink)] transition-colors hover:bg-[var(--color-mint)] md:top-[78px]"
+        >
+          <span className="mx-auto flex w-full max-w-[1500px] items-center gap-3 px-4 py-3 text-sm font-black uppercase leading-5 sm:px-6 lg:px-10">
+            <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <span>
+              Vincule seu canal do YouTube para interagir com a live. Veja o passo a passo na sua
+              página.
+            </span>
+          </span>
+        </Link>
+      ) : null}
 
       {showTicker ? (
         <div className="marquee-strip" aria-hidden="true">

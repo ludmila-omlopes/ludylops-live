@@ -91,7 +91,7 @@ export default async function IndicacoesPage() {
     activeViewerId ? getViewerDashboard(activeViewerId) : Promise.resolve(null),
   ]);
   const viewerBalance = dashboard?.balance.currentBalance ?? null;
-  const canInteract = Boolean(activeViewerId);
+  const canInteract = Boolean(activeViewerId && dashboard?.viewer.isLinked);
 
   return (
     <div className="flex w-full flex-col pb-20">
