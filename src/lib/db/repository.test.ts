@@ -60,6 +60,7 @@ import {
 import { GAME_SUGGESTION_CREATION_COST } from "@/lib/game-suggestions/constants";
 import { VIDEO_SUGGESTION_CREATION_COST } from "@/lib/video-suggestions/constants";
 import {
+  adminAttachYoutubeChannelToGoogleAccount,
   adminLinkGoogleViewerToYoutubeViewer,
   boostGameSuggestion,
   boostVideoSuggestion,
@@ -2587,6 +2588,62 @@ describe("adminLinkGoogleViewerToYoutubeViewer", () => {
   });
 });
 
+describe("adminAttachYoutubeChannelToGoogleAccount", () => {
+  beforeEach(() => {
+    getDbMock.mockReset();
+    delete (globalThis as typeof globalThis & { __lojaDemoStore?: unknown }).__lojaDemoStore;
+  });
+
+  it("attaches an unlinked YouTube channel as an extra viewer of an existing Google account", async () => {
+    getDbMock.mockReturnValue(null);
+
+    const result = await adminAttachYoutubeChannelToGoogleAccount({
+      googleAccountId: "ga_ana",
+      viewerId: "viewer_lia",
+    });
+
+    expect(result.viewer).toMatchObject({
+      id: "viewer_lia",
+      googleAccountId: "ga_ana",
+      googleAccountEmail: "ana@example.com",
+      isLinked: true,
+      isSyntheticYoutubeChannel: false,
+    });
+
+    const directory = await listAdminViewerDirectory();
+    const anaViewers = directory.filter((entry) => entry.googleAccountId === "ga_ana");
+    expect(anaViewers.map((entry) => entry.id).sort()).toEqual(["viewer_ana", "viewer_lia"]);
+
+    const state = await getSessionViewerState({
+      googleUserId: "google_ana",
+      email: "ana@example.com",
+    });
+    expect(state?.activeViewer.id).toBe("viewer_ana");
+  });
+
+  it("rejects attaching a channel that already belongs to another Google account", async () => {
+    getDbMock.mockReturnValue(null);
+
+    await expect(
+      adminAttachYoutubeChannelToGoogleAccount({
+        googleAccountId: "ga_ana",
+        viewerId: "viewer_caio",
+      }),
+    ).rejects.toThrow(/outra conta Google/);
+  });
+
+  it("rejects attaching a channel that is already linked to the same Google account", async () => {
+    getDbMock.mockReturnValue(null);
+
+    await expect(
+      adminAttachYoutubeChannelToGoogleAccount({
+        googleAccountId: "ga_ana",
+        viewerId: "viewer_ana",
+      }),
+    ).rejects.toThrow(/essa conta Google/);
+  });
+});
+
 describe("viewer link codes", () => {
   beforeEach(() => {
     getDbMock.mockReset();
@@ -2693,6 +2750,73 @@ describe("viewer link codes", () => {
 
     const consumed = await getViewerLinkCodeState(stateAfter!.googleAccount.id);
     expect(consumed).toBeNull();
+  });
+
+  it("adds another YouTube channel to an already linked Google account", async () => {
+    getDbMock.mockReturnValue(null);
+
+    const firstViewer = await ensureViewerFromSession({
+      googleUserId: "google_multi_link",
+      email: "multi-link@example.com",
+      name: "Multi Link",
+      image: null,
+      youtubeChannels: [
+        {
+          youtubeChannelId: "yt_multi_primary",
+          youtubeDisplayName: "Multi Principal",
+          youtubeHandle: "@multiprincipal",
+        },
+      ],
+    });
+    const stateBefore = await getSessionViewerState({
+      googleUserId: "google_multi_link",
+      email: "multi-link@example.com",
+    });
+    const link = await issueViewerLinkCode(stateBefore!.googleAccount.id);
+
+    const result = await claimViewerLinkCodeFromStreamerbot({
+      linkCode: link.linkCode,
+      viewerExternalId: "yt_multi_alt",
+      youtubeDisplayName: "Multi Secundário",
+      youtubeHandle: "@multisecundario",
+    });
+
+    expect(result.mergedSyntheticViewer).toBe(false);
+    expect(result.viewer.youtubeChannelId).toBe("yt_multi_alt");
+
+    const stateAfter = await getSessionViewerState({
+      googleUserId: "google_multi_link",
+      email: "multi-link@example.com",
+    });
+    const channels = await listViewerChannelsForGoogleAccount(stateAfter!.googleAccount.id);
+
+    expect(channels.map((entry) => entry.youtubeChannelId)).toEqual(
+      expect.arrayContaining(["yt_multi_primary", "yt_multi_alt"]),
+    );
+    expect(channels).toHaveLength(2);
+    expect(firstViewer?.youtubeChannelId).toBe("yt_multi_primary");
+    expect(stateAfter?.activeViewer.youtubeChannelId).toBe("yt_multi_primary");
+
+    const before = await getViewerDashboard(firstViewer!.id);
+    const beforeBalance = before?.balance.currentBalance ?? 0;
+    await ingestStreamerbotEvent({
+      eventId: "presence-multi-alt-1",
+      eventType: "presence_tick",
+      viewerExternalId: "yt_multi_alt",
+      youtubeDisplayName: "Multi Secundário",
+      youtubeHandle: "@multisecundario",
+      amount: 15,
+      occurredAt: new Date().toISOString(),
+      payload: { isLive: true },
+    });
+    const after = await getViewerDashboard(firstViewer!.id);
+    const channelsAfterPoints = await listViewerChannelsForGoogleAccount(stateAfter!.googleAccount.id);
+
+    expect(after?.balance.currentBalance).toBe(beforeBalance + 15);
+    expect(channelsAfterPoints.map((entry) => entry.currentBalance)).toEqual([
+      after?.balance.currentBalance,
+      after?.balance.currentBalance,
+    ]);
   });
 });
 

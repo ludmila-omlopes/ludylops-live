@@ -2,15 +2,18 @@ import { redirect } from "next/navigation";
 
 import { PipetzBalanceCard } from "@/components/pipetz-balance-card";
 import { RedemptionGrid } from "@/components/redemption-grid";
+import { ViewerChannelListCard } from "@/components/viewer-channel-list-card";
 import { ViewerLinkCard } from "@/components/viewer-link-card";
-import { getCatalog, getViewerDashboard } from "@/lib/db/repository";
+import { getCatalog, getViewerDashboard, listViewerChannelsForGoogleAccount } from "@/lib/db/repository";
 import { requireSession } from "@/lib/auth/session";
 
 export default async function MePage() {
   const session = await requireSession();
-  const [dashboard, catalog] = await Promise.all([
+  const googleAccountId = session.user!.googleAccountId;
+  const [dashboard, catalog, channels] = await Promise.all([
     getViewerDashboard(session.user!.activeViewerId!),
     getCatalog(),
+    googleAccountId ? listViewerChannelsForGoogleAccount(googleAccountId) : Promise.resolve([]),
   ]);
 
   if (!dashboard) {
@@ -25,7 +28,9 @@ export default async function MePage() {
         currentBalance={dashboard.balance.currentBalance}
       />
 
-      {dashboard.viewer.isLinked ? null : <ViewerLinkCard />}
+      <ViewerChannelListCard channels={channels} />
+
+      <ViewerLinkCard alreadyLinked={dashboard.viewer.isLinked} />
 
       <RedemptionGrid
         items={catalog}

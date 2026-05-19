@@ -123,6 +123,7 @@ export function AdminCurrentGamePanel({
       setCurrentGame(payload.data);
       setSelectedGame(null);
       setQuery(payload.data.name);
+      setResults([]);
       setFeedback("Jogo atual atualizado.");
       router.refresh();
     });
@@ -228,7 +229,7 @@ export function AdminCurrentGamePanel({
               </p>
             ) : null}
 
-            {results.length > 0 ? (
+            {!selectedGame && results.length > 0 ? (
               <div className="absolute z-20 mt-2 grid max-h-72 w-full gap-2 overflow-auto border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-2 shadow-purple">
                 {results.map((game) => (
                   <button
