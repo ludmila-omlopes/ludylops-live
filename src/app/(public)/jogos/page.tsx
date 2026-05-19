@@ -14,7 +14,7 @@ export default async function JogosPage() {
   ]);
 
   const viewerBalance = dashboard?.balance.currentBalance ?? null;
-  const canInteract = Boolean(activeViewerId);
+  const canInteract = Boolean(activeViewerId && dashboard?.viewer.isLinked);
   const isAdmin = Boolean(session?.user?.email && adminEmails.has(session.user.email.toLowerCase()));
 
   return (

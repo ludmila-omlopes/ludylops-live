@@ -16,7 +16,7 @@ export default async function VideosPage() {
   ]);
 
   const viewerBalance = dashboard?.balance.currentBalance ?? null;
-  const canInteract = Boolean(activeViewerId);
+  const canInteract = Boolean(activeViewerId && dashboard?.viewer.isLinked);
 
   return (
     <div className="flex w-full flex-col pb-20">

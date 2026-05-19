@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 
-import { fail, isTrustedAppMutationRequest, ok, requireApiSession } from "@/lib/api";
+import { fail, isTrustedAppMutationRequest, ok, requireLinkedApiSession } from "@/lib/api";
 import { boostVideoSuggestion } from "@/lib/db/repository";
 import {
   boostVideoSuggestionSchema,
@@ -16,7 +16,7 @@ export async function POST(
     return fail("Forbidden", 403);
   }
 
-  const session = await requireApiSession();
+  const session = await requireLinkedApiSession();
   if (!session?.user?.activeViewerId) {
     return fail("Unauthorized", 401);
   }

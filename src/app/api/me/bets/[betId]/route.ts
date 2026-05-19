@@ -1,4 +1,4 @@
-import { fail, isTrustedAppMutationRequest, ok, requireApiSession } from "@/lib/api";
+import { fail, isTrustedAppMutationRequest, ok, requireLinkedApiSession } from "@/lib/api";
 import { placeBet } from "@/lib/db/repository";
 import { placeBetSchema } from "@/lib/streamerbot/schemas";
 
@@ -10,7 +10,7 @@ export async function POST(
     return fail("Forbidden", 403);
   }
 
-  const session = await requireApiSession();
+  const session = await requireLinkedApiSession();
   if (!session?.user?.activeViewerId) {
     return fail("Unauthorized", 401);
   }

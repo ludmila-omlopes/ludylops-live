@@ -21,7 +21,7 @@ describe("validateCreateBetDraft", () => {
         closesAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         options: ["1", "2", "3", "4", "5", "6", "7"],
       }),
-    ).toBe("A aposta pode ter no maximo 6 opcoes.");
+    ).toBe("A aposta pode ter no máximo 6 opções.");
   });
 
   it("rejects closing dates in the past", () => {
@@ -31,7 +31,7 @@ describe("validateCreateBetDraft", () => {
         closesAt: new Date(Date.now() - 60 * 1000).toISOString(),
         options: ["Sim", "Nao"],
       }),
-    ).toBe("Escolha um horario futuro para encerrar a aposta.");
+    ).toBe("Escolha um horário futuro para encerrar a aposta.");
   });
 });
 

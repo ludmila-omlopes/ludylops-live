@@ -32,7 +32,7 @@ export default async function QuotesPage() {
     activeViewerId ? getViewerDashboard(activeViewerId) : Promise.resolve(null),
     getPipetzPricing(),
   ]);
-  const canShowOnOverlay = Boolean(activeViewerId);
+  const canShowOnOverlay = Boolean(activeViewerId && dashboard?.viewer.isLinked);
 
   return (
     <div className="flex w-full flex-col pb-20">

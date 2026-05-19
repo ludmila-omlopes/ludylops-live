@@ -20,6 +20,14 @@ export async function requireApiSession() {
   return session;
 }
 
+export async function requireLinkedApiSession() {
+  const session = await requireApiSession();
+  if (!session?.user?.activeViewerId || !session.user.isLinked) {
+    return null;
+  }
+  return session;
+}
+
 export async function requireAdminApiSession() {
   const session = await requireApiSession();
   if (!session?.user?.email) {
