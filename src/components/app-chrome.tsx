@@ -193,7 +193,9 @@ export function AppChrome({
                   key={link.href}
                   href={link.href}
                   className={`rounded-[var(--radius)] border px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-[0.1em] transition-colors duration-[var(--snap)] ${
-                    isActiveLink(link.href)
+                    link.href === "/admin"
+                      ? "admin-action border-[2px] border-[var(--color-ink)] text-[var(--color-admin-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
+                      : isActiveLink(link.href)
                       ? "pastel-action border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
                       : "border-transparent text-[var(--color-ink-soft)] hover:border-[var(--color-ink)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)]"
                   }`}
@@ -243,7 +245,9 @@ export function AppChrome({
                       href={link.href}
                       onClick={() => setMobileOpen(false)}
                       className={`rounded-[var(--radius)] border px-4 py-3 text-sm font-extrabold uppercase tracking-[0.1em] transition-colors duration-[var(--snap)] ${
-                        isActiveLink(link.href)
+                        link.href === "/admin"
+                          ? "admin-action border-[2px] border-[var(--color-ink)] text-[var(--color-admin-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
+                          : isActiveLink(link.href)
                           ? "pastel-action border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
                           : "border-[2px] border-transparent text-[var(--color-ink-soft)] hover:border-[var(--color-ink)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)] active:border-[var(--color-ink)] active:bg-[var(--color-paper)] active:text-[var(--color-ink)]"
                       }`}
