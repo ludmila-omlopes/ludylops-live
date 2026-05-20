@@ -17,9 +17,9 @@ describe("active death counter game config", () => {
   });
 
   it("stores and clears the active game in demo mode", async () => {
-    const module = await import("@/lib/streamerbot/death-counter-game");
+    const deathCounterGame = await import("@/lib/streamerbot/death-counter-game");
 
-    const saved = await module.setActiveDeathCounterGame({
+    const saved = await deathCounterGame.setActiveDeathCounterGame({
       gameName: "Hollow Knight: Silksong",
       updatedBy: "admin@example.com",
     });
@@ -31,13 +31,13 @@ describe("active death counter game config", () => {
       updatedBy: "admin@example.com",
     });
 
-    await expect(module.getActiveDeathCounterGame()).resolves.toMatchObject({
+    await expect(deathCounterGame.getActiveDeathCounterGame()).resolves.toMatchObject({
       scopeKey: "hollow-knight-silksong",
       scopeLabel: "Hollow Knight: Silksong",
     });
 
-    await expect(module.clearActiveDeathCounterGame()).resolves.toBeNull();
-    await expect(module.getActiveDeathCounterGame()).resolves.toBeNull();
+    await expect(deathCounterGame.clearActiveDeathCounterGame()).resolves.toBeNull();
+    await expect(deathCounterGame.getActiveDeathCounterGame()).resolves.toBeNull();
   });
 
   it("reads the active game from streamerbot_counters in database mode", async () => {
@@ -61,9 +61,9 @@ describe("active death counter game config", () => {
       }),
     });
 
-    const module = await import("@/lib/streamerbot/death-counter-game");
+    const deathCounterGame = await import("@/lib/streamerbot/death-counter-game");
 
-    await expect(module.getActiveDeathCounterGame()).resolves.toEqual({
+    await expect(deathCounterGame.getActiveDeathCounterGame()).resolves.toEqual({
       scopeType: "game",
       scopeKey: "silksong",
       scopeLabel: "Silksong",

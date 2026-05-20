@@ -59,7 +59,7 @@ export default async function AdminPage() {
   ]);
 
   return (
-    <div className="flex w-full flex-col pb-20">
+    <div className="flex w-full flex-col">
       <section className="landing-plane surface-hero py-8 sm:py-10">
         <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
           <p className="mono text-xs font-bold uppercase tracking-[0.32em] text-[var(--color-ink-soft)]">

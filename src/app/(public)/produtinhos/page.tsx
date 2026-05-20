@@ -17,7 +17,7 @@ export default async function ProdutinhosPage() {
   );
 
   return (
-    <div className="flex w-full flex-col pb-20">
+    <div className="flex w-full flex-col">
       <section className="landing-plane surface-hero relative overflow-hidden py-8 sm:py-10">
         <div className="bg-dots-light pointer-events-none absolute inset-0 opacity-20" />
         <div className="relative mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">

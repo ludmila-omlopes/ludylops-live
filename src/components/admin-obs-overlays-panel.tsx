@@ -25,6 +25,14 @@ const overlays = [
     demoHref: "/obs/quotes?demo=1",
     apiHref: "/api/obs/quotes/current",
   },
+  {
+    id: "bets",
+    name: "Apostas no OBS",
+    description: "Overlay da aposta aberta, com pool, opções e distribuição dos votos atualizados automaticamente.",
+    liveHref: "/obs/bets",
+    demoHref: "/obs/bets?demo=1",
+    apiHref: "/api/obs/bets/current",
+  },
 ];
 
 export function AdminObsOverlaysPanel({
@@ -116,8 +124,8 @@ export function AdminObsOverlaysPanel({
                 </span>
               </div>
               <p className="mt-3 text-sm leading-6 text-[var(--color-ink-soft)]">
-                Quando pausado, novas quotes pagas entram em fila FIFO. A fila aceita ate 20 itens e
-                cada item expira em 2 horas com reembolso automatico se nao for exibido.
+                Quando pausado, novas quotes pagas entram em fila FIFO. A fila aceita até 20 itens e
+                cada item expira em 2 horas com reembolso automático se não for exibido.
               </p>
               {status.control.lastError ? (
                 <p className="mt-3 border-2 border-[var(--color-ink)] bg-[var(--color-rose)] px-3 py-2 text-sm font-black text-[var(--color-ink)]">

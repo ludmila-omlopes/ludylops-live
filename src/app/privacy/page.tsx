@@ -74,7 +74,7 @@ const sections: PolicySection[] = [
 
 export default function PrivacyPage() {
   return (
-    <div className="mx-auto flex w-full max-w-[980px] flex-col gap-6 px-4 pb-20 sm:px-6 lg:px-8">
+    <div className="mx-auto flex w-full max-w-[980px] flex-col gap-6 px-4 sm:px-6 lg:px-8">
       <section className="panel surface-hero p-6 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>

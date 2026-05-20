@@ -21,7 +21,7 @@ export default async function MePage() {
   }
 
   return (
-    <div className="flex w-full flex-col pb-20">
+    <div className="flex w-full flex-col">
       {/* Balance hero */}
       <PipetzBalanceCard
         displayName={dashboard.viewer.youtubeDisplayName}
