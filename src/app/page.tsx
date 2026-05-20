@@ -685,7 +685,7 @@ export default async function Home({ searchParams }: HomePageProps) {
 
   const metrics = hasUsableSession ? authedMetrics : publicMetrics;
   return (
-    <div className="flex w-full flex-col pb-20">
+    <div className="flex w-full flex-col">
       <section className="landing-plane surface-hero relative py-8 sm:py-10 lg:py-12">
         <div className="bg-micro-grid pointer-events-none absolute inset-0 opacity-30" />
         <StickerBadge

@@ -12,6 +12,7 @@ import { hasUsableAppSession } from "@/lib/auth/session-state";
 import type { ThemeMode } from "@/lib/theme";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { socialLinks } from "@/lib/social-links";
 
 type NavLink = {
   href: string;
@@ -299,19 +300,39 @@ export function AppChrome({
       <main className="flex-1">{children}</main>
 
       <footer className="border-t-[3px] border-[var(--color-ink)] bg-[var(--color-paper)]">
-        <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 px-4 py-5 text-sm font-medium text-[var(--color-ink-soft)] sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10">
+        <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-5 text-sm font-medium text-[var(--color-ink-soft)] sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10">
           <Link
             href="/privacy"
             className="w-fit font-black uppercase tracking-[0.08em] text-[var(--color-ink)] underline decoration-[3px] underline-offset-4"
           >
             Política de Privacidade
           </Link>
-          <p className="flex items-center gap-2 text-[var(--color-ink)]">
-            <span>Feito com carinho por ludylops</span>
-            <span aria-hidden="true" className="text-lg text-[var(--color-pink)]">
-              💗
+          <Link
+            href="/terms"
+            className="w-fit font-black uppercase tracking-[0.08em] text-[var(--color-ink)] underline decoration-[3px] underline-offset-4"
+          >
+            Termos de Serviço
+          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-black uppercase tracking-[0.08em] text-[var(--color-ink)]">
+              Siga a Ludylops
             </span>
-          </p>
+            <div className="flex items-center gap-2">
+              {socialLinks.map(({ href, label, Icon }) => (
+                <a
+                  key={href}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Abrir ${label} da Ludylops`}
+                  title={label}
+                  className="flex size-10 items-center justify-center border-[2px] border-[var(--color-ink)] bg-[var(--color-paper)] text-[var(--color-ink)] shadow-[3px_3px_0_var(--shadow-color)] transition-transform hover:-translate-y-0.5"
+                >
+                  <Icon className="size-5" aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
       </footer>
     </div>
