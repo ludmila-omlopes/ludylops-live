@@ -32,7 +32,47 @@ function CounterCard({ counter }: { counter: StreamerbotCounterSummaryRecord }) 
   );
 }
 
-export function CounterBoard({ counters }: { counters: StreamerbotCounterSummaryRecord[] }) {
+function GameCounterGroup({
+  scopeKey,
+  entries,
+  current,
+}: {
+  scopeKey: string;
+  entries: StreamerbotCounterSummaryRecord[];
+  current?: boolean;
+}) {
+  return (
+    <div className="landing-plane h-full bg-[var(--color-paper-pink)] p-5 sm:p-6">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <h3
+          className="text-3xl uppercase leading-none"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {scopeHeading(scopeKey, entries[0]?.scopeLabel ?? null)}
+        </h3>
+        {current ? (
+          <span className="mono border-2 border-[var(--color-ink)] bg-[var(--color-mint)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em]">
+            contador atual
+          </span>
+        ) : null}
+      </div>
+
+      <div className="grid gap-4">
+        {entries.map((counter) => (
+          <CounterCard key={`${counter.scopeType}:${counter.scopeKey}:${counter.key}`} counter={counter} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function CounterBoard({
+  counters,
+  currentScopeKey,
+}: {
+  counters: StreamerbotCounterSummaryRecord[];
+  currentScopeKey?: string | null;
+}) {
   const globalCounters = counters.filter((counter) => counter.scopeType === "global");
   const gameGroups = counters
     .filter((counter) => counter.scopeType === "game")
@@ -42,35 +82,37 @@ export function CounterBoard({ counters }: { counters: StreamerbotCounterSummary
       groups.set(counter.scopeKey, existing);
       return groups;
     }, new Map());
+  const gameGroupEntries = Array.from(gameGroups.entries());
+  const currentGameGroup = currentScopeKey
+    ? gameGroupEntries.find(([scopeKey]) => scopeKey === currentScopeKey)
+    : undefined;
+  const otherGameGroups = currentScopeKey
+    ? gameGroupEntries.filter(([scopeKey]) => scopeKey !== currentScopeKey)
+    : gameGroupEntries;
 
   return (
     <div className="space-y-10">
-      <section>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {globalCounters.map((counter) => (
-            <CounterCard key={`${counter.scopeType}:${counter.scopeKey}:${counter.key}`} counter={counter} />
-          ))}
-        </div>
-      </section>
+      {currentGameGroup ? (
+        <section>
+          <GameCounterGroup scopeKey={currentGameGroup[0]} entries={currentGameGroup[1]} current />
+        </section>
+      ) : null}
 
-      {gameGroups.size > 0 ? (
+      {globalCounters.length > 0 ? (
+        <section>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {globalCounters.map((counter) => (
+              <CounterCard key={`${counter.scopeType}:${counter.scopeKey}:${counter.key}`} counter={counter} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {otherGameGroups.length > 0 ? (
         <section className="space-y-8">
           <div className="grid gap-8 xl:grid-cols-2">
-            {Array.from(gameGroups.entries()).map(([scopeKey, entries]) => (
-              <div key={scopeKey} className="landing-plane h-full bg-[var(--color-paper-pink)] p-5 sm:p-6">
-                <h3
-                  className="mb-5 text-3xl uppercase leading-none"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  {scopeHeading(scopeKey, entries[0]?.scopeLabel ?? null)}
-                </h3>
-
-                <div className="grid gap-4">
-                  {entries.map((counter) => (
-                    <CounterCard key={`${counter.scopeType}:${counter.scopeKey}:${counter.key}`} counter={counter} />
-                  ))}
-                </div>
-              </div>
+            {otherGameGroups.map(([scopeKey, entries]) => (
+              <GameCounterGroup key={scopeKey} scopeKey={scopeKey} entries={entries} />
             ))}
           </div>
         </section>

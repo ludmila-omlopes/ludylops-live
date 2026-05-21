@@ -24,6 +24,7 @@ export async function PATCH(
     const updated = await updateProductRecommendationStatus({
       recommendationId: id,
       isActive: payload.isActive,
+      category: payload.category,
     });
 
     return ok(updated);

@@ -11,7 +11,7 @@ describe("productRecommendationSchema", () => {
     const parsed = productRecommendationSchema.safeParse({
       name: "Produto exemplo",
       category: "videogames",
-      context: "Console facil de indicar para quem acompanha a live.",
+      context: "Console fácil de indicar para quem acompanha a live.",
       imageUrl: "/uploads/produto-exemplo.jpg",
       href: "https://example.com/produto-exemplo",
       storeLabel: "Loja Teste",
@@ -47,8 +47,8 @@ describe("productRecommendationSchema", () => {
     expect(flattenProductRecommendationSchemaErrors(parsed.error)).toMatchObject({
       name: "Digite pelo menos 2 caracteres no nome.",
       context: "Escreva um contexto com pelo menos 8 caracteres.",
-      imageUrl: "Use uma URL valida ou um caminho local que comece com /.",
-      href: "Digite uma URL valida com http ou https.",
+      imageUrl: "Use uma URL válida ou um caminho local que comece com /.",
+      href: "Digite uma URL válida com http ou https.",
       storeLabel: "Digite pelo menos 2 caracteres no nome da loja.",
       sortOrder: "A ordem deve ser zero ou maior.",
     });

@@ -128,7 +128,7 @@ function FeatureStoryCard({ feature }: { feature: FeatureCard }) {
     <Card
       variant="poster"
       className={cn(
-        "flex-row gap-4 p-4 sm:p-5",
+        "flex-row gap-4 p-4 sm:p-5 md:flex-col md:gap-3 lg:flex-row lg:gap-4",
         feature.bg,
         usesPastelInk && "text-[var(--color-accent-ink)]",
       )}
@@ -148,7 +148,7 @@ function FeatureStoryCard({ feature }: { feature: FeatureCard }) {
           {feature.eyebrow}
         </CardDescription>
         <CardTitle
-          className="mt-2 text-2xl uppercase leading-none"
+          className="mt-2 text-xl uppercase leading-none lg:text-2xl"
           style={{ fontFamily: "var(--font-display)" }}
         >
           {feature.title}
@@ -387,7 +387,7 @@ function FeatureShowcase({
             que aparecem comigo ao vivo.
           </p>
 
-          <div className="mt-8 space-y-4">
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
             {features.map((feature) => (
               <FeatureStoryCard key={feature.title} feature={feature} />
             ))}

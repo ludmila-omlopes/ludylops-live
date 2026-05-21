@@ -15,6 +15,8 @@ import {
 import type { AdminViewerDirectoryRecord } from "@/lib/types";
 import { formatDateTime, formatPipetz } from "@/lib/utils";
 
+const INITIAL_VISIBLE_VIEWERS = 8;
+
 function getViewerStatus(entry: AdminViewerDirectoryRecord) {
   if (entry.isLinked && entry.googleAccountId && !entry.isSyntheticYoutubeChannel) {
     return {
@@ -105,6 +107,7 @@ export function AdminViewerLinksPanel({
   const [extraConfirmationText, setExtraConfirmationText] = useState("");
   const [extraFeedback, setExtraFeedback] = useState<string | null>(null);
   const [isExtraPending, startExtraTransition] = useTransition();
+  const [showAllViewers, setShowAllViewers] = useState(false);
 
   const googleCandidates = useMemo(
     () => entries.filter((entry) => entry.googleAccountId && entry.isSyntheticYoutubeChannel),
@@ -153,6 +156,8 @@ export function AdminViewerLinksPanel({
   const totalGoogleOnly = entries.filter((entry) => entry.googleAccountId && entry.isSyntheticYoutubeChannel).length;
   const totalYoutubeOnly = entries.filter((entry) => !entry.googleAccountId && !entry.isSyntheticYoutubeChannel).length;
   const isConfirmationValid = confirmationText.trim().toUpperCase() === "VINCULAR";
+  const visibleEntries = showAllViewers ? entries : entries.slice(0, INITIAL_VISIBLE_VIEWERS);
+  const hiddenViewerCount = Math.max(entries.length - visibleEntries.length, 0);
 
   function submitLink() {
     if (!googleViewerId || !youtubeViewerId) {
@@ -552,7 +557,7 @@ export function AdminViewerLinksPanel({
             <span>Saldo</span>
           </div>
           <div>
-            {entries.map((entry) => {
+            {visibleEntries.map((entry) => {
               const status = getViewerStatus(entry);
 
               return (
@@ -604,6 +609,18 @@ export function AdminViewerLinksPanel({
               );
             })}
           </div>
+          {hiddenViewerCount > 0 || showAllViewers ? (
+            <div className="border-t-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] px-4 py-4">
+              <Button
+                type="button"
+                onClick={() => setShowAllViewers((current) => !current)}
+                variant="neutral"
+                size="sm"
+              >
+                {showAllViewers ? "Ver menos" : `Ver mais ${hiddenViewerCount}`}
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
