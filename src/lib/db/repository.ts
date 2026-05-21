@@ -68,7 +68,7 @@ import {
   eventRequiresActiveLivestream,
   requireActiveLivestream,
 } from "@/lib/streamerbot/live-status";
-import { getActiveDeathCounterGame } from "@/lib/streamerbot/death-counter-game";
+import { getCurrentGame } from "@/lib/current-game";
 import { normalizeYoutubeHandle } from "@/lib/youtube/identity";
 import { evaluateRedeemability } from "@/lib/redemptions/service";
 import {
@@ -613,7 +613,11 @@ export async function updatePipetzPricing(input: {
 function sanitizePublicCounterSummaries(
   counters: StreamerbotCounterSummaryRecord[],
 ): StreamerbotCounterSummaryRecord[] {
-  const hiddenCounterKeys = new Set(["livestream_override", "death_counter_active_game"]);
+  const hiddenCounterKeys = new Set([
+    "livestream_override",
+    "death_counter_active_game",
+    "current_stream_game",
+  ]);
 
   return counters
     .filter((counter) => !hiddenCounterKeys.has(counter.key))
@@ -6814,14 +6818,20 @@ export async function runDeathCounterCommand(input: {
   confirmReset?: boolean;
   resetReason?: string | null;
 }) {
-  const hasExplicitGameScope = input.scopeType === "game" && Boolean(input.scopeKey?.trim());
-  const activeGame = hasExplicitGameScope ? null : await getActiveDeathCounterGame();
+  const currentGame = await getCurrentGame();
+  const currentGameScope = currentGame
+    ? {
+        scopeType: "game" as const,
+        scopeKey: slugify(currentGame.name) || String(currentGame.igdbId),
+        scopeLabel: currentGame.name,
+      }
+    : null;
 
   return runStreamerbotCounterCommand({
     ...input,
-    scopeType: hasExplicitGameScope ? input.scopeType : activeGame?.scopeType ?? input.scopeType,
-    scopeKey: hasExplicitGameScope ? input.scopeKey : activeGame?.scopeKey ?? input.scopeKey,
-    scopeLabel: hasExplicitGameScope ? input.scopeLabel : activeGame?.scopeLabel ?? input.scopeLabel,
+    scopeType: currentGameScope?.scopeType ?? input.scopeType,
+    scopeKey: currentGameScope?.scopeKey ?? input.scopeKey,
+    scopeLabel: currentGameScope?.scopeLabel ?? input.scopeLabel,
     counterKey: DEFAULT_DEATH_COUNTER_KEY,
     counterLabel: DEFAULT_DEATH_COUNTER_LABEL,
   });

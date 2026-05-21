@@ -2,7 +2,6 @@ import { AdminObsOverlaysPanel } from "@/components/admin-obs-overlays-panel";
 import { AdminCurrentGamePanel } from "@/components/admin-current-game-panel";
 import { AdminDashboardTabs } from "@/components/admin-dashboard-tabs";
 import { AdminBetsPanel } from "@/components/admin-bets-panel";
-import { DeathCounterGamePanel } from "@/components/death-counter-game-panel";
 import { AdminGameSuggestionsPanel } from "@/components/admin-game-suggestions-panel";
 import { AdminVideoSuggestionsPanel } from "@/components/admin-video-suggestions-panel";
 import { AdminPipetzPricingPanel } from "@/components/admin-pipetz-pricing-panel";
@@ -27,7 +26,6 @@ import {
   listAdminRedemptions,
 } from "@/lib/db/repository";
 import { getStreamerbotLivestreamStatus } from "@/lib/streamerbot/live-status";
-import { getActiveDeathCounterGame } from "@/lib/streamerbot/death-counter-game";
 import { getCurrentGame } from "@/lib/current-game";
 import { formatDateTime, formatPipetz } from "@/lib/utils";
 
@@ -41,12 +39,11 @@ const statusColorMap: Record<string, string> = {
 
 export default async function AdminPage() {
   await requireAdminSession();
-  const [catalog, leaderboard, bridge, liveStatus, activeDeathCounterGame, currentGame, redemptions, bets, suggestions, videoSuggestions, recommendations, viewers, obsOverlayStatus, pricing] = await Promise.all([
+  const [catalog, leaderboard, bridge, liveStatus, currentGame, redemptions, bets, suggestions, videoSuggestions, recommendations, viewers, obsOverlayStatus, pricing] = await Promise.all([
     getCatalog(),
     getLeaderboard(),
     getBridgeStatus(),
     getStreamerbotLivestreamStatus(),
-    getActiveDeathCounterGame(),
     getCurrentGame(),
     listAdminRedemptions(),
     listAdminBets(),
@@ -107,7 +104,6 @@ export default async function AdminPage() {
                 <div className="space-y-6">
                   <LiveStatusPanel bridge={bridge} initialStatus={liveStatus} />
                   <AdminCurrentGamePanel initialGame={currentGame} />
-                  <DeathCounterGamePanel initialGame={activeDeathCounterGame} />
                   <AdminPipetzPricingPanel initialPricing={pricing} />
                 </div>
                 <AdminObsOverlaysPanel initialStatus={obsOverlayStatus} />
