@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getDbMock = vi.hoisted(() => vi.fn());
 const isStreamerbotLivestreamActiveMock = vi.hoisted(() => vi.fn());
-const getActiveDeathCounterGameMock = vi.hoisted(() => vi.fn());
+const getCurrentGameMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/client", () => ({
   getDb: getDbMock,
@@ -41,8 +41,8 @@ vi.mock("@/lib/streamerbot/live-status", () => ({
   },
 }));
 
-vi.mock("@/lib/streamerbot/death-counter-game", () => ({
-  getActiveDeathCounterGame: getActiveDeathCounterGameMock,
+vi.mock("@/lib/current-game", () => ({
+  getCurrentGame: getCurrentGameMock,
 }));
 
 import { demoBetRecords, demoQuotes } from "@/lib/demo-data";
@@ -718,8 +718,8 @@ describe("listBets", () => {
   beforeEach(() => {
     getDbMock.mockReset();
     delete (globalThis as typeof globalThis & { __lojaDemoStore?: unknown }).__lojaDemoStore;
-    getActiveDeathCounterGameMock.mockReset();
-    getActiveDeathCounterGameMock.mockResolvedValue(null);
+    getCurrentGameMock.mockReset();
+    getCurrentGameMock.mockResolvedValue(null);
   });
 
   it("falls back to demo bets when the bets table query is unavailable", async () => {
@@ -1441,8 +1441,8 @@ describe("showQuoteOverlayForViewer", () => {
 describe("runStreamerbotCounterCommand", () => {
   beforeEach(() => {
     getDbMock.mockReset();
-    getActiveDeathCounterGameMock.mockReset();
-    getActiveDeathCounterGameMock.mockResolvedValue(null);
+    getCurrentGameMock.mockReset();
+    getCurrentGameMock.mockResolvedValue(null);
     delete (globalThis as typeof globalThis & { __lojaDemoStore?: unknown }).__lojaDemoStore;
   });
 
@@ -1749,6 +1749,17 @@ describe("runStreamerbotCounterCommand", () => {
           },
         },
         {
+          key: "current_stream_game",
+          value: 1,
+          lastResetAt: null,
+          updatedAt: new Date("2026-04-07T11:03:00.000Z"),
+          metadata: {
+            igdbId: 103837,
+            name: "Silksong",
+            updatedBy: "admin@example.com",
+          },
+        },
+        {
           key: "death_count",
           value: 154,
           lastResetAt: null,
@@ -1834,13 +1845,16 @@ describe("runStreamerbotCounterCommand", () => {
     expect(rows[0]?.lastResetAt?.toISOString()).toBe("2026-04-07T12:00:00.000Z");
   });
 
-  it("routes death commands to the configured active game when no game scope is provided", async () => {
+  it("routes death commands to the current stream game", async () => {
     const { db, rows } = createStreamerbotCounterDb();
     getDbMock.mockReturnValue(db);
-    getActiveDeathCounterGameMock.mockResolvedValue({
-      scopeType: "game",
-      scopeKey: "silksong",
-      scopeLabel: "Silksong",
+    getCurrentGameMock.mockResolvedValue({
+      igdbId: 103837,
+      name: "Hollow Knight: Silksong",
+      releaseYear: 2025,
+      coverImageUrl: null,
+      platforms: [],
+      genres: [],
       updatedAt: "2026-04-07T10:00:00.000Z",
       updatedBy: "admin@example.com",
     });
@@ -1855,28 +1869,31 @@ describe("runStreamerbotCounterCommand", () => {
       mode: "database",
       action: "increment",
       count: 3,
-      replyMessage: "Mod, contador de mortes em Silksong: 3 (+3).",
+      replyMessage: "Mod, contador de mortes em Hollow Knight: Silksong: 3 (+3).",
     });
     expect(rows[0]).toMatchObject({
-      key: "game::silksong::death_count",
+      key: "game::hollow-knight-silksong::death_count",
       value: 3,
       metadata: {
         counterKey: "death_count",
         counterLabel: "mortes",
         scopeType: "game",
-        scopeKey: "silksong",
-        scopeLabel: "Silksong",
+        scopeKey: "hollow-knight-silksong",
+        scopeLabel: "Hollow Knight: Silksong",
       },
     });
   });
 
-  it("preserves an explicit game scope even when an active game is configured", async () => {
+  it("uses the current stream game even when an explicit game scope is provided", async () => {
     const { db, rows } = createStreamerbotCounterDb();
     getDbMock.mockReturnValue(db);
-    getActiveDeathCounterGameMock.mockResolvedValue({
-      scopeType: "game",
-      scopeKey: "silksong",
-      scopeLabel: "Silksong",
+    getCurrentGameMock.mockResolvedValue({
+      igdbId: 103837,
+      name: "Silksong",
+      releaseYear: 2025,
+      coverImageUrl: null,
+      platforms: [],
+      genres: [],
       updatedAt: "2026-04-07T10:00:00.000Z",
       updatedBy: "admin@example.com",
     });
@@ -1889,8 +1906,8 @@ describe("runStreamerbotCounterCommand", () => {
       amount: 1,
     });
 
-    expect(result.replyMessage).toBe("contador de mortes em Hades 2: 1.");
-    expect(rows[0]?.key).toBe("game::hades_2::death_count");
+    expect(result.replyMessage).toBe("contador de mortes em Silksong: 1.");
+    expect(rows[0]?.key).toBe("game::silksong::death_count");
   });
 });
 
