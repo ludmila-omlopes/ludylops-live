@@ -10,8 +10,10 @@ import { formatDateTime } from "@/lib/utils";
 
 export function DeathCounterGamePanel({
   initialGame,
+  existingGames,
 }: {
   initialGame: ActiveDeathCounterGameRecord | null;
+  existingGames: ActiveDeathCounterGameRecord[];
 }) {
   const router = useRouter();
   const [activeGame, setActiveGame] = useState(initialGame);
@@ -141,9 +143,19 @@ export function DeathCounterGamePanel({
           <Input
             value={gameName}
             onChange={(event) => setGameName(event.target.value)}
+            list={existingGames.length > 0 ? "death-counter-game-options" : undefined}
             placeholder="Ex.: Silksong"
             className="mt-2"
           />
+          {existingGames.length > 0 ? (
+            <datalist id="death-counter-game-options">
+              {existingGames.map((game) => (
+                <option key={game.scopeKey} value={game.scopeLabel}>
+                  {game.scopeKey}
+                </option>
+              ))}
+            </datalist>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={saveGame} disabled={isPending} variant="success" size="sm">

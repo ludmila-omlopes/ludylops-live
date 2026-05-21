@@ -21,6 +21,8 @@ const statusBgMap: Record<GameSuggestionWithMeta["status"], string> = {
   rejected: "var(--color-periwinkle)",
 };
 
+const INITIAL_VISIBLE_GAME_SUGGESTIONS = 6;
+
 function mapSuggestionError(message: string) {
   switch (message) {
     case "suggestion_not_found":
@@ -38,6 +40,11 @@ export function AdminGameSuggestionsPanel({
   const router = useRouter();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  const visibleSuggestions = showAllSuggestions
+    ? suggestions
+    : suggestions.slice(0, INITIAL_VISIBLE_GAME_SUGGESTIONS);
+  const hiddenSuggestionCount = Math.max(suggestions.length - visibleSuggestions.length, 0);
 
   function submitStatus(suggestionId: string, status: GameSuggestionWithMeta["status"]) {
     setFeedback(null);
@@ -90,7 +97,7 @@ export function AdminGameSuggestionsPanel({
           </div>
         ) : null}
 
-        {suggestions.map((suggestion) => (
+        {visibleSuggestions.map((suggestion) => (
           <article key={suggestion.id} className="card-brutal-static p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -166,6 +173,18 @@ export function AdminGameSuggestionsPanel({
             </div>
           </article>
         ))}
+        {hiddenSuggestionCount > 0 || showAllSuggestions ? (
+          <div className="card-brutal-static flex justify-center p-4">
+            <Button
+              type="button"
+              onClick={() => setShowAllSuggestions((current) => !current)}
+              variant="neutral"
+              size="sm"
+            >
+              {showAllSuggestions ? "Ver menos" : `Ver mais ${hiddenSuggestionCount}`}
+            </Button>
+          </div>
+        ) : null}
         </div>
       </div>
     </section>

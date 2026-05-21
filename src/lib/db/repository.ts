@@ -7498,9 +7498,11 @@ export async function createProductRecommendationFromInput(
 
 export async function updateProductRecommendationStatus(input: {
   recommendationId: string;
-  isActive: boolean;
+  isActive?: boolean;
+  category?: ProductRecommendationRecord["category"];
 }) {
   const db = getDb();
+  const updatedAt = new Date();
 
   if (isDemoMode || !db) {
     const store = getDemoStore();
@@ -7509,18 +7511,30 @@ export async function updateProductRecommendationStatus(input: {
       throw new Error("recommendation_not_found");
     }
 
-    recommendation.isActive = input.isActive;
-    recommendation.updatedAt = new Date().toISOString();
+    if (input.isActive !== undefined) {
+      recommendation.isActive = input.isActive;
+    }
+    if (input.category !== undefined) {
+      recommendation.category = input.category;
+    }
+    recommendation.updatedAt = updatedAt.toISOString();
     return recommendation;
   }
 
   try {
+    const changes: Partial<typeof productRecommendations.$inferInsert> = {
+      updatedAt,
+    };
+    if (input.isActive !== undefined) {
+      changes.isActive = input.isActive;
+    }
+    if (input.category !== undefined) {
+      changes.category = input.category;
+    }
+
     const [updated] = await db
       .update(productRecommendations)
-      .set({
-        isActive: input.isActive,
-        updatedAt: new Date(),
-      })
+      .set(changes)
       .where(eq(productRecommendations.id, input.recommendationId))
       .returning();
 
@@ -7537,8 +7551,13 @@ export async function updateProductRecommendationStatus(input: {
         throw new Error("recommendation_not_found");
       }
 
-      recommendation.isActive = input.isActive;
-      recommendation.updatedAt = new Date().toISOString();
+      if (input.isActive !== undefined) {
+        recommendation.isActive = input.isActive;
+      }
+      if (input.category !== undefined) {
+        recommendation.category = input.category;
+      }
+      recommendation.updatedAt = updatedAt.toISOString();
       return recommendation;
     }
 

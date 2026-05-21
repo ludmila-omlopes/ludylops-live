@@ -9,8 +9,13 @@ import {
   formatProductRecommendationSchemaError,
   productRecommendationSchema,
 } from "@/lib/recommendation-schemas";
-import { recommendationCategories } from "@/lib/recommendations";
+import {
+  getRecommendationCategoryLabel,
+  getRecommendationCategoryOptions,
+} from "@/lib/recommendations";
 import type { ProductRecommendationRecord } from "@/lib/types";
+
+const INITIAL_VISIBLE_RECOMMENDATIONS = 6;
 
 function mapRecommendationError(message: string) {
   switch (message) {
@@ -43,7 +48,25 @@ export function AdminRecommendationsPanel({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [pendingCategories, setPendingCategories] = useState<Record<string, string>>({});
+  const [showAllRecommendations, setShowAllRecommendations] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const pendingCategoryChanges = recommendations
+    .map((item) => ({
+      item,
+      category: pendingCategories[item.id]?.trim() ?? item.category,
+    }))
+    .filter(({ item, category }) => category && category !== item.category);
+  const categoryOptions = getRecommendationCategoryOptions(
+    [
+      ...recommendations.map((item) => item.category),
+      ...Object.values(pendingCategories),
+    ],
+  );
+  const visibleRecommendations = showAllRecommendations
+    ? recommendations
+    : recommendations.slice(0, INITIAL_VISIBLE_RECOMMENDATIONS);
+  const hiddenRecommendationCount = Math.max(recommendations.length - visibleRecommendations.length, 0);
 
   function resetForm() {
     setName("");
@@ -162,6 +185,60 @@ export function AdminRecommendationsPanel({
     });
   }
 
+  function updatePendingCategory(item: ProductRecommendationRecord, nextCategory: string) {
+    setFeedback(null);
+    setPendingCategories((current) => {
+      const trimmedCategory = nextCategory.trim();
+      const next = { ...current };
+
+      if (trimmedCategory === item.category) {
+        delete next[item.id];
+      } else {
+        next[item.id] = nextCategory;
+      }
+
+      return next;
+    });
+  }
+
+  function discardCategoryChanges() {
+    setFeedback(null);
+    setPendingCategories({});
+  }
+
+  function saveCategoryChanges() {
+    if (pendingCategoryChanges.length === 0) {
+      setFeedback("Nenhuma categoria alterada.");
+      return;
+    }
+
+    setFeedback(null);
+    startTransition(async () => {
+      try {
+        await Promise.all(
+          pendingCategoryChanges.map(({ item, category }) =>
+            runAction(`/api/admin/recommendations/${item.id}`, "PATCH", {
+              category,
+            }),
+          ),
+        );
+        setFieldErrors({});
+        setConfirmingDeleteId(null);
+        setPendingCategories({});
+        setFeedback(
+          pendingCategoryChanges.length === 1
+            ? "Categoria atualizada."
+            : `${pendingCategoryChanges.length} categorias atualizadas.`,
+        );
+        router.refresh();
+      } catch (error) {
+        setFeedback(
+          error instanceof Error ? mapRecommendationError(error.message) : "Falha ao atualizar recomendação.",
+        );
+      }
+    });
+  }
+
   function confirmDelete(item: ProductRecommendationRecord) {
     setFeedback(null);
     startTransition(async () => {
@@ -220,21 +297,24 @@ export function AdminRecommendationsPanel({
 
             <label className="grid gap-2">
               <span className="text-sm font-black uppercase tracking-[0.14em]">Categoria</span>
-              <select
+              <input
                 value={category}
+                list="product-recommendation-category-options"
                 onChange={(event) => {
-                  setCategory(event.target.value as ProductRecommendationRecord["category"]);
+                  setCategory(event.target.value);
                   clearFieldError("category");
                 }}
+                placeholder="Ex.: Casa"
                 aria-invalid={Boolean(fieldErrors.category)}
                 className={getFieldClass("category")}
-              >
-                {recommendationCategories.map((entry) => (
+              />
+              <datalist id="product-recommendation-category-options">
+                {categoryOptions.map((entry) => (
                   <option key={entry.key} value={entry.key}>
                     {entry.label}
                   </option>
                 ))}
-              </select>
+              </datalist>
               {renderFieldError("category")}
             </label>
 
@@ -362,18 +442,45 @@ export function AdminRecommendationsPanel({
         </div>
 
         <div className="grid gap-3">
+          {recommendations.length > 0 ? (
+            <div className="card-brutal-static flex flex-wrap items-center justify-between gap-3 p-4">
+              <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--color-ink-soft)]">
+                {pendingCategoryChanges.length === 0
+                  ? "Nenhuma categoria pendente"
+                  : `${pendingCategoryChanges.length} alteração(ões) de categoria pendente(s)`}
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={discardCategoryChanges}
+                  disabled={isPending || pendingCategoryChanges.length === 0}
+                  className="btn-brutal bg-[var(--color-paper)] px-3 py-2 text-xs disabled:opacity-60"
+                >
+                  Descartar
+                </button>
+                <button
+                  type="button"
+                  onClick={saveCategoryChanges}
+                  disabled={isPending || pendingCategoryChanges.length === 0}
+                  className="btn-brutal ink-button px-3 py-2 text-xs disabled:opacity-60"
+                >
+                  {isPending ? "Salvando..." : "Salvar categorias"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {recommendations.length === 0 ? (
             <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
               Nenhuma recomendação cadastrada.
             </div>
           ) : null}
 
-          {recommendations.map((item) => {
-            const categoryMeta = recommendationCategories.find((entry) => entry.key === item.category);
+          {visibleRecommendations.map((item) => {
             return (
               <article key={item.id} className="card-brutal-static overflow-hidden">
                 <div className="grid gap-0 md:grid-cols-[168px_1fr]">
-                  <div className={`min-h-[140px] ${categoryMeta?.accentClass ?? "bg-[var(--color-paper)]"}`}>
+                  <div className="min-h-[140px] bg-[var(--color-paper)]">
                     <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
                   </div>
 
@@ -383,7 +490,7 @@ export function AdminRecommendationsPanel({
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-lg font-bold">{item.name}</p>
                           <span className="badge-brutal bg-[var(--color-paper)] px-2 py-1 text-[10px] text-[var(--color-ink)]">
-                            {categoryMeta?.label ?? item.category}
+                            {getRecommendationCategoryLabel(item.category)}
                           </span>
                           <span className="badge-brutal bg-[var(--color-paper)] px-2 py-1 text-[10px] text-[var(--color-ink)]">
                             {item.linkKind === "affiliate" ? "Afiliado" : "Externo"}
@@ -402,6 +509,25 @@ export function AdminRecommendationsPanel({
                         <p className="mono mt-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-ink-soft)]">
                           ordem {item.sortOrder} . {item.storeLabel}
                         </p>
+                        <label className="mt-3 grid max-w-xs gap-1">
+                          <span className="mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-ink-soft)]">
+                            Categoria
+                          </span>
+                          <input
+                            value={pendingCategories[item.id] ?? item.category}
+                            list="product-recommendation-category-options"
+                            onChange={(event) => updatePendingCategory(item, event.target.value)}
+                            disabled={isPending}
+                            placeholder="Ex.: Casa"
+                            className={[
+                              "rounded-[var(--radius)] border-[3px] bg-[var(--color-paper)] px-3 py-2 text-xs font-black uppercase tracking-[0.12em] disabled:opacity-60",
+                              pendingCategories[item.id] !== undefined &&
+                                pendingCategories[item.id]?.trim() !== item.category
+                                ? "border-[var(--color-admin)]"
+                                : "border-[var(--color-ink)]",
+                            ].join(" ")}
+                          />
+                        </label>
                       </div>
 
                       <div className="flex flex-col items-end gap-2">
@@ -470,6 +596,17 @@ export function AdminRecommendationsPanel({
               </article>
             );
           })}
+          {hiddenRecommendationCount > 0 || showAllRecommendations ? (
+            <div className="card-brutal-static flex justify-center p-4">
+              <button
+                type="button"
+                onClick={() => setShowAllRecommendations((current) => !current)}
+                className="btn-brutal bg-[var(--color-paper)] px-3 py-2 text-xs"
+              >
+                {showAllRecommendations ? "Ver menos" : `Ver mais ${hiddenRecommendationCount}`}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

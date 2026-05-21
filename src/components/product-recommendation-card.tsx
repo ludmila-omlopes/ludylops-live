@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import type { ProductRecommendationRecord } from "@/lib/types";
+import Link from "next/link";
 
 function recommendationRel(linkKind: ProductRecommendationRecord["linkKind"]) {
   return linkKind === "affiliate" ? "noopener noreferrer sponsored" : "noopener noreferrer";
@@ -8,28 +9,31 @@ function recommendationRel(linkKind: ProductRecommendationRecord["linkKind"]) {
 export function ProductRecommendationCard({
   item,
   categoryLabel,
-  accentClass,
+  categoryHref,
 }: {
   item: ProductRecommendationRecord;
   categoryLabel: string;
-  accentClass: string;
+  categoryHref: string;
 }) {
   return (
     <article className="panel surface-section flex h-full flex-col overflow-hidden">
       <div className="flex flex-1 flex-col">
-        <div className={`aspect-[4/3] border-b-[3px] border-[var(--color-ink)] ${accentClass}`}>
-          <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+        <div className="border-b-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-2 sm:p-3">
+          <div className="flex aspect-[4/3] max-h-64 items-center justify-center overflow-hidden bg-white p-3 sm:p-4">
+            <img
+              src={item.imageUrl}
+              alt={item.name}
+              className="block h-full w-full object-contain"
+            />
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col justify-between gap-5 p-5">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="retro-label bg-[var(--color-paper)] text-[var(--color-ink)]">
+              <Link href={categoryHref} className="retro-label bg-[var(--color-paper)] text-[var(--color-ink)]">
                 {categoryLabel}
-              </span>
-              <span className="retro-label bg-[var(--color-paper)] text-[var(--color-ink-soft)]">
-                {item.storeLabel}
-              </span>
+              </Link>
               <span className="retro-label bg-[var(--color-paper)] text-[var(--color-ink-soft)]">
                 {item.linkKind === "affiliate" ? "Link afiliado" : "Link externo"}
               </span>

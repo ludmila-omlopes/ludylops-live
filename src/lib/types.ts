@@ -66,10 +66,7 @@ export type CreatorPlatform =
   | "kick"
   | "other";
 
-export type ProductRecommendationCategory =
-  | "videogames"
-  | "perifericos"
-  | "acessorios";
+export type ProductRecommendationCategory = string;
 
 export type ProductRecommendationLinkKind =
   | "external"

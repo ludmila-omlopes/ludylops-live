@@ -3,18 +3,36 @@ import Link from "next/link";
 
 import { ProductRecommendationCard } from "@/components/product-recommendation-card";
 import { listProductRecommendations } from "@/lib/db/repository";
-import { recommendationCategories } from "@/lib/recommendations";
+import {
+  getRecommendationCategoryLabel,
+  getRecommendationCategoryOptions,
+} from "@/lib/recommendations";
 
 export const metadata: Metadata = {
   title: "Produtinhos que indico | Pipetz",
   description: "Produtos de setup, jogos e live que eu indico para a comunidade.",
 };
 
-export default async function ProdutinhosPage() {
+type ProdutinhosPageProps = {
+  searchParams: Promise<{ categoria?: string | string[] | undefined }>;
+};
+
+export default async function ProdutinhosPage({ searchParams }: ProdutinhosPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const selectedCategoryParam = Array.isArray(resolvedSearchParams.categoria)
+    ? resolvedSearchParams.categoria[0]
+    : resolvedSearchParams.categoria;
   const productRecommendations = await listProductRecommendations();
-  const categoryLookup = Object.fromEntries(
-    recommendationCategories.map((category) => [category.key, category]),
+  const categoryOptions = getRecommendationCategoryOptions(
+    productRecommendations.map((item) => item.category),
+    { includeDefaults: false },
   );
+  const categoryLookup = Object.fromEntries(categoryOptions.map((category) => [category.key, category]));
+  const selectedCategory =
+    selectedCategoryParam && selectedCategoryParam in categoryLookup ? selectedCategoryParam : null;
+  const filteredRecommendations = selectedCategory
+    ? productRecommendations.filter((item) => item.category === selectedCategory)
+    : productRecommendations;
 
   return (
     <div className="flex w-full flex-col">
@@ -37,25 +55,45 @@ export default async function ProdutinhosPage() {
 
       <section className="landing-plane landing-divider py-8 sm:py-10">
         <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-6 px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/produtinhos"
+              className={`retro-label ${
+                selectedCategory ? "bg-[var(--color-paper)] text-[var(--color-ink)]" : "ink-button"
+              }`}
+            >
+              Todas
+            </Link>
+            {categoryOptions.map((category) => (
+              <Link
+                key={category.key}
+                href={`/produtinhos?categoria=${encodeURIComponent(category.key)}`}
+                className={`retro-label ${
+                  selectedCategory === category.key
+                    ? "ink-button"
+                    : "bg-[var(--color-paper)] text-[var(--color-ink)]"
+                }`}
+              >
+                {category.label}
+              </Link>
+            ))}
+          </div>
+
           <section className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {productRecommendations.length === 0 ? (
+              {filteredRecommendations.length === 0 ? (
                 <div className="panel surface-section p-6 text-sm font-bold text-[var(--color-ink-soft)]">
                   Nenhuma recomendação publicada ainda.
                 </div>
               ) : null}
 
-              {productRecommendations.map((item) => {
-                const category = categoryLookup[item.category];
-
+              {filteredRecommendations.map((item) => {
                 return (
                   <ProductRecommendationCard
                     key={item.id}
                     item={item}
-                    categoryLabel={category?.label ?? item.category}
-                    accentClass={
-                      category?.accentClass ?? "bg-[var(--color-paper)]"
-                    }
+                    categoryLabel={getRecommendationCategoryLabel(item.category)}
+                    categoryHref={`/produtinhos?categoria=${encodeURIComponent(item.category)}`}
                   />
                 );
               })}
