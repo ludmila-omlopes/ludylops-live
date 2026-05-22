@@ -6,6 +6,7 @@ import { AdminGameSuggestionsPanel } from "@/components/admin-game-suggestions-p
 import { AdminVideoSuggestionsPanel } from "@/components/admin-video-suggestions-panel";
 import { AdminPipetzPricingPanel } from "@/components/admin-pipetz-pricing-panel";
 import { AdminPipetzAirdropPanel } from "@/components/admin-pipetz-airdrop-panel";
+import { AdminLiveLikeGoalsPanel } from "@/components/admin-live-like-goals-panel";
 import { AdminRecommendationsPanel } from "@/components/admin-recommendations-panel";
 import { AdminViewerLinksPanel } from "@/components/admin-viewer-links-panel";
 import { RedemptionGrid } from "@/components/redemption-grid";
@@ -23,6 +24,7 @@ import {
   listAdminVideoSuggestions,
   listAdminProductRecommendations,
   listAdminBets,
+  listAdminLiveLikeGoals,
   listAdminRedemptions,
 } from "@/lib/db/repository";
 import { getStreamerbotLivestreamStatus } from "@/lib/streamerbot/live-status";
@@ -39,7 +41,7 @@ const statusColorMap: Record<string, string> = {
 
 export default async function AdminPage() {
   await requireAdminSession();
-  const [catalog, leaderboard, bridge, liveStatus, currentGame, redemptions, bets, suggestions, videoSuggestions, recommendations, viewers, obsOverlayStatus, pricing] = await Promise.all([
+  const [catalog, leaderboard, bridge, liveStatus, currentGame, redemptions, bets, likeGoals, suggestions, videoSuggestions, recommendations, viewers, obsOverlayStatus, pricing] = await Promise.all([
     getCatalog(),
     getLeaderboard(),
     getBridgeStatus(),
@@ -47,6 +49,7 @@ export default async function AdminPage() {
     getCurrentGame(),
     listAdminRedemptions(),
     listAdminBets(),
+    listAdminLiveLikeGoals(),
     listAdminGameSuggestions(),
     listAdminVideoSuggestions(),
     listAdminProductRecommendations(),
@@ -105,6 +108,7 @@ export default async function AdminPage() {
                   <LiveStatusPanel bridge={bridge} initialStatus={liveStatus} />
                   <AdminCurrentGamePanel initialGame={currentGame} />
                   <AdminPipetzPricingPanel initialPricing={pricing} />
+                  <AdminLiveLikeGoalsPanel initialGoals={likeGoals} />
                 </div>
                 <AdminObsOverlaysPanel initialStatus={obsOverlayStatus} />
               </div>

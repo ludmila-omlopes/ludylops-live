@@ -175,5 +175,26 @@ export function shouldRefundBetOnResolve(input: {
   entries: BetEntryRecord[];
   winningOptionId: string;
 }) {
-  return !input.entries.some((entry) => entry.optionId === input.winningOptionId);
+  return !input.entries.some((entry) => entry.optionId === input.winningOptionId && !entry.isHouseEntry);
+}
+
+export function calculateHouseBetEntries(input: {
+  options: BetOptionRecord[];
+  existingEntries: BetEntryRecord[];
+}) {
+  return input.options
+    .filter((option) => option.poolAmount === 0)
+    .filter(
+      (option) =>
+        !input.existingEntries.some(
+          (entry) => entry.optionId === option.id && entry.isHouseEntry,
+        ),
+    )
+    .map((option) => ({
+      optionId: option.id,
+      amount: input.options
+        .filter((candidate) => candidate.id !== option.id)
+        .reduce((sum, candidate) => sum + candidate.poolAmount, 0),
+    }))
+    .filter((entry) => entry.amount > 0);
 }

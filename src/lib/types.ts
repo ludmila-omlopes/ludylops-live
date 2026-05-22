@@ -8,6 +8,8 @@ export type CatalogItemType =
 export type LedgerKind =
   | "presence_tick"
   | "chat_bonus"
+  | "channel_subscription"
+  | "like_goal_reward"
   | "admin_airdrop"
   | "manual_adjustment"
   | "redemption_debit"
@@ -40,7 +42,9 @@ export type RedemptionStatus =
 export type StreamerbotEventType =
   | "presence_tick"
   | "chat_bonus"
-  | "manual_adjustment";
+  | "manual_adjustment"
+  | "channel_subscription"
+  | "like_count_update";
 
 export type GameSuggestionStatus =
   | "open"
@@ -393,10 +397,36 @@ export interface BetEntryRecord {
   optionId: string;
   viewerId: string;
   amount: number;
+  isHouseEntry?: boolean;
   payoutAmount: number | null;
   settledAt: string | null;
   refundedAt: string | null;
   createdAt: string;
+}
+
+export interface LiveLikeGoalRecord {
+  id: string;
+  label: string | null;
+  targetLikeCount: number;
+  rewardAmount: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LiveLikeGoalRewardRecord {
+  id: string;
+  goalId: string;
+  broadcastId: string;
+  likeCount: number;
+  rewardAmount: number;
+  rewardedViewerCount: number;
+  totalAmount: number;
+  paidAt: string;
+}
+
+export interface LiveLikeGoalAdminRecord extends LiveLikeGoalRecord {
+  lastReward: LiveLikeGoalRewardRecord | null;
 }
 
 export interface BetViewerPositionRecord {

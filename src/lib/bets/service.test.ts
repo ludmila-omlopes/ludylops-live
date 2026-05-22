@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calculateHouseBetEntries,
   calculateBetPayouts,
   evaluateBetLifecycleAction,
   evaluateBetPlacement,
@@ -153,6 +154,46 @@ describe("calculateBetPayouts", () => {
       { entryId: "entry-a", viewerId: "viewer-a", payoutAmount: 75 },
       { entryId: "entry-b", viewerId: "viewer-b", payoutAmount: 225 },
     ]);
+  });
+});
+
+describe("calculateHouseBetEntries", () => {
+  it("creates a house entry for each empty option using the sum of the other pools", () => {
+    expect(
+      calculateHouseBetEntries({
+        options: [
+          { id: "a", betId: "bet-1", label: "A", sortOrder: 0, poolAmount: 100 },
+          { id: "b", betId: "bet-1", label: "B", sortOrder: 1, poolAmount: 0 },
+          { id: "c", betId: "bet-1", label: "C", sortOrder: 2, poolAmount: 50 },
+        ],
+        existingEntries: [],
+      }),
+    ).toEqual([{ optionId: "b", amount: 150 }]);
+  });
+
+  it("does not duplicate an existing house entry", () => {
+    expect(
+      calculateHouseBetEntries({
+        options: [
+          { id: "a", betId: "bet-1", label: "A", sortOrder: 0, poolAmount: 100 },
+          { id: "b", betId: "bet-1", label: "B", sortOrder: 1, poolAmount: 0 },
+        ],
+        existingEntries: [
+          {
+            id: "house-entry",
+            betId: "bet-1",
+            optionId: "b",
+            viewerId: "house_b",
+            amount: 100,
+            isHouseEntry: true,
+            payoutAmount: null,
+            settledAt: null,
+            refundedAt: null,
+            createdAt: new Date("2026-03-31T10:00:00.000Z").toISOString(),
+          },
+        ],
+      }),
+    ).toEqual([]);
   });
 });
 

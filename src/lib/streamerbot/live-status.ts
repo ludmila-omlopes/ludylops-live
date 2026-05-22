@@ -12,6 +12,7 @@ import type {
 const LIVE_REQUIRED_EVENT_TYPES: StreamerbotEventType[] = [
   "presence_tick",
   "chat_bonus",
+  "like_count_update",
 ];
 const LIVE_STATUS_CACHE_TTL_MS = 15_000;
 const LIVE_STATUS_REQUEST_TIMEOUT_MS = 5_000;
