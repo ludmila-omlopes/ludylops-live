@@ -205,7 +205,13 @@ export const adminAirdropSchema = z.object({
 
 export const streamerbotEventSchema = z.object({
   eventId: z.string().min(3),
-  eventType: z.enum(["presence_tick", "chat_bonus", "manual_adjustment"]),
+  eventType: z.enum([
+    "presence_tick",
+    "chat_bonus",
+    "manual_adjustment",
+    "channel_subscription",
+    "like_count_update",
+  ]),
   viewerExternalId: z.string().min(1).optional(),
   youtubeDisplayName: z.string().min(1).optional(),
   youtubeHandle: z.string().min(1).optional(),
@@ -213,6 +219,13 @@ export const streamerbotEventSchema = z.object({
   balance: z.number().int().optional(),
   occurredAt: z.string().datetime(),
   payload: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const liveLikeGoalSchema = z.object({
+  label: z.string().trim().max(255).optional(),
+  targetLikeCount: z.number().int().min(1).max(1_000_000),
+  rewardAmount: z.number().int().min(1).max(100_000),
+  isActive: z.boolean().default(true),
 });
 
 export const bridgeHeartbeatSchema = z.object({

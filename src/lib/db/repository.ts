@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import {
+  calculateHouseBetEntries,
   calculateBetPayouts,
   evaluateBetLifecycleAction,
   evaluateBetPlacement,
@@ -22,6 +23,8 @@ import {
   googleAccounts,
   googleAccountViewers,
   googleRiscDeliveries,
+  liveLikeGoalRewards,
+  liveLikeGoals,
   obsOverlayControl,
   pointLedger,
   quoteOverlayQueue,
@@ -92,6 +95,9 @@ import {
   GoogleAccountViewerRecord,
   GoogleRiscDeliveryRecord,
   LedgerEntryRecord,
+  LiveLikeGoalAdminRecord,
+  LiveLikeGoalRecord,
+  LiveLikeGoalRewardRecord,
   ObsOverlayAdminStatusRecord,
   ObsOverlayControlRecord,
   PipetzPricingRecord,
@@ -148,6 +154,8 @@ const DEFAULT_PIPETZ_PRICING: PipetzPricingRecord = {
   updatedAt: null,
   updatedBy: null,
 };
+const CHANNEL_SUBSCRIPTION_REWARD_AMOUNT = 2000;
+const LIKE_GOAL_PRESENCE_WINDOW_MS = 5 * 60 * 1000;
 
 type StreamerbotCounterCommandAction = "increment" | "decrement" | "get" | "reset";
 type StreamerbotCounterScopeType = "global" | "game";
@@ -287,6 +295,8 @@ type DemoStore = {
   bets: BetRecord[];
   betOptions: BetOptionRecord[];
   betEntries: BetEntryRecord[];
+  liveLikeGoals: LiveLikeGoalRecord[];
+  liveLikeGoalRewards: LiveLikeGoalRewardRecord[];
   gameSuggestions: GameSuggestionRecord[];
   gameSuggestionBoosts: GameSuggestionBoostRecord[];
   creatorSuggestions: CreatorSuggestionRecord[];
@@ -321,6 +331,8 @@ function getDemoStore(): DemoStore {
       bets: structuredClone(demoBetRecords),
       betOptions: structuredClone(demoBetOptions),
       betEntries: structuredClone(demoBetEntries),
+      liveLikeGoals: [],
+      liveLikeGoalRewards: [],
       gameSuggestions: structuredClone(demoGameSuggestions),
       gameSuggestionBoosts: structuredClone(demoGameSuggestionBoosts),
       creatorSuggestions: structuredClone(demoCreatorSuggestions),
@@ -1365,6 +1377,25 @@ function getDemoViewerByYoutubeChannelId(store: DemoStore, youtubeChannelId: str
   return store.viewers.find((entry) => entry.youtubeChannelId === youtubeChannelId) ?? null;
 }
 
+function buildHouseViewerId(optionId: string) {
+  return `house_${optionId}`.slice(0, 64);
+}
+
+function buildHouseViewerForOption(option: BetOptionRecord): ViewerRecord {
+  return {
+    id: buildHouseViewerId(option.id),
+    googleUserId: null,
+    email: null,
+    youtubeChannelId: `house:${option.id}`.slice(0, 128),
+    youtubeDisplayName: "Casa Pipetz",
+    youtubeHandle: null,
+    avatarUrl: null,
+    isLinked: false,
+    excludeFromRanking: true,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 function getDemoGoogleAccountViewerLinks(store: DemoStore, googleAccountId: string) {
   return store.googleAccountViewers.filter((entry) => entry.googleAccountId === googleAccountId);
 }
@@ -1418,11 +1449,69 @@ function serializeBetEntry(row: typeof betEntries.$inferSelect): BetEntryRecord 
     optionId: row.optionId,
     viewerId: row.viewerId,
     amount: row.amount,
+    isHouseEntry: row.isHouseEntry,
     payoutAmount: row.payoutAmount,
     settledAt: row.settledAt?.toISOString() ?? null,
     refundedAt: row.refundedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+function serializeLiveLikeGoal(row: typeof liveLikeGoals.$inferSelect): LiveLikeGoalRecord {
+  return {
+    id: row.id,
+    label: row.label,
+    targetLikeCount: row.targetLikeCount,
+    rewardAmount: row.rewardAmount,
+    isActive: row.isActive,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function serializeLiveLikeGoalReward(
+  row: typeof liveLikeGoalRewards.$inferSelect,
+): LiveLikeGoalRewardRecord {
+  return {
+    id: row.id,
+    goalId: row.goalId,
+    broadcastId: row.broadcastId,
+    likeCount: row.likeCount,
+    rewardAmount: row.rewardAmount,
+    rewardedViewerCount: row.rewardedViewerCount,
+    totalAmount: row.totalAmount,
+    paidAt: row.paidAt.toISOString(),
+  };
+}
+
+function buildLiveLikeGoalAdminRecord(
+  goal: LiveLikeGoalRecord,
+  rewards: LiveLikeGoalRewardRecord[],
+): LiveLikeGoalAdminRecord {
+  return {
+    ...goal,
+    lastReward:
+      rewards
+        .filter((reward) => reward.goalId === goal.id)
+        .sort((a, b) => b.paidAt.localeCompare(a.paidAt))[0] ?? null,
+  };
+}
+
+function readNumberFromPayload(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function readStringFromPayload(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function buildViewerPosition(
@@ -6141,6 +6230,7 @@ async function placeBetForViewer(input: {
     optionId: input.optionId,
     viewerId: dashboard.viewer.id,
     amount: input.amount,
+    isHouseEntry: false,
     payoutAmount: null,
     settledAt: null,
     refundedAt: null,
@@ -6243,6 +6333,7 @@ async function placeBetForViewer(input: {
           optionId: input.optionId,
           viewerId: dashboard.viewer.id,
           amount: input.amount,
+          isHouseEntry: false,
           payoutAmount: null,
           settledAt: null,
           refundedAt: null,
@@ -6850,12 +6941,40 @@ export async function lockBet(betId: string) {
     if (!transition.canTransition) {
       throw new Error(transition.reason);
     }
+    const options = store.betOptions.filter((option) => option.betId === betId);
+    const existingEntries = store.betEntries.filter((entry) => entry.betId === betId);
+    const houseEntries = calculateHouseBetEntries({ options, existingEntries });
+    for (const houseEntry of houseEntries) {
+      const option = options.find((entry) => entry.id === houseEntry.optionId);
+      if (!option) {
+        continue;
+      }
+      const houseViewer = buildHouseViewerForOption(option);
+      if (!store.viewers.some((viewer) => viewer.id === houseViewer.id)) {
+        store.viewers.push(houseViewer);
+      }
+      getBalance(store, houseViewer.id);
+      option.poolAmount += houseEntry.amount;
+      store.betEntries.unshift({
+        id: randomUUID(),
+        betId,
+        optionId: option.id,
+        viewerId: houseViewer.id,
+        amount: houseEntry.amount,
+        isHouseEntry: true,
+        payoutAmount: null,
+        settledAt: null,
+        refundedAt: null,
+        createdAt: new Date().toISOString(),
+      });
+    }
     bet.status = "locked";
     bet.lockedAt = new Date().toISOString();
     return buildBetWithOptions({
       bet,
-      options: store.betOptions.filter((option) => option.betId === betId),
+      options,
       viewerEntry: null,
+      entries: store.betEntries.filter((entry) => entry.betId === betId),
     });
   }
 
@@ -6869,20 +6988,93 @@ export async function lockBet(betId: string) {
     throw new Error(transition.reason);
   }
   const lockedAt = new Date();
+  let optionRows: Array<typeof betOptions.$inferSelect> = [];
+  let entryRows: Array<typeof betEntries.$inferSelect> = [];
 
-  await db
-    .update(bets)
-    .set({
-      status: "locked",
-      lockedAt,
-    })
-    .where(eq(bets.id, betId));
+  await db.transaction(async (tx) => {
+    optionRows = await tx.select().from(betOptions).where(eq(betOptions.betId, betId));
+    entryRows = await tx.select().from(betEntries).where(eq(betEntries.betId, betId));
+    const serializedOptions = optionRows.map(serializeBetOption);
+    const houseEntries = calculateHouseBetEntries({
+      options: serializedOptions,
+      existingEntries: entryRows.map(serializeBetEntry),
+    });
 
-  const optionRows = await db.select().from(betOptions).where(eq(betOptions.betId, betId));
+    for (const houseEntry of houseEntries) {
+      const option = serializedOptions.find((entry) => entry.id === houseEntry.optionId);
+      if (!option) {
+        continue;
+      }
+      const houseViewer = buildHouseViewerForOption(option);
+      await tx
+        .insert(users)
+        .values({
+          id: houseViewer.id,
+          googleUserId: null,
+          email: null,
+          youtubeChannelId: houseViewer.youtubeChannelId,
+          youtubeDisplayName: houseViewer.youtubeDisplayName,
+          youtubeHandle: null,
+          avatarUrl: null,
+          isLinked: false,
+          excludeFromRanking: true,
+          createdAt: new Date(houseViewer.createdAt),
+        })
+        .onConflictDoNothing();
+      await tx
+        .insert(viewerBalances)
+        .values({
+          viewerId: houseViewer.id,
+          currentBalance: 0,
+          lifetimeEarned: 0,
+          lifetimeSpent: 0,
+          lastSyncedAt: new Date(),
+        })
+        .onConflictDoNothing();
+      const [insertedEntry] = await tx
+        .insert(betEntries)
+        .values({
+          id: randomUUID(),
+          betId,
+          optionId: option.id,
+          viewerId: houseViewer.id,
+          amount: houseEntry.amount,
+          isHouseEntry: true,
+          payoutAmount: null,
+          settledAt: null,
+          refundedAt: null,
+          createdAt: lockedAt,
+        })
+        .onConflictDoNothing({
+          target: [betEntries.betId, betEntries.viewerId],
+        })
+        .returning();
+
+      if (insertedEntry) {
+        await tx
+          .update(betOptions)
+          .set({ poolAmount: sql`${betOptions.poolAmount} + ${houseEntry.amount}` })
+          .where(eq(betOptions.id, option.id));
+      }
+    }
+
+    await tx
+      .update(bets)
+      .set({
+        status: "locked",
+        lockedAt,
+      })
+      .where(eq(bets.id, betId));
+
+    optionRows = await tx.select().from(betOptions).where(eq(betOptions.betId, betId));
+    entryRows = await tx.select().from(betEntries).where(eq(betEntries.betId, betId));
+  });
+
   return buildBetWithOptions({
     bet: { ...currentBet, status: "locked", lockedAt: lockedAt.toISOString() },
     options: optionRows.map(serializeBetOption),
     viewerEntry: null,
+    entries: entryRows.map(serializeBetEntry),
   });
 }
 
@@ -7635,6 +7827,162 @@ export async function listAdminRedemptions() {
   }));
 }
 
+export async function listAdminLiveLikeGoals(): Promise<LiveLikeGoalAdminRecord[]> {
+  const db = getDb();
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    return store.liveLikeGoals
+      .map((goal) => buildLiveLikeGoalAdminRecord(goal, store.liveLikeGoalRewards))
+      .sort((a, b) => a.targetLikeCount - b.targetLikeCount);
+  }
+
+  const [goalRows, rewardRows] = await Promise.all([
+    db.select().from(liveLikeGoals).orderBy(liveLikeGoals.targetLikeCount),
+    db.select().from(liveLikeGoalRewards).orderBy(desc(liveLikeGoalRewards.paidAt)),
+  ]);
+  const rewards = rewardRows.map(serializeLiveLikeGoalReward);
+  return goalRows.map((goal) => buildLiveLikeGoalAdminRecord(serializeLiveLikeGoal(goal), rewards));
+}
+
+export async function createLiveLikeGoal(input: {
+  label?: string | null;
+  targetLikeCount: number;
+  rewardAmount: number;
+  isActive?: boolean;
+}) {
+  const now = new Date().toISOString();
+  const goal: LiveLikeGoalRecord = {
+    id: randomUUID(),
+    label: input.label?.trim() || null,
+    targetLikeCount: input.targetLikeCount,
+    rewardAmount: input.rewardAmount,
+    isActive: input.isActive ?? true,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const db = getDb();
+  if (isDemoMode || !db) {
+    getDemoStore().liveLikeGoals.push(goal);
+    return goal;
+  }
+
+  await db.insert(liveLikeGoals).values({
+    id: goal.id,
+    label: goal.label,
+    targetLikeCount: goal.targetLikeCount,
+    rewardAmount: goal.rewardAmount,
+    isActive: goal.isActive,
+    createdAt: new Date(goal.createdAt),
+    updatedAt: new Date(goal.updatedAt),
+  });
+  return goal;
+}
+
+export async function updateLiveLikeGoal(
+  goalId: string,
+  input: {
+    label?: string | null;
+    targetLikeCount: number;
+    rewardAmount: number;
+    isActive?: boolean;
+  },
+) {
+  const updatedAt = new Date().toISOString();
+  const db = getDb();
+  if (isDemoMode || !db) {
+    const goal = getDemoStore().liveLikeGoals.find((entry) => entry.id === goalId);
+    if (!goal) {
+      throw new Error("like_goal_not_found");
+    }
+    goal.label = input.label?.trim() || null;
+    goal.targetLikeCount = input.targetLikeCount;
+    goal.rewardAmount = input.rewardAmount;
+    goal.isActive = input.isActive ?? true;
+    goal.updatedAt = updatedAt;
+    return goal;
+  }
+
+  const [updated] = await db
+    .update(liveLikeGoals)
+    .set({
+      label: input.label?.trim() || null,
+      targetLikeCount: input.targetLikeCount,
+      rewardAmount: input.rewardAmount,
+      isActive: input.isActive ?? true,
+      updatedAt: new Date(updatedAt),
+    })
+    .where(eq(liveLikeGoals.id, goalId))
+    .returning();
+  if (!updated) {
+    throw new Error("like_goal_not_found");
+  }
+  return serializeLiveLikeGoal(updated);
+}
+
+export async function deleteLiveLikeGoal(goalId: string) {
+  const db = getDb();
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const index = store.liveLikeGoals.findIndex((entry) => entry.id === goalId);
+    if (index < 0) {
+      throw new Error("like_goal_not_found");
+    }
+    const [deleted] = store.liveLikeGoals.splice(index, 1);
+    store.liveLikeGoalRewards = store.liveLikeGoalRewards.filter((entry) => entry.goalId !== goalId);
+    return deleted;
+  }
+
+  await db.delete(liveLikeGoalRewards).where(eq(liveLikeGoalRewards.goalId, goalId));
+  const [deleted] = await db.delete(liveLikeGoals).where(eq(liveLikeGoals.id, goalId)).returning();
+  if (!deleted) {
+    throw new Error("like_goal_not_found");
+  }
+  return serializeLiveLikeGoal(deleted);
+}
+
+function getDemoPresentViewerIds(store: DemoStore, occurredAt: string) {
+  const cutoff = new Date(occurredAt).getTime() - LIKE_GOAL_PRESENCE_WINDOW_MS;
+  const present = store.ledger
+    .filter(
+      (entry) =>
+        entry.kind === "presence_tick" &&
+        new Date(entry.createdAt).getTime() >= cutoff &&
+        new Date(entry.createdAt).getTime() <= new Date(occurredAt).getTime(),
+    )
+    .map((entry) => entry.viewerId);
+
+  return [...new Set(present)].filter((viewerId) => {
+    const viewer = store.viewers.find((entry) => entry.id === viewerId);
+    return viewer && !viewer.excludeFromRanking;
+  });
+}
+
+async function getDatabasePresentViewerIds(occurredAt: string) {
+  const db = getDb();
+  if (!db) {
+    return [];
+  }
+  const occurred = new Date(occurredAt);
+  const cutoff = new Date(occurred.getTime() - LIKE_GOAL_PRESENCE_WINDOW_MS);
+  const rows = await db
+    .select({
+      viewerId: pointLedger.viewerId,
+      excludeFromRanking: users.excludeFromRanking,
+    })
+    .from(pointLedger)
+    .innerJoin(users, eq(pointLedger.viewerId, users.id))
+    .where(
+      and(
+        eq(pointLedger.kind, "presence_tick"),
+        gte(pointLedger.createdAt, cutoff),
+        lt(pointLedger.createdAt, occurred),
+        eq(users.excludeFromRanking, false),
+      ),
+    );
+  return [...new Set(rows.map((entry) => entry.viewerId))];
+}
+
 export async function adjustViewerBalance({
   viewerId,
   amount,
@@ -7727,7 +8075,7 @@ export async function getBridgeStatus() {
 
 export async function ingestStreamerbotEvent(input: {
   eventId: string;
-  eventType: "presence_tick" | "chat_bonus" | "manual_adjustment";
+  eventType: "presence_tick" | "chat_bonus" | "manual_adjustment" | "channel_subscription" | "like_count_update";
   viewerExternalId?: string;
   youtubeDisplayName?: string;
   youtubeHandle?: string;
@@ -7753,8 +8101,70 @@ export async function ingestStreamerbotEvent(input: {
       };
     }
 
+    if (input.eventType === "like_count_update") {
+      const likeCount = readNumberFromPayload(input.payload, "likeCount") ?? input.balance ?? 0;
+      const broadcastId = readStringFromPayload(input.payload, "broadcastId") ?? "demo_live";
+      const eligibleGoals = store.liveLikeGoals.filter(
+        (goal) =>
+          goal.isActive &&
+          goal.targetLikeCount <= likeCount &&
+          !store.liveLikeGoalRewards.some(
+            (reward) => reward.goalId === goal.id && reward.broadcastId === broadcastId,
+          ),
+      );
+      const presentViewerIds = getDemoPresentViewerIds(store, input.occurredAt);
+      for (const goal of eligibleGoals) {
+        for (const viewerId of presentViewerIds) {
+          const balance = getBalance(store, viewerId);
+          balance.currentBalance += goal.rewardAmount;
+          balance.lifetimeEarned += goal.rewardAmount;
+          balance.lastSyncedAt = new Date().toISOString();
+          createLedgerEntry(store, {
+            viewerId,
+            kind: "like_goal_reward",
+            amount: goal.rewardAmount,
+            source: "like_goal_reward",
+            externalEventId: `${input.eventId}:${goal.id}:${viewerId}`,
+            metadata: {
+              goalId: goal.id,
+              broadcastId,
+              likeCount,
+              targetLikeCount: goal.targetLikeCount,
+              presenceCriterion: "presence_tick nos últimos 5 minutos",
+            },
+            createdAt: input.occurredAt,
+          });
+        }
+        store.liveLikeGoalRewards.unshift({
+          id: randomUUID(),
+          goalId: goal.id,
+          broadcastId,
+          likeCount,
+          rewardAmount: goal.rewardAmount,
+          rewardedViewerCount: presentViewerIds.length,
+          totalAmount: presentViewerIds.length * goal.rewardAmount,
+          paidAt: input.occurredAt,
+        });
+      }
+      return {
+        mode: "demo" as const,
+        deduped: false,
+        eventLogInserted: false,
+        viewerCreated: false,
+        balanceUpdated: eligibleGoals.length > 0 && presentViewerIds.length > 0,
+        ledgerInserted: eligibleGoals.length > 0 && presentViewerIds.length > 0,
+        linkMatched: false,
+        likeGoalsPaid: eligibleGoals.length,
+        rewardedViewerCount: presentViewerIds.length,
+      };
+    }
+
     const viewer = store.viewers.find((entry) => entry.youtubeChannelId === input.viewerExternalId);
-    if (!viewer || typeof input.amount !== "number") {
+    const eventAmount =
+      input.eventType === "channel_subscription"
+        ? CHANNEL_SUBSCRIPTION_REWARD_AMOUNT
+        : input.amount;
+    if (!viewer || typeof eventAmount !== "number") {
       return {
         mode: "demo" as const,
         deduped: false,
@@ -7775,20 +8185,45 @@ export async function ingestStreamerbotEvent(input: {
     }
 
     const creditedViewer = await resolveUnifiedViewerForLinkedChannel(viewer);
+    if (
+      input.eventType === "channel_subscription" &&
+      store.ledger.some(
+        (entry) => entry.viewerId === creditedViewer.id && entry.kind === "channel_subscription",
+      )
+    ) {
+      return {
+        mode: "demo" as const,
+        deduped: false,
+        eventLogInserted: false,
+        viewerCreated: false,
+        balanceUpdated: false,
+        ledgerInserted: false,
+        linkMatched: false,
+        viewerId: creditedViewer.id,
+        ignoredReason: "subscription_already_rewarded",
+      };
+    }
     const balance = getBalance(store, creditedViewer.id);
-    balance.currentBalance += input.amount;
-    if (input.amount > 0) {
-      balance.lifetimeEarned += input.amount;
+    balance.currentBalance += eventAmount;
+    if (eventAmount > 0) {
+      balance.lifetimeEarned += eventAmount;
     } else {
-      balance.lifetimeSpent += Math.abs(input.amount);
+      balance.lifetimeSpent += Math.abs(eventAmount);
     }
     balance.lastSyncedAt = new Date().toISOString();
 
     createLedgerEntry(store, {
       viewerId: creditedViewer.id,
-      kind: input.eventType === "presence_tick" ? "presence_tick" : input.eventType === "chat_bonus" ? "chat_bonus" : "manual_adjustment",
-      amount: input.amount,
-      source: "streamerbot",
+      kind:
+        input.eventType === "presence_tick"
+          ? "presence_tick"
+          : input.eventType === "chat_bonus"
+            ? "chat_bonus"
+            : input.eventType === "channel_subscription"
+              ? "channel_subscription"
+              : "manual_adjustment",
+      amount: eventAmount,
+      source: input.eventType === "channel_subscription" ? "channel_subscription" : "streamerbot",
       externalEventId: input.eventId,
       metadata: input.payload,
       createdAt: input.occurredAt,
@@ -7853,7 +8288,90 @@ export async function ingestStreamerbotEvent(input: {
     signatureValid: true,
   });
 
-  if (typeof input.amount === "number" && input.viewerExternalId) {
+  if (input.eventType === "like_count_update") {
+    const likeCount = readNumberFromPayload(input.payload, "likeCount") ?? input.balance ?? 0;
+    const broadcastId = readStringFromPayload(input.payload, "broadcastId") ?? "current_live";
+    const [goalRows, rewardRows, presentViewerIds] = await Promise.all([
+      db.select().from(liveLikeGoals).where(eq(liveLikeGoals.isActive, true)),
+      db.select().from(liveLikeGoalRewards).where(eq(liveLikeGoalRewards.broadcastId, broadcastId)),
+      getDatabasePresentViewerIds(input.occurredAt),
+    ]);
+    const paidGoalIds = new Set(rewardRows.map((entry) => entry.goalId));
+    const eligibleGoals = goalRows
+      .map(serializeLiveLikeGoal)
+      .filter((goal) => goal.targetLikeCount <= likeCount && !paidGoalIds.has(goal.id));
+
+    await db.transaction(async (tx) => {
+      for (const goal of eligibleGoals) {
+        const [reward] = await tx
+          .insert(liveLikeGoalRewards)
+          .values({
+            id: randomUUID(),
+            goalId: goal.id,
+            broadcastId,
+            likeCount,
+            rewardAmount: goal.rewardAmount,
+            rewardedViewerCount: presentViewerIds.length,
+            totalAmount: presentViewerIds.length * goal.rewardAmount,
+            paidAt: new Date(input.occurredAt),
+          })
+          .onConflictDoNothing({
+            target: [liveLikeGoalRewards.goalId, liveLikeGoalRewards.broadcastId],
+          })
+          .returning();
+
+        if (!reward) {
+          continue;
+        }
+
+        for (const viewerId of presentViewerIds) {
+          await tx
+            .update(viewerBalances)
+            .set({
+              currentBalance: sql`${viewerBalances.currentBalance} + ${goal.rewardAmount}`,
+              lifetimeEarned: sql`${viewerBalances.lifetimeEarned} + ${goal.rewardAmount}`,
+              lastSyncedAt: new Date(),
+            })
+            .where(eq(viewerBalances.viewerId, viewerId));
+          await tx.insert(pointLedger).values({
+            id: randomUUID(),
+            viewerId,
+            kind: "like_goal_reward",
+            amount: goal.rewardAmount,
+            source: "like_goal_reward",
+            externalEventId: `${input.eventId}:${goal.id}:${viewerId}`.slice(0, 128),
+            metadata: {
+              goalId: goal.id,
+              broadcastId,
+              likeCount,
+              targetLikeCount: goal.targetLikeCount,
+              presenceCriterion: "presence_tick nos últimos 5 minutos",
+            },
+            createdAt: new Date(input.occurredAt),
+          });
+        }
+      }
+    });
+
+    return {
+      mode: "database" as const,
+      deduped: false,
+      eventLogInserted: true,
+      viewerCreated: false,
+      balanceUpdated: eligibleGoals.length > 0 && presentViewerIds.length > 0,
+      ledgerInserted: eligibleGoals.length > 0 && presentViewerIds.length > 0,
+      linkMatched: false,
+      likeGoalsPaid: eligibleGoals.length,
+      rewardedViewerCount: presentViewerIds.length,
+    };
+  }
+
+  const eventAmount =
+    input.eventType === "channel_subscription"
+      ? CHANNEL_SUBSCRIPTION_REWARD_AMOUNT
+      : input.amount;
+
+  if (typeof eventAmount === "number" && input.viewerExternalId) {
     let viewerCreated = false;
     let [viewer] = await db
       .select()
@@ -7902,18 +8420,43 @@ export async function ingestStreamerbotEvent(input: {
 
     const serializedViewer = serializeViewer(viewer);
     const creditedViewer = await resolveUnifiedViewerForLinkedChannel(serializedViewer);
+    if (input.eventType === "channel_subscription") {
+      const [existingSubscriptionReward] = await db
+        .select()
+        .from(pointLedger)
+        .where(
+          and(
+            eq(pointLedger.viewerId, creditedViewer.id),
+            eq(pointLedger.kind, "channel_subscription"),
+          ),
+        )
+        .limit(1);
+      if (existingSubscriptionReward) {
+        return {
+          mode: "database" as const,
+          deduped: false,
+          eventLogInserted: true,
+          viewerCreated,
+          balanceUpdated: false,
+          ledgerInserted: false,
+          linkMatched: false,
+          viewerId: creditedViewer.id,
+          ignoredReason: "subscription_already_rewarded",
+        };
+      }
+    }
 
     await db
       .update(viewerBalances)
       .set({
-        currentBalance: sql`${viewerBalances.currentBalance} + ${input.amount}`,
+        currentBalance: sql`${viewerBalances.currentBalance} + ${eventAmount}`,
         lifetimeEarned:
-          input.amount > 0
-            ? sql`${viewerBalances.lifetimeEarned} + ${input.amount}`
+          eventAmount > 0
+            ? sql`${viewerBalances.lifetimeEarned} + ${eventAmount}`
             : viewerBalances.lifetimeEarned,
         lifetimeSpent:
-          input.amount < 0
-            ? sql`${viewerBalances.lifetimeSpent} + ${Math.abs(input.amount)}`
+          eventAmount < 0
+            ? sql`${viewerBalances.lifetimeSpent} + ${Math.abs(eventAmount)}`
             : viewerBalances.lifetimeSpent,
         lastSyncedAt: new Date(),
       })
@@ -7927,9 +8470,11 @@ export async function ingestStreamerbotEvent(input: {
           ? "presence_tick"
           : input.eventType === "chat_bonus"
             ? "chat_bonus"
-            : "manual_adjustment",
-      amount: input.amount,
-      source: "streamerbot",
+            : input.eventType === "channel_subscription"
+              ? "channel_subscription"
+              : "manual_adjustment",
+      amount: eventAmount,
+      source: input.eventType === "channel_subscription" ? "channel_subscription" : "streamerbot",
       externalEventId: input.eventId,
       metadata: input.payload,
       createdAt: new Date(input.occurredAt),

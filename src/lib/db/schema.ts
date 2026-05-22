@@ -182,6 +182,7 @@ export const betEntries = pgTable(
       .references(() => users.id)
       .notNull(),
     amount: integer("amount").notNull(),
+    isHouseEntry: boolean("is_house_entry").default(false).notNull(),
     payoutAmount: integer("payout_amount"),
     settledAt: timestamp("settled_at", { withTimezone: true }),
     refundedAt: timestamp("refunded_at", { withTimezone: true }),
@@ -189,6 +190,38 @@ export const betEntries = pgTable(
   },
   (table) => ({
     betViewerIdx: uniqueIndex("bet_entries_bet_viewer_idx").on(table.betId, table.viewerId),
+  }),
+);
+
+export const liveLikeGoals = pgTable("live_like_goals", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  label: varchar("label", { length: 255 }),
+  targetLikeCount: integer("target_like_count").notNull(),
+  rewardAmount: integer("reward_amount").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const liveLikeGoalRewards = pgTable(
+  "live_like_goal_rewards",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    goalId: varchar("goal_id", { length: 64 })
+      .references(() => liveLikeGoals.id)
+      .notNull(),
+    broadcastId: varchar("broadcast_id", { length: 128 }).notNull(),
+    likeCount: integer("like_count").notNull(),
+    rewardAmount: integer("reward_amount").notNull(),
+    rewardedViewerCount: integer("rewarded_viewer_count").notNull(),
+    totalAmount: integer("total_amount").notNull(),
+    paidAt: timestamp("paid_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    goalBroadcastIdx: uniqueIndex("live_like_goal_rewards_goal_broadcast_idx").on(
+      table.goalId,
+      table.broadcastId,
+    ),
   }),
 );
 

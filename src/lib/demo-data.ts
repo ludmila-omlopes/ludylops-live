@@ -373,6 +373,7 @@ export const demoBetEntries: BetEntryRecord[] = [
     optionId: "opt-2b",
     viewerId: "viewer_ana",
     amount: 400,
+    isHouseEntry: false,
     payoutAmount: 683,
     settledAt: new Date(now.getTime() - 23 * 60 * 60 * 1000).toISOString(),
     refundedAt: null,
