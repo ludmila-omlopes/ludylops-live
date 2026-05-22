@@ -145,7 +145,7 @@ export function AdminLiveLikeGoalsPanel({
                 Ao bater {goal.targetLikeCount} likes, cada viewer presente recebe {formatPipetz(goal.rewardAmount)} pipetz.
               </p>
               <p className="mt-1 text-xs font-bold text-[var(--color-ink-soft)]">
-                Presença: viewers com registro de presença nos últimos 5 minutos.
+                Viewer presente: desde o início da live.
               </p>
               {goal.lastReward ? (
                 <p className="mt-2 text-xs font-bold text-[var(--color-ink-soft)]">

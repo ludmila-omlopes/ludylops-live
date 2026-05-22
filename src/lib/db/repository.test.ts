@@ -67,6 +67,7 @@ import {
   cancelBet,
   createBet,
   createGameSuggestion,
+  createLiveLikeGoal,
   createVideoSuggestion,
   createProductRecommendationFromInput,
   deleteProductRecommendation,
@@ -3188,6 +3189,76 @@ describe("ingestStreamerbotEvent", () => {
         isLive: true,
         reason: "present_viewers",
         source: "streamerbot",
+      },
+    });
+  });
+
+  it("rewards viewers present since the beginning of the same live like goal broadcast", async () => {
+    getDbMock.mockReturnValue(null);
+
+    const goal = await createLiveLikeGoal({
+      label: "Meta 30 likes",
+      targetLikeCount: 30,
+      rewardAmount: 100,
+      isActive: true,
+    });
+    const before = await getViewerDashboard("viewer_lia");
+    const balanceBeforePresence = before?.balance.currentBalance ?? 0;
+
+    await ingestStreamerbotEvent({
+      eventId: "presence-like-goal-start",
+      eventType: "presence_tick",
+      viewerExternalId: "yt_lia",
+      youtubeDisplayName: "Lia Pixel",
+      amount: 5,
+      occurredAt: "2026-04-01T12:00:00.000Z",
+      payload: {
+        broadcastId: "live-like-goal-1",
+        isLive: true,
+        reason: "present_viewers",
+      },
+    });
+
+    const afterPresence = await getViewerDashboard("viewer_lia");
+    const balanceAfterPresence = afterPresence?.balance.currentBalance ?? 0;
+    const result = await ingestStreamerbotEvent({
+      eventId: "likes-goal-start",
+      eventType: "like_count_update",
+      amount: 0,
+      occurredAt: "2026-04-01T12:30:00.000Z",
+      payload: {
+        broadcastId: "live-like-goal-1",
+        isLive: true,
+        likeCount: 30,
+      },
+    });
+    const afterReward = await getViewerDashboard("viewer_lia");
+    const balanceAfterReward = afterReward?.balance.currentBalance ?? 0;
+
+    expect(result).toMatchObject({
+      mode: "demo",
+      likeGoalsPaid: 1,
+      rewardedViewerCount: 1,
+    });
+    expect(balanceAfterPresence).toBe(balanceBeforePresence + 5);
+    expect(balanceAfterReward).toBe(balanceAfterPresence + 100);
+    const store = (globalThis as typeof globalThis & {
+      __lojaDemoStore?: {
+        ledger: Array<{
+          kind: string;
+          amount: number;
+          metadata: Record<string, unknown>;
+        }>;
+      };
+    }).__lojaDemoStore;
+    const rewardLedger = store?.ledger.find((entry) => entry.kind === "like_goal_reward");
+    expect(rewardLedger).toMatchObject({
+      kind: "like_goal_reward",
+      amount: goal.rewardAmount,
+      metadata: {
+        goalId: goal.id,
+        broadcastId: "live-like-goal-1",
+        presenceCriterion: "presence_tick desde o início da live",
       },
     });
   });

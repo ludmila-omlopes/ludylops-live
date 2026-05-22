@@ -155,7 +155,7 @@ const DEFAULT_PIPETZ_PRICING: PipetzPricingRecord = {
   updatedBy: null,
 };
 const CHANNEL_SUBSCRIPTION_REWARD_AMOUNT = 2000;
-const LIKE_GOAL_PRESENCE_WINDOW_MS = 5 * 60 * 1000;
+const LIKE_GOAL_PRESENCE_CRITERION = "presence_tick desde o início da live";
 
 type StreamerbotCounterCommandAction = "increment" | "decrement" | "get" | "reset";
 type StreamerbotCounterScopeType = "global" | "game";
@@ -7941,14 +7941,14 @@ export async function deleteLiveLikeGoal(goalId: string) {
   return serializeLiveLikeGoal(deleted);
 }
 
-function getDemoPresentViewerIds(store: DemoStore, occurredAt: string) {
-  const cutoff = new Date(occurredAt).getTime() - LIKE_GOAL_PRESENCE_WINDOW_MS;
+function getDemoPresentViewerIds(store: DemoStore, occurredAt: string, broadcastId: string) {
+  const occurredTime = new Date(occurredAt).getTime();
   const present = store.ledger
     .filter(
       (entry) =>
         entry.kind === "presence_tick" &&
-        new Date(entry.createdAt).getTime() >= cutoff &&
-        new Date(entry.createdAt).getTime() <= new Date(occurredAt).getTime(),
+        readStringFromPayload(entry.metadata, "broadcastId") === broadcastId &&
+        new Date(entry.createdAt).getTime() <= occurredTime,
     )
     .map((entry) => entry.viewerId);
 
@@ -7958,13 +7958,12 @@ function getDemoPresentViewerIds(store: DemoStore, occurredAt: string) {
   });
 }
 
-async function getDatabasePresentViewerIds(occurredAt: string) {
+async function getDatabasePresentViewerIds(occurredAt: string, broadcastId: string) {
   const db = getDb();
   if (!db) {
     return [];
   }
   const occurred = new Date(occurredAt);
-  const cutoff = new Date(occurred.getTime() - LIKE_GOAL_PRESENCE_WINDOW_MS);
   const rows = await db
     .select({
       viewerId: pointLedger.viewerId,
@@ -7975,7 +7974,7 @@ async function getDatabasePresentViewerIds(occurredAt: string) {
     .where(
       and(
         eq(pointLedger.kind, "presence_tick"),
-        gte(pointLedger.createdAt, cutoff),
+        sql`${pointLedger.metadata}->>'broadcastId' = ${broadcastId}`,
         lt(pointLedger.createdAt, occurred),
         eq(users.excludeFromRanking, false),
       ),
@@ -8112,7 +8111,7 @@ export async function ingestStreamerbotEvent(input: {
             (reward) => reward.goalId === goal.id && reward.broadcastId === broadcastId,
           ),
       );
-      const presentViewerIds = getDemoPresentViewerIds(store, input.occurredAt);
+      const presentViewerIds = getDemoPresentViewerIds(store, input.occurredAt, broadcastId);
       for (const goal of eligibleGoals) {
         for (const viewerId of presentViewerIds) {
           const balance = getBalance(store, viewerId);
@@ -8130,7 +8129,7 @@ export async function ingestStreamerbotEvent(input: {
               broadcastId,
               likeCount,
               targetLikeCount: goal.targetLikeCount,
-              presenceCriterion: "presence_tick nos últimos 5 minutos",
+              presenceCriterion: LIKE_GOAL_PRESENCE_CRITERION,
             },
             createdAt: input.occurredAt,
           });
@@ -8294,7 +8293,7 @@ export async function ingestStreamerbotEvent(input: {
     const [goalRows, rewardRows, presentViewerIds] = await Promise.all([
       db.select().from(liveLikeGoals).where(eq(liveLikeGoals.isActive, true)),
       db.select().from(liveLikeGoalRewards).where(eq(liveLikeGoalRewards.broadcastId, broadcastId)),
-      getDatabasePresentViewerIds(input.occurredAt),
+      getDatabasePresentViewerIds(input.occurredAt, broadcastId),
     ]);
     const paidGoalIds = new Set(rewardRows.map((entry) => entry.goalId));
     const eligibleGoals = goalRows
@@ -8345,7 +8344,7 @@ export async function ingestStreamerbotEvent(input: {
               broadcastId,
               likeCount,
               targetLikeCount: goal.targetLikeCount,
-              presenceCriterion: "presence_tick nos últimos 5 minutos",
+              presenceCriterion: LIKE_GOAL_PRESENCE_CRITERION,
             },
             createdAt: new Date(input.occurredAt),
           });

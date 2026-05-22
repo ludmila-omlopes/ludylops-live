@@ -25,7 +25,7 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
   - `payload.broadcastId`: ID da live, usado para garantir que cada meta pague só uma vez por live
   - `payload.isLive`: `true` quando o evento veio da live monitorada
   - `occurredAt`: data em ISO
-- Critério de presença: viewers com ledger `presence_tick` nos últimos 5 minutos antes do evento de likes. Esse critério acompanha o comportamento do trigger `YouTube > General > Present Viewers`, que no YouTube funciona como rastreador de atividade do chat e usa 5 minutos como padrão.
+- Critério de presença: viewers com ledger `presence_tick` na mesma `broadcastId` do evento de likes, desde o início da live até o momento em que a meta bateu.
 
 Fontes da configuração Streamer.bot:
 
