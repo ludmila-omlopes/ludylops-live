@@ -25,7 +25,7 @@ export function PipetzSpendingHistoryCard({
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-[var(--radius)] border-[3px] border-[var(--color-ink)] bg-white">
+        <div className="overflow-hidden rounded-[var(--radius)] border-[3px] border-[var(--color-ink)] bg-[var(--surface-card)]">
           {visibleEntries.length > 0 ? (
             <ul className="divide-y-[3px] divide-[var(--color-ink)]">
               {visibleEntries.map((entry) => (
