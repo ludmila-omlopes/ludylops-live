@@ -78,6 +78,7 @@ import {
   ensureViewerFromSession,
   getViewerDashboard,
   getActiveQuoteOverlay,
+  getLiveLikeGoalOverlayState,
   getObsOverlayAdminStatus,
   getSessionViewerState,
   getViewerLinkCodeState,
@@ -3358,6 +3359,77 @@ describe("ingestStreamerbotEvent", () => {
         goalId: goal.id,
         broadcastId: "live-like-goal-1",
         presenceCriterion: "presence_tick desde o início da live",
+      },
+    });
+  });
+
+  it("returns the initial like goal overlay state from the first active goal", async () => {
+    getDbMock.mockReturnValue(null);
+
+    const goal = await createLiveLikeGoal({
+      label: "Meta 50 likes",
+      targetLikeCount: 50,
+      rewardAmount: 150,
+      isActive: true,
+    });
+
+    const state = await getLiveLikeGoalOverlayState();
+
+    expect(state).toMatchObject({
+      currentLikeCount: 0,
+      updatedAt: null,
+      broadcastId: null,
+      progressPercent: 0,
+      remainingLikes: 50,
+      isGoalReached: false,
+      goal: {
+        id: goal.id,
+        label: "Meta 50 likes",
+        targetLikeCount: 50,
+      },
+    });
+  });
+
+  it("updates the like goal overlay state from the latest like count event", async () => {
+    getDbMock.mockReturnValue(null);
+
+    await createLiveLikeGoal({
+      label: "Meta 30 likes",
+      targetLikeCount: 30,
+      rewardAmount: 100,
+      isActive: true,
+    });
+    const nextGoal = await createLiveLikeGoal({
+      label: "Meta 50 likes",
+      targetLikeCount: 50,
+      rewardAmount: 150,
+      isActive: true,
+    });
+
+    await ingestStreamerbotEvent({
+      eventId: "likes-overlay-1",
+      eventType: "like_count_update",
+      balance: 42,
+      occurredAt: "2026-04-01T12:30:00.000Z",
+      payload: {
+        broadcastId: "live-like-overlay",
+        isLive: true,
+      },
+    });
+
+    const state = await getLiveLikeGoalOverlayState();
+
+    expect(state).toMatchObject({
+      currentLikeCount: 42,
+      updatedAt: "2026-04-01T12:30:00.000Z",
+      broadcastId: "live-like-overlay",
+      progressPercent: 84,
+      remainingLikes: 8,
+      isGoalReached: false,
+      goal: {
+        id: nextGoal.id,
+        label: "Meta 50 likes",
+        targetLikeCount: 50,
       },
     });
   });

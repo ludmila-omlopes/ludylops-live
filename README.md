@@ -144,7 +144,9 @@ Mais detalhes ficam em `bridge/README.md`.
 - `/contadores`: contadores públicos.
 - `/privacy`: política de privacidade.
 - `/admin`: operação da live.
+- `/obs/likes`: browser source para a meta de likes no OBS.
 - `/obs/quotes`: browser source para quotes no OBS.
+- `/obs/bets`: browser source para apostas abertas no OBS.
 
 ## Setup local
 
