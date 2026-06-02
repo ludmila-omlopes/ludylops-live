@@ -230,6 +230,18 @@ export interface LedgerEntryRecord {
   createdAt: string;
 }
 
+export interface PipetzSpendingHistoryRecord {
+  id: string;
+  viewerId: string;
+  kind: LedgerKind | "redemption_purchase";
+  label: string;
+  amount: number;
+  source: string;
+  referenceId: string | null;
+  metadata: Record<string, unknown>;
+  occurredAt: string;
+}
+
 export interface BridgeClientRecord {
   id: string;
   machineKey: string;

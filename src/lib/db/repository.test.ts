@@ -63,9 +63,11 @@ import {
   adminAttachYoutubeChannelToGoogleAccount,
   adminLinkGoogleViewerToYoutubeViewer,
   boostGameSuggestion,
+  boostCreatorSuggestion,
   boostVideoSuggestion,
   cancelBet,
   createBet,
+  createCreatorSuggestion,
   createGameSuggestion,
   createLiveLikeGoal,
   createVideoSuggestion,
@@ -96,6 +98,7 @@ import {
   placeBetFromChatCommand,
   listQuotes,
   registerGoogleRiscDelivery,
+  redeemItem,
   runQuoteCommandFromChat,
   runDeathCounterCommand,
   runStreamerbotCounterCommand,
@@ -431,6 +434,16 @@ function createPlaceBetDb(options?: {
             }
 
             if (table === redemptions) {
+              return {
+                where() {
+                  return {
+                    orderBy: async () => [],
+                  };
+                },
+              };
+            }
+
+            if (table === pointLedger) {
               return {
                 where() {
                   return {
@@ -1436,6 +1449,92 @@ describe("showQuoteOverlayForViewer", () => {
         source: "web",
       }),
     ).rejects.toThrow("livestream_not_live");
+  });
+});
+
+describe("getViewerDashboard spending history", () => {
+  beforeEach(() => {
+    getDbMock.mockReset();
+    getDbMock.mockReturnValue(null);
+    isStreamerbotLivestreamActiveMock.mockReset();
+    isStreamerbotLivestreamActiveMock.mockResolvedValue(true);
+    delete (globalThis as typeof globalThis & { __lojaDemoStore?: unknown }).__lojaDemoStore;
+  });
+
+  it("lists every pipetz debit type in reverse chronological order", async () => {
+    await redeemItem({
+      viewerId: "viewer_ana",
+      itemId: "item_sticker",
+      source: "web",
+    });
+    await placeBet({
+      viewerId: "viewer_ana",
+      betId: "bet-1",
+      optionId: "opt-1a",
+      amount: 40,
+      source: "web",
+    });
+    await showQuoteOverlayForViewer({
+      viewerId: "viewer_ana",
+      quoteId: 1,
+      source: "web",
+    });
+    await boostGameSuggestion({
+      suggestionId: "gs-4",
+      viewerId: "viewer_ana",
+      amount: 30,
+      source: "web",
+    });
+    await createGameSuggestion({
+      viewerId: "viewer_ana",
+      name: "Signalis",
+      description: "Terror com estética retrô.",
+      source: "web",
+    });
+    await createVideoSuggestion({
+      viewerId: "viewer_ana",
+      youtubeVideoId: "abc123DEF45",
+      title: "Um vídeo para reagir",
+      creatorName: "Canal Legal",
+      thumbnailUrl: "https://i.ytimg.com/vi/abc123DEF45/hqdefault.jpg",
+      videoUrl: "https://www.youtube.com/watch?v=abc123DEF45",
+      source: "web",
+    });
+    const creatorSuggestion = await createCreatorSuggestion({
+      viewerId: "viewer_ana",
+      name: "Canal da Live",
+      channelUrl: "https://www.youtube.com/@canaldalive",
+      platform: "youtube",
+      source: "web",
+    });
+    await boostCreatorSuggestion({
+      suggestionId: creatorSuggestion.id,
+      viewerId: "viewer_ana",
+      amount: 25,
+      source: "web",
+    });
+
+    const dashboard = await getViewerDashboard("viewer_ana");
+    const labels = dashboard?.spendingHistory.map((entry) => entry.label) ?? [];
+
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "Resgate",
+        "Aposta",
+        "Quote no OBS",
+        "Boost em jogo",
+        "Sugestão de jogo",
+        "Sugestão de vídeo",
+        "Indicação",
+        "Boost em indicação",
+      ]),
+    );
+    expect(dashboard?.spendingHistory.every((entry) => entry.amount > 0 && entry.occurredAt)).toBe(true);
+    expect(dashboard?.spendingHistory).toEqual(
+      [...(dashboard?.spendingHistory ?? [])].sort(
+        (a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt),
+      ),
+    );
   });
 });
 

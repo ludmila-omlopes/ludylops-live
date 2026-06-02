@@ -27,6 +27,10 @@ export async function POST(request: Request) {
   });
 
   if (!valid) {
+    console.warn("[streamerbot/link] Invalid signature.", {
+      hasTimestamp: Boolean(timestamp),
+      hasSignature: Boolean(signature),
+    });
     return fail("Invalid signature.", 401);
   }
 
@@ -37,6 +41,12 @@ export async function POST(request: Request) {
       viewerExternalId: payload.viewerExternalId,
       youtubeDisplayName: payload.youtubeDisplayName,
       youtubeHandle: payload.youtubeHandle,
+    });
+
+    console.info("[streamerbot/link] Linked viewer from chat.", {
+      viewerId: result.viewer.id,
+      googleAccountId: result.googleAccountId,
+      mergedSyntheticViewer: result.mergedSyntheticViewer,
     });
 
     return ok({
@@ -56,6 +66,11 @@ export async function POST(request: Request) {
         : message === "viewer_owned_by_other_account"
           ? 409
           : 400;
+
+    console.warn("[streamerbot/link] Failed to link viewer from chat.", {
+      status,
+      message,
+    });
 
     return fail(message, status);
   }
