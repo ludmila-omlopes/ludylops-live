@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { PipetzBalanceCard } from "@/components/pipetz-balance-card";
+import { PipetzSpendingHistoryCard } from "@/components/pipetz-spending-history-card";
 import { RedemptionGrid } from "@/components/redemption-grid";
 import { ViewerChannelListCard } from "@/components/viewer-channel-list-card";
 import { ViewerLinkCard } from "@/components/viewer-link-card";
@@ -31,6 +32,8 @@ export default async function MePage() {
       <ViewerChannelListCard channels={channels} />
 
       <ViewerLinkCard alreadyLinked={dashboard.viewer.isLinked} />
+
+      <PipetzSpendingHistoryCard entries={dashboard.spendingHistory} />
 
       <RedemptionGrid
         items={catalog}

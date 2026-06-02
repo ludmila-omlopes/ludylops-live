@@ -7,5 +7,5 @@ export async function GET() {
     return fail("Unauthorized", 401);
   }
   const dashboard = await getViewerDashboard(session.user.activeViewerId);
-  return ok(dashboard?.redemptions ?? []);
+  return ok(dashboard?.spendingHistory ?? []);
 }

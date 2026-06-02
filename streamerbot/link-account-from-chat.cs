@@ -46,6 +46,8 @@ public class CPHInline
         "commandInput",
         "rawInput",
         "input",
+        "input0",
+        "input1",
         "message",
         "text",
     };
@@ -181,15 +183,29 @@ public class CPHInline
 
     private string ResolveLinkCode()
     {
-        string rawValue = GetFirstArgString(LinkCodeArgCandidates);
-        if (string.IsNullOrWhiteSpace(rawValue))
+        foreach (string candidate in LinkCodeArgCandidates)
         {
-            return string.Empty;
+            string rawValue = GetArgString(candidate);
+            if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                continue;
+            }
+
+            string payload = NormalizeCommandPayload(rawValue);
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                continue;
+            }
+
+            string firstToken = ExtractFirstToken(payload);
+            Match match = Regex.Match(firstToken, @"^[A-Z0-9]{4,32}$", RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                return match.Value.ToUpperInvariant();
+            }
         }
 
-        string trimmed = rawValue.Trim();
-        Match match = Regex.Match(trimmed, @"([A-Z0-9]{4,32})", RegexOptions.IgnoreCase);
-        return match.Success ? match.Groups[1].Value.ToUpperInvariant() : string.Empty;
+        return string.Empty;
     }
 
     private string GetFirstArgString(params string[] argNames)
@@ -246,6 +262,39 @@ public class CPHInline
         return trimmed.StartsWith("@") ? trimmed : "@" + trimmed;
     }
 
+    private string NormalizeCommandPayload(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string trimmed = value.Trim();
+        if (!trimmed.StartsWith("!"))
+        {
+            return trimmed;
+        }
+
+        int firstSpace = trimmed.IndexOf(' ');
+        if (firstSpace < 0 || firstSpace == trimmed.Length - 1)
+        {
+            return null;
+        }
+
+        return trimmed.Substring(firstSpace + 1).Trim();
+    }
+
+    private string ExtractFirstToken(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        Match match = Regex.Match(value.Trim(), @"^([A-Z0-9]{4,32})(?:\s|$)", RegexOptions.IgnoreCase);
+        return match.Success ? match.Groups[1].Value : string.Empty;
+    }
+
     private string BuildRequestBody(
         string linkCode,
         string viewerExternalId,
@@ -279,7 +328,7 @@ public class CPHInline
         using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret)))
         {
             byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(timestamp + "." + body));
-            return Convert.ToHexString(hash).ToLowerInvariant();
+            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
     }
 

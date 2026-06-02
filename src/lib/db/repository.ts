@@ -100,6 +100,7 @@ import {
   LiveLikeGoalRewardRecord,
   ObsOverlayAdminStatusRecord,
   ObsOverlayControlRecord,
+  PipetzSpendingHistoryRecord,
   PipetzPricingRecord,
   QuoteOverlayStateRecord,
   QuoteOverlayQueueRecord,
@@ -128,6 +129,99 @@ function shouldExcludeFromRanking(email: string | null) {
 }
 
 const DEFAULT_DEATH_COUNTER_KEY = "death_count";
+
+const spendingHistoryLabels: Partial<Record<LedgerEntryRecord["kind"], string>> = {
+  redemption_debit: "Resgate",
+  bet_debit: "Aposta",
+  game_suggestion_creation: "Sugestão de jogo",
+  game_suggestion_boost: "Boost em jogo",
+  video_suggestion_creation: "Sugestão de vídeo",
+  video_suggestion_boost: "Boost em vídeo",
+  creator_suggestion_creation: "Indicação",
+  creator_suggestion_boost: "Boost em indicação",
+  quote_overlay_debit: "Quote no OBS",
+  manual_adjustment: "Ajuste manual",
+};
+
+function metadataReferenceId(metadata: Record<string, unknown>) {
+  const reference =
+    metadata.redemptionId ??
+    metadata.itemId ??
+    metadata.betId ??
+    metadata.optionId ??
+    metadata.suggestionId ??
+    metadata.queueId ??
+    metadata.overlayId ??
+    metadata.quoteNumber ??
+    null;
+
+  return reference === null || reference === undefined ? null : String(reference);
+}
+
+function serializeSpendingLedgerEntry(entry: LedgerEntryRecord): PipetzSpendingHistoryRecord {
+  return {
+    id: entry.id,
+    viewerId: entry.viewerId,
+    kind: entry.kind,
+    label: spendingHistoryLabels[entry.kind] ?? "Gasto de pipetz",
+    amount: Math.abs(entry.amount),
+    source: entry.source,
+    referenceId: metadataReferenceId(entry.metadata),
+    metadata: entry.metadata,
+    occurredAt: entry.createdAt,
+  };
+}
+
+function serializeRedemptionSpendingHistory(entry: RedemptionRecord): PipetzSpendingHistoryRecord {
+  return {
+    id: `redemption:${entry.id}`,
+    viewerId: entry.viewerId,
+    kind: "redemption_purchase",
+    label: "Resgate",
+    amount: entry.costAtPurchase,
+    source: entry.requestSource,
+    referenceId: entry.catalogItemId,
+    metadata: {
+      redemptionId: entry.id,
+      itemId: entry.catalogItemId,
+      status: entry.status,
+    },
+    occurredAt: entry.queuedAt,
+  };
+}
+
+function hasMatchingRedemptionDebit(redemption: RedemptionRecord, ledger: LedgerEntryRecord[]) {
+  const queuedAt = new Date(redemption.queuedAt).getTime();
+
+  return ledger.some((entry) => {
+    if (entry.kind !== "redemption_debit" || Math.abs(entry.amount) !== redemption.costAtPurchase) {
+      return false;
+    }
+
+    const itemId = entry.metadata.itemId;
+    if (typeof itemId === "string" && itemId !== redemption.catalogItemId) {
+      return false;
+    }
+
+    const createdAt = new Date(entry.createdAt).getTime();
+    return Number.isFinite(createdAt) && Number.isFinite(queuedAt) && Math.abs(createdAt - queuedAt) <= 5 * 60 * 1000;
+  });
+}
+
+function buildSpendingHistory(input: {
+  redemptions: RedemptionRecord[];
+  ledger: LedgerEntryRecord[];
+}): PipetzSpendingHistoryRecord[] {
+  const ledgerDebits = input.ledger.filter((entry) => entry.amount < 0);
+  const redemptionFallbacks = input.redemptions.filter(
+    (entry) => !hasMatchingRedemptionDebit(entry, ledgerDebits),
+  );
+
+  return [
+    ...ledgerDebits.map(serializeSpendingLedgerEntry),
+    ...redemptionFallbacks.map(serializeRedemptionSpendingHistory),
+  ].sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt));
+}
 const DEFAULT_DEATH_COUNTER_LABEL = "mortes";
 const GLOBAL_COUNTER_SCOPE_TYPE = "global";
 const GLOBAL_COUNTER_SCOPE_KEY = "global";
@@ -4419,16 +4513,47 @@ export async function getViewerDashboard(viewerId: string) {
     const redemptions = store.redemptions
       .filter((entry) => entry.viewerId === viewer.id)
       .sort((a, b) => +new Date(b.queuedAt) - +new Date(a.queuedAt));
+    const ledger = store.ledger
+      .filter((entry) => entry.viewerId === viewer.id)
+      .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
 
-    return { viewer, balance, redemptions };
+    return {
+      viewer,
+      balance,
+      redemptions,
+      spendingHistory: buildSpendingHistory({ redemptions, ledger }),
+    };
   }
 
   const [balance] = await db.select().from(viewerBalances).where(eq(viewerBalances.viewerId, viewer.id)).limit(1);
-  const history = await db
-    .select()
-    .from(redemptions)
-    .where(eq(redemptions.viewerId, viewer.id))
-    .orderBy(desc(redemptions.queuedAt));
+  const [redemptionRows, ledgerRows] = await Promise.all([
+    db
+      .select()
+      .from(redemptions)
+      .where(eq(redemptions.viewerId, viewer.id))
+      .orderBy(desc(redemptions.queuedAt)),
+    db
+      .select()
+      .from(pointLedger)
+      .where(and(eq(pointLedger.viewerId, viewer.id), lt(pointLedger.amount, 0)))
+      .orderBy(desc(pointLedger.createdAt)),
+  ]);
+  const serializedRedemptions = redemptionRows.map((entry) => ({
+    ...entry,
+    status: entry.status as RedemptionRecord["status"],
+    claimedByBridgeId: entry.claimedByBridgeId,
+    queuedAt: entry.queuedAt.toISOString(),
+    executedAt: entry.executedAt?.toISOString() ?? null,
+    failedAt: entry.failedAt?.toISOString() ?? null,
+  }));
+  const serializedLedger = ledgerRows.map((entry) => ({
+    ...entry,
+    kind: entry.kind as LedgerEntryRecord["kind"],
+    externalEventId: entry.externalEventId,
+    metadata: entry.metadata as Record<string, unknown>,
+    createdAt: entry.createdAt.toISOString(),
+  }));
+
   return {
     viewer,
     balance: {
@@ -4438,14 +4563,11 @@ export async function getViewerDashboard(viewerId: string) {
       lifetimeSpent: balance?.lifetimeSpent ?? 0,
       lastSyncedAt: balance?.lastSyncedAt.toISOString() ?? new Date().toISOString(),
     },
-    redemptions: history.map((entry) => ({
-      ...entry,
-      status: entry.status as RedemptionRecord["status"],
-      claimedByBridgeId: entry.claimedByBridgeId,
-      queuedAt: entry.queuedAt.toISOString(),
-      executedAt: entry.executedAt?.toISOString() ?? null,
-      failedAt: entry.failedAt?.toISOString() ?? null,
-    })),
+    redemptions: serializedRedemptions,
+    spendingHistory: buildSpendingHistory({
+      redemptions: serializedRedemptions,
+      ledger: serializedLedger,
+    }),
   };
 }
 
