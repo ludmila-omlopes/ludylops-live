@@ -26,6 +26,14 @@ const overlays = [
     apiHref: "/api/obs/quotes/current",
   },
   {
+    id: "likes",
+    name: "Meta de likes no OBS",
+    description: "Overlay da meta ativa de likes, com contador, progresso e recompensa exibidos ao vivo.",
+    liveHref: "/obs/likes",
+    demoHref: "/obs/likes?demo=1",
+    apiHref: "/api/obs/likes/current",
+  },
+  {
     id: "bets",
     name: "Apostas no OBS",
     description: "Overlay da aposta aberta, com pool, opções e distribuição dos votos atualizados automaticamente.",

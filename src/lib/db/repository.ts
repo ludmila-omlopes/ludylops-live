@@ -97,6 +97,7 @@ import {
   LedgerEntryRecord,
   LiveLikeGoalAdminRecord,
   LiveLikeGoalRecord,
+  LiveLikeGoalOverlayStateRecord,
   LiveLikeGoalRewardRecord,
   ObsOverlayAdminStatusRecord,
   ObsOverlayControlRecord,
@@ -107,6 +108,7 @@ import {
   QuoteRecord,
   ProductRecommendationRecord,
   RedemptionRecord,
+  StreamerbotEventType,
   StreamerbotCounterRecord,
   StreamerbotCounterSummaryRecord,
   VideoSuggestionBoostRecord,
@@ -400,6 +402,15 @@ type DemoStore = {
   productRecommendations: ProductRecommendationRecord[];
   bridgeClients: BridgeClientRecord[];
   streamerbotCounters: StreamerbotCounterRecord[];
+  streamerbotEvents: DemoStreamerbotEventLogRecord[];
+};
+
+type DemoStreamerbotEventLogRecord = {
+  eventId: string;
+  eventType: StreamerbotEventType;
+  balance: number | null;
+  payload: Record<string, unknown>;
+  occurredAt: string;
 };
 
 declare global {
@@ -436,6 +447,7 @@ function getDemoStore(): DemoStore {
       productRecommendations: structuredClone(demoProductRecommendations),
       bridgeClients: structuredClone(demoBridgeClients),
       streamerbotCounters: [],
+      streamerbotEvents: [],
     };
   }
 
@@ -1606,6 +1618,71 @@ function readNumberFromPayload(payload: Record<string, unknown>, key: string) {
 function readStringFromPayload(payload: Record<string, unknown>, key: string) {
   const value = payload[key];
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function readLikeCountFromStreamerbotEvent(input: {
+  balance?: number | null;
+  payload: Record<string, unknown>;
+}) {
+  const likeCount =
+    readNumberFromPayload(input.payload, "likeCount") ??
+    readNumberFromPayload(input.payload, "balance") ??
+    input.balance ??
+    0;
+
+  return Math.max(0, Math.floor(likeCount));
+}
+
+function buildStreamerbotEventLogPayload(input: {
+  eventType: StreamerbotEventType;
+  balance?: number;
+  payload: Record<string, unknown>;
+}) {
+  if (input.eventType !== "like_count_update") {
+    return input.payload;
+  }
+
+  return {
+    ...input.payload,
+    likeCount: readLikeCountFromStreamerbotEvent(input),
+  };
+}
+
+function buildLiveLikeGoalOverlayState(
+  goals: LiveLikeGoalRecord[],
+  latestEvent: {
+    balance?: number | null;
+    occurredAt: string;
+    payload: Record<string, unknown>;
+  } | null,
+): LiveLikeGoalOverlayStateRecord {
+  const currentLikeCount = latestEvent ? readLikeCountFromStreamerbotEvent(latestEvent) : 0;
+  const activeGoals = goals
+    .filter((goal) => goal.isActive)
+    .sort((left, right) => left.targetLikeCount - right.targetLikeCount);
+  const goal =
+    activeGoals.find((entry) => entry.targetLikeCount > currentLikeCount) ??
+    activeGoals[activeGoals.length - 1] ??
+    null;
+
+  return {
+    currentLikeCount,
+    updatedAt: latestEvent?.occurredAt ?? null,
+    broadcastId: latestEvent ? readStringFromPayload(latestEvent.payload, "broadcastId") : null,
+    goal,
+    progressPercent: goal
+      ? Math.min(100, Math.round((currentLikeCount / goal.targetLikeCount) * 100))
+      : 0,
+    remainingLikes: goal ? Math.max(goal.targetLikeCount - currentLikeCount, 0) : null,
+    isGoalReached: goal ? currentLikeCount >= goal.targetLikeCount : false,
+  };
 }
 
 function buildViewerPosition(
@@ -7966,6 +8043,38 @@ export async function listAdminLiveLikeGoals(): Promise<LiveLikeGoalAdminRecord[
   return goalRows.map((goal) => buildLiveLikeGoalAdminRecord(serializeLiveLikeGoal(goal), rewards));
 }
 
+export async function getLiveLikeGoalOverlayState(): Promise<LiveLikeGoalOverlayStateRecord> {
+  const db = getDb();
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const latestEvent =
+      store.streamerbotEvents
+        .filter((entry) => entry.eventType === "like_count_update")
+        .sort((left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime())[0] ??
+      null;
+
+    return buildLiveLikeGoalOverlayState(store.liveLikeGoals, latestEvent);
+  }
+
+  const [goalRows, latestEventRows] = await Promise.all([
+    db.select().from(liveLikeGoals).where(eq(liveLikeGoals.isActive, true)).orderBy(liveLikeGoals.targetLikeCount),
+    db
+      .select()
+      .from(streamerbotEventLog)
+      .where(eq(streamerbotEventLog.eventType, "like_count_update"))
+      .orderBy(desc(streamerbotEventLog.occurredAt))
+      .limit(1),
+  ]);
+  const latestEvent = latestEventRows[0]
+    ? {
+        occurredAt: latestEventRows[0].occurredAt.toISOString(),
+        payload: asRecord(latestEventRows[0].payload),
+      }
+    : null;
+
+  return buildLiveLikeGoalOverlayState(goalRows.map(serializeLiveLikeGoal), latestEvent);
+}
+
 export async function createLiveLikeGoal(input: {
   label?: string | null;
   targetLikeCount: number;
@@ -8209,8 +8318,12 @@ export async function ingestStreamerbotEvent(input: {
   const db = getDb();
   if (isDemoMode || !db) {
     const store = getDemoStore();
+    const eventLogPayload = buildStreamerbotEventLogPayload(input);
 
-    if (store.ledger.some((entry) => entry.externalEventId === input.eventId)) {
+    if (
+      store.streamerbotEvents.some((entry) => entry.eventId === input.eventId) ||
+      store.ledger.some((entry) => entry.externalEventId === input.eventId)
+    ) {
       return {
         mode: "demo" as const,
         deduped: true,
@@ -8222,9 +8335,20 @@ export async function ingestStreamerbotEvent(input: {
       };
     }
 
+    store.streamerbotEvents.unshift({
+      eventId: input.eventId,
+      eventType: input.eventType,
+      balance: input.balance ?? null,
+      payload: eventLogPayload,
+      occurredAt: input.occurredAt,
+    });
+
     if (input.eventType === "like_count_update") {
-      const likeCount = readNumberFromPayload(input.payload, "likeCount") ?? input.balance ?? 0;
-      const broadcastId = readStringFromPayload(input.payload, "broadcastId") ?? "demo_live";
+      const likeCount = readLikeCountFromStreamerbotEvent({
+        balance: input.balance,
+        payload: eventLogPayload,
+      });
+      const broadcastId = readStringFromPayload(eventLogPayload, "broadcastId") ?? "demo_live";
       const eligibleGoals = store.liveLikeGoals.filter(
         (goal) =>
           goal.isActive &&
@@ -8399,19 +8523,24 @@ export async function ingestStreamerbotEvent(input: {
     };
   }
 
+  const eventLogPayload = buildStreamerbotEventLogPayload(input);
+
   await db.insert(streamerbotEventLog).values({
     id: randomUUID(),
     eventId: input.eventId,
     eventType: input.eventType,
     viewerExternalId: input.viewerExternalId ?? null,
-    payload: input.payload,
+    payload: eventLogPayload,
     occurredAt: new Date(input.occurredAt),
     signatureValid: true,
   });
 
   if (input.eventType === "like_count_update") {
-    const likeCount = readNumberFromPayload(input.payload, "likeCount") ?? input.balance ?? 0;
-    const broadcastId = readStringFromPayload(input.payload, "broadcastId") ?? "current_live";
+    const likeCount = readLikeCountFromStreamerbotEvent({
+      balance: input.balance,
+      payload: eventLogPayload,
+    });
+    const broadcastId = readStringFromPayload(eventLogPayload, "broadcastId") ?? "current_live";
     const [goalRows, rewardRows, presentViewerIds] = await Promise.all([
       db.select().from(liveLikeGoals).where(eq(liveLikeGoals.isActive, true)),
       db.select().from(liveLikeGoalRewards).where(eq(liveLikeGoalRewards.broadcastId, broadcastId)),

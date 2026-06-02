@@ -441,6 +441,16 @@ export interface LiveLikeGoalAdminRecord extends LiveLikeGoalRecord {
   lastReward: LiveLikeGoalRewardRecord | null;
 }
 
+export interface LiveLikeGoalOverlayStateRecord {
+  currentLikeCount: number;
+  updatedAt: string | null;
+  broadcastId: string | null;
+  goal: LiveLikeGoalRecord | null;
+  progressPercent: number;
+  remainingLikes: number | null;
+  isGoalReached: boolean;
+}
+
 export interface BetViewerPositionRecord {
   amount: number;
   optionId: string;

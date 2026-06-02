@@ -27,6 +27,13 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
   - `occurredAt`: data em ISO
 - Critério de presença: viewers com ledger `presence_tick` na mesma `broadcastId` do evento de likes, desde o início da live até o momento em que a meta bateu.
 
+### Overlay da meta de likes
+
+- Abra `/obs/likes` como Browser Source no OBS ou em ferramenta equivalente.
+- Use `/obs/likes?demo=1` para testar o visual sem depender de eventos reais.
+- O overlay lê a meta ativa cadastrada no admin e o último `like_count_update` aceito pela API.
+- Para atualizar o progresso ao vivo, mantenha o script `streamerbot/like-count-update.cs` em uma action ligada ao trigger `YouTube > Broadcast > Statistics Updated`.
+
 Fontes da configuração Streamer.bot:
 
 - https://docs.streamer.bot/api/triggers/youtube/general/new-subscriber
