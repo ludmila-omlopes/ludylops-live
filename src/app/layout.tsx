@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { Archivo_Black, IBM_Plex_Mono, DM_Sans, Geist } from "next/font/google";
+import Script from "next/script";
 
 import { auth } from "@/auth";
 import { AppChrome } from "@/components/app-chrome";
@@ -82,7 +83,9 @@ export default async function RootLayout({
       style={initialTheme ? { colorScheme: initialTheme } : undefined}
     >
       <body className="min-h-full text-[var(--color-ink)]" style={{ fontFamily: "var(--font-body), var(--font-display), sans-serif" }}>
-        <script id="pipetz-theme" dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <Script id="pipetz-theme" strategy="beforeInteractive">
+          {themeScript}
+        </Script>
         <Providers>
           <AppChrome
             session={session}

@@ -7,6 +7,7 @@ import { AdminVideoSuggestionsPanel } from "@/components/admin-video-suggestions
 import { AdminPipetzPricingPanel } from "@/components/admin-pipetz-pricing-panel";
 import { AdminPipetzAirdropPanel } from "@/components/admin-pipetz-airdrop-panel";
 import { AdminLiveLikeGoalsPanel } from "@/components/admin-live-like-goals-panel";
+import { AdminWheelPanel } from "@/components/admin-wheel-panel";
 import { AdminRecommendationsPanel } from "@/components/admin-recommendations-panel";
 import { AdminViewerLinksPanel } from "@/components/admin-viewer-links-panel";
 import { RedemptionGrid } from "@/components/redemption-grid";
@@ -30,6 +31,7 @@ import {
 import { getStreamerbotLivestreamStatus } from "@/lib/streamerbot/live-status";
 import { getCurrentGame } from "@/lib/current-game";
 import { formatDateTime, formatPipetz } from "@/lib/utils";
+import { getWheelConfig } from "@/lib/wheel";
 
 const statusColorMap: Record<string, string> = {
   queued: "var(--color-lavender)",
@@ -41,7 +43,7 @@ const statusColorMap: Record<string, string> = {
 
 export default async function AdminPage() {
   await requireAdminSession();
-  const [catalog, leaderboard, bridge, liveStatus, currentGame, redemptions, bets, likeGoals, suggestions, videoSuggestions, recommendations, viewers, obsOverlayStatus, pricing] = await Promise.all([
+  const [catalog, leaderboard, bridge, liveStatus, currentGame, redemptions, bets, likeGoals, suggestions, videoSuggestions, recommendations, viewers, obsOverlayStatus, pricing, wheelConfig] = await Promise.all([
     getCatalog(),
     getLeaderboard(),
     getBridgeStatus(),
@@ -56,6 +58,7 @@ export default async function AdminPage() {
     listAdminViewerDirectory(),
     getObsOverlayAdminStatus(),
     getPipetzPricing(),
+    getWheelConfig(),
   ]);
 
   return (
@@ -106,6 +109,7 @@ export default async function AdminPage() {
               <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
                 <div className="space-y-6">
                   <LiveStatusPanel bridge={bridge} initialStatus={liveStatus} />
+                  <AdminWheelPanel initialConfig={wheelConfig} />
                   <AdminCurrentGamePanel initialGame={currentGame} />
                   <AdminPipetzPricingPanel initialPricing={pricing} />
                   <AdminLiveLikeGoalsPanel initialGoals={likeGoals} />

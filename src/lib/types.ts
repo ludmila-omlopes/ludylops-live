@@ -327,7 +327,34 @@ export interface PipetzPricingRecord {
   updatedBy: string | null;
 }
 
-export interface StreamerbotCounterRecord {
+export interface WheelOptionRecord {
+  id: string;
+  label: string;
+  weight: number;
+  color: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+export interface WheelSpinRecord {
+  spinId: string;
+  optionId: string;
+  label: string;
+  color: string;
+  requestedBy: string | null;
+  source: string;
+  startedAt: string;
+  spinDurationMs: number;
+  resultVisibleUntil: string;
+}
+export interface WheelConfigRecord {
+  title: string;
+  spinDurationMs: number;
+  resultHoldSeconds: number;
+  options: WheelOptionRecord[];
+  updatedAt: string | null;
+  updatedBy: string | null;
+  lastSpin: WheelSpinRecord | null;
+}export interface StreamerbotCounterRecord {
   key: string;
   scopeType: string;
   scopeKey: string;
