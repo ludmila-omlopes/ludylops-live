@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -247,6 +248,14 @@ export const gameSuggestions = pgTable("game_suggestions", {
   hltbCompletionistMinutes: integer("hltb_completionist_minutes"),
   hltbSimilarity: integer("hltb_similarity"),
   hltbFetchedAt: timestamp("hltb_fetched_at", { withTimezone: true }),
+  psPlusAvailable: boolean("ps_plus_available").default(false).notNull(),
+  psPlusRegion: varchar("ps_plus_region", { length: 16 }),
+  psPlusTier: varchar("ps_plus_tier", { length: 32 }),
+  psPlusProductId: varchar("ps_plus_product_id", { length: 128 }),
+  psPlusTitleId: varchar("ps_plus_title_id", { length: 64 }),
+  psPlusProductUrl: text("ps_plus_product_url"),
+  psPlusCheckedAt: timestamp("ps_plus_checked_at", { withTimezone: true }),
+  psPlusLastSeenAt: timestamp("ps_plus_last_seen_at", { withTimezone: true }),
   status: varchar("status", { length: 32 }).notNull(),
   totalVotes: integer("total_votes").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -263,6 +272,45 @@ export const gameSuggestionBoosts = pgTable("game_suggestion_boosts", {
     .notNull(),
   amount: integer("amount").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const psPlusCatalogItems = pgTable(
+  "ps_plus_catalog_items",
+  {
+    id: varchar("id", { length: 160 }).primaryKey(),
+    region: varchar("region", { length: 16 }).notNull(),
+    tier: varchar("tier", { length: 32 }).notNull(),
+    productId: varchar("product_id", { length: 128 }).notNull(),
+    titleId: varchar("title_id", { length: 64 }),
+    name: varchar("name", { length: 255 }).notNull(),
+    normalizedName: varchar("normalized_name", { length: 255 }).notNull(),
+    productUrl: text("product_url").notNull(),
+    platforms: jsonb("platforms").default([]).notNull(),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    productRegionIdx: uniqueIndex("ps_plus_catalog_items_region_product_idx").on(
+      table.region,
+      table.productId,
+    ),
+    normalizedNameIdx: index("ps_plus_catalog_items_region_normalized_name_idx").on(
+      table.region,
+      table.normalizedName,
+    ),
+  }),
+);
+
+export const psPlusCatalogSyncState = pgTable("ps_plus_catalog_sync_state", {
+  region: varchar("region", { length: 16 }).primaryKey(),
+  tier: varchar("tier", { length: 32 }).notNull(),
+  status: varchar("status", { length: 32 }).notNull(),
+  itemCount: integer("item_count").default(0).notNull(),
+  syncedAt: timestamp("synced_at", { withTimezone: true }),
+  nextSyncAt: timestamp("next_sync_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const videoSuggestions = pgTable("video_suggestions", {

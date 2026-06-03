@@ -113,6 +113,13 @@
       "when": 1780444800000,
       "tag": "0015_game_suggestion_howlongtobeat",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1780502400000,
+      "tag": "0016_ps_plus_deluxe_catalog",
+      "breakpoints": true
     }
   ]
 }

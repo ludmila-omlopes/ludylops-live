@@ -98,6 +98,12 @@ Para comandos e C# actions, confira a documentação oficial do Streamer.bot ant
 
 - `POST /api/internal/google/cross-account-protection`: receiver do Google Cross-Account Protection (RISC).
 
+### PS Plus
+
+- `POST /api/internal/ps-plus/sync`: atualiza o índice local do catálogo PS Plus Deluxe (`pt-BR`) e reavalia as tags das indicações de jogos.
+
+Proteja a chamada com `Authorization: Bearer $PS_PLUS_SYNC_SECRET` e configure um agendador externo para chamar esse endpoint uma vez por dia. A criação/correção de indicações também tenta atualizar o índice quando ele está vencido, mas continua funcionando se a PlayStation Store estiver indisponível.
+
 ## Bridge local
 
 A bridge roda no PC da live e liga o app hospedado ao Streamer.bot local.
@@ -184,6 +190,7 @@ YOUTUBE_API_KEY=
 STREAM_YOUTUBE_CHANNEL_ID=
 IGDB_CLIENT_ID=
 IGDB_CLIENT_SECRET=
+PS_PLUS_SYNC_SECRET=
 ```
 
 Para Google Cross-Account Protection (RISC), configure também:

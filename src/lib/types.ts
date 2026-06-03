@@ -521,6 +521,14 @@ export interface GameSuggestionRecord {
   platforms: string[];
   genres: string[];
   howLongToBeat: GameHowLongToBeatRecord | null;
+  psPlusAvailable: boolean;
+  psPlusRegion: string | null;
+  psPlusTier: string | null;
+  psPlusProductId: string | null;
+  psPlusTitleId: string | null;
+  psPlusProductUrl: string | null;
+  psPlusCheckedAt: string | null;
+  psPlusLastSeenAt: string | null;
   status: GameSuggestionStatus;
   totalVotes: number;
   createdAt: string;

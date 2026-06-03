@@ -30,6 +30,7 @@ const envSchema = z.object({
   NEXTAUTH_SECRET: z.string().optional(),
   STREAMERBOT_SHARED_SECRET: z.string().optional(),
   BRIDGE_SHARED_SECRET: z.string().optional(),
+  PS_PLUS_SYNC_SECRET: z.string().optional(),
   YOUTUBE_API_KEY: z.string().optional(),
   STREAM_YOUTUBE_CHANNEL_ID: z.string().optional(),
   IGDB_CLIENT_ID: z.string().optional(),
