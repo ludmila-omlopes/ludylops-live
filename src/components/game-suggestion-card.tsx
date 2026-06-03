@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { Clock3 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,38 @@ function mapSuggestionError(message: string) {
     default:
       return message;
   }
+}
+
+function formatCompletionTime(minutes: number | null) {
+  if (!minutes) {
+    return "Sem dado confiável";
+  }
+
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (remainingMinutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h${String(remainingMinutes).padStart(2, "0")}`;
+}
+
+function buildHowLongToBeatTooltip(suggestion: GameSuggestionWithMeta) {
+  const howLongToBeat = suggestion.howLongToBeat;
+
+  return [
+    ["História", howLongToBeat?.mainStoryMinutes ?? null],
+    ["História + extras", howLongToBeat?.mainExtraMinutes ?? null],
+    ["Completista", howLongToBeat?.completionistMinutes ?? null],
+  ].map(([label, minutes]) => ({
+    label,
+    value: formatCompletionTime(minutes as number | null),
+  }));
 }
 
 export function GameSuggestionCard({
@@ -194,6 +227,9 @@ export function GameSuggestionCard({
     ...suggestion.genres.slice(0, 2),
   ].filter(Boolean);
   const displayName = suggestion.canonicalName ?? suggestion.name;
+  const completionMinutes = suggestion.howLongToBeat?.mainStoryMinutes ?? null;
+  const howLongToBeatTooltip = buildHowLongToBeatTooltip(suggestion);
+  const howLongToBeatTooltipId = `hltb-times-${suggestion.id}`;
   const metadataText = [
     ...metadata.map(String),
     suggestion.igdbId ? `IGDB #${suggestion.igdbId}` : null,
@@ -244,6 +280,35 @@ export function GameSuggestionCard({
               {suggestion.description}
             </p>
           ) : null}
+
+          <div className="mono mt-3 inline-flex max-w-full items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-ink-soft)] opacity-75">
+            <span
+              className="group relative inline-flex shrink-0 cursor-help items-center"
+              tabIndex={0}
+              aria-label="Ver tempos do HowLongToBeat"
+              aria-describedby={howLongToBeatTooltipId}
+            >
+              <Clock3 className="h-3 w-3 text-[var(--color-purple-bold)]" aria-hidden="true" />
+              <span
+                id={howLongToBeatTooltipId}
+                role="tooltip"
+                className="invisible absolute bottom-full left-0 z-20 mb-1 w-44 border-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-2 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--color-ink)] opacity-0 shadow-[3px_3px_0_var(--color-ink)] transition-opacity group-hover:visible group-hover:opacity-100 group-focus:visible group-focus:opacity-100"
+              >
+                {howLongToBeatTooltip.map((entry) => (
+                  <span key={entry.label} className="flex justify-between gap-3">
+                    <span className="text-[var(--color-ink-soft)]">{entry.label}</span>
+                    <strong>{entry.value}</strong>
+                  </span>
+                ))}
+              </span>
+            </span>
+            <span className="truncate">
+              Tempo médio:{" "}
+              <strong className="text-[var(--color-ink)]">
+                {formatCompletionTime(completionMinutes)}
+              </strong>
+            </span>
+          </div>
 
           <div className="mt-auto pt-5">
             <p className="mono text-xs opacity-75">

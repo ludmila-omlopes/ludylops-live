@@ -22,6 +22,7 @@ function suggestion(input: {
     releaseYear: null,
     platforms: [],
     genres: [],
+    howLongToBeat: null,
     status: input.status,
     totalVotes: input.totalVotes,
     createdAt: input.createdAt,
