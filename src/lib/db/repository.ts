@@ -27,6 +27,8 @@ import {
   liveLikeGoals,
   obsOverlayControl,
   pointLedger,
+  psPlusCatalogItems,
+  psPlusCatalogSyncState,
   quoteOverlayQueue,
   quoteOverlayState,
   quotes,
@@ -78,6 +80,14 @@ import {
   resolveHowLongToBeatGame,
   type HowLongToBeatResolution,
 } from "@/lib/howlongtobeat";
+import {
+  fetchPsPlusDeluxeCatalog,
+  findBestPsPlusCatalogMatch,
+  normalizePsPlusGameName,
+  PS_PLUS_DELUXE_REGION,
+  PS_PLUS_DELUXE_TIER,
+  type PsPlusCatalogItem,
+} from "@/lib/playstation/ps-plus";
 import {
   AdminViewerChannelAttachResult,
   AdminViewerDirectoryRecord,
@@ -248,6 +258,7 @@ const PIPETZ_PRICING_SETTING_KEYS = {
   videoSuggestionCost: "pricing_video_suggestion",
   quoteOverlayCost: "pricing_quote_overlay",
 } as const;
+const PS_PLUS_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_PIPETZ_PRICING: PipetzPricingRecord = {
   gameSuggestionCost: GAME_SUGGESTION_CREATION_COST,
@@ -1784,6 +1795,14 @@ function serializeGameSuggestion(row: typeof gameSuggestions.$inferSelect): Game
           fetchedAt: hltbFetchedAt.toISOString(),
         }
       : null,
+    psPlusAvailable: row.psPlusAvailable,
+    psPlusRegion: row.psPlusRegion ?? null,
+    psPlusTier: row.psPlusTier ?? null,
+    psPlusProductId: row.psPlusProductId ?? null,
+    psPlusTitleId: row.psPlusTitleId ?? null,
+    psPlusProductUrl: row.psPlusProductUrl ?? null,
+    psPlusCheckedAt: row.psPlusCheckedAt?.toISOString() ?? null,
+    psPlusLastSeenAt: row.psPlusLastSeenAt?.toISOString() ?? null,
     status: row.status as GameSuggestionRecord["status"],
     totalVotes: row.totalVotes,
     createdAt: row.createdAt.toISOString(),
@@ -3031,6 +3050,273 @@ async function refreshStaleHowLongToBeatRows(
   }
 
   return rows.map((row) => refreshedRows.get(row.id) ?? row);
+}
+
+function buildPsPlusCatalogItemId(region: string, productId: string) {
+  return `${region}:${productId}`.slice(0, 160);
+}
+
+function serializePsPlusCatalogItem(row: typeof psPlusCatalogItems.$inferSelect): PsPlusCatalogItem {
+  const platforms = Array.isArray(row.platforms) ? row.platforms : [];
+
+  return {
+    productId: row.productId,
+    titleId: row.titleId ?? null,
+    name: row.name,
+    normalizedName: row.normalizedName,
+    productUrl: row.productUrl,
+    platforms: platforms.filter((entry): entry is string => typeof entry === "string"),
+    region: row.region,
+    tier: row.tier,
+  };
+}
+
+function buildPsPlusAvailabilityUpdate(
+  suggestion: typeof gameSuggestions.$inferSelect,
+  catalogItems: PsPlusCatalogItem[],
+  now: Date,
+) {
+  const match = findBestPsPlusCatalogMatch(
+    {
+      name: suggestion.name,
+      canonicalName: suggestion.canonicalName,
+      platforms: Array.isArray(suggestion.platforms)
+        ? suggestion.platforms.filter((entry): entry is string => typeof entry === "string")
+        : [],
+      psPlusProductId: suggestion.psPlusProductId,
+      psPlusTitleId: suggestion.psPlusTitleId,
+    },
+    catalogItems,
+  );
+
+  return {
+    psPlusAvailable: Boolean(match),
+    psPlusRegion: match?.region ?? suggestion.psPlusRegion,
+    psPlusTier: match?.tier ?? suggestion.psPlusTier,
+    psPlusProductId: match?.productId ?? suggestion.psPlusProductId,
+    psPlusTitleId: match?.titleId ?? suggestion.psPlusTitleId,
+    psPlusProductUrl: match?.productUrl ?? suggestion.psPlusProductUrl,
+    psPlusCheckedAt: now,
+    psPlusLastSeenAt: match ? now : suggestion.psPlusLastSeenAt,
+    updatedAt: now,
+  };
+}
+
+async function getCurrentPsPlusCatalogItems(region = PS_PLUS_DELUXE_REGION) {
+  const db = getDb();
+  if (isDemoMode || !db) {
+    return [];
+  }
+
+  const [state] = await db
+    .select()
+    .from(psPlusCatalogSyncState)
+    .where(eq(psPlusCatalogSyncState.region, region))
+    .limit(1);
+  if (!state?.syncedAt) {
+    return [];
+  }
+
+  const rows = await db
+    .select()
+    .from(psPlusCatalogItems)
+    .where(
+      and(
+        eq(psPlusCatalogItems.region, region),
+        gte(psPlusCatalogItems.lastSeenAt, state.syncedAt),
+      ),
+    );
+
+  return rows.map(serializePsPlusCatalogItem);
+}
+
+async function ensureFreshPsPlusCatalog({
+  force = false,
+  now = new Date(),
+}: {
+  force?: boolean;
+  now?: Date;
+} = {}) {
+  const db = getDb();
+  if (isDemoMode || !db) {
+    return {
+      mode: "demo" as const,
+      skipped: true,
+      reason: "demo_mode",
+      itemCount: 0,
+      updatedSuggestionCount: 0,
+    };
+  }
+
+  const [state] = await db
+    .select()
+    .from(psPlusCatalogSyncState)
+    .where(eq(psPlusCatalogSyncState.region, PS_PLUS_DELUXE_REGION))
+    .limit(1);
+  if (!force && state?.nextSyncAt && state.nextSyncAt > now) {
+    return {
+      mode: "database" as const,
+      skipped: true,
+      reason: "fresh_catalog",
+      itemCount: state.itemCount,
+      updatedSuggestionCount: 0,
+      nextSyncAt: state.nextSyncAt.toISOString(),
+    };
+  }
+
+  const startedAt = now;
+  try {
+    const catalog = await fetchPsPlusDeluxeCatalog({ region: PS_PLUS_DELUXE_REGION });
+    if (catalog.itemCount === 0) {
+      throw new Error("playstation_store_empty_catalog");
+    }
+
+    await db.transaction(async (tx) => {
+      for (const item of catalog.items) {
+        await tx
+          .insert(psPlusCatalogItems)
+          .values({
+            id: buildPsPlusCatalogItemId(item.region, item.productId),
+            region: item.region,
+            tier: item.tier,
+            productId: item.productId,
+            titleId: item.titleId,
+            name: item.name,
+            normalizedName: item.normalizedName || normalizePsPlusGameName(item.name),
+            productUrl: item.productUrl,
+            platforms: item.platforms,
+            firstSeenAt: startedAt,
+            lastSeenAt: startedAt,
+            updatedAt: startedAt,
+          })
+          .onConflictDoUpdate({
+            target: psPlusCatalogItems.id,
+            set: {
+              tier: item.tier,
+              titleId: item.titleId,
+              name: item.name,
+              normalizedName: item.normalizedName || normalizePsPlusGameName(item.name),
+              productUrl: item.productUrl,
+              platforms: item.platforms,
+              lastSeenAt: startedAt,
+              updatedAt: startedAt,
+            },
+          });
+      }
+
+      await tx
+        .insert(psPlusCatalogSyncState)
+        .values({
+          region: catalog.region,
+          tier: catalog.tier,
+          status: "ok",
+          itemCount: catalog.itemCount,
+          syncedAt: startedAt,
+          nextSyncAt: new Date(startedAt.getTime() + PS_PLUS_SYNC_INTERVAL_MS),
+          lastError: null,
+          updatedAt: startedAt,
+        })
+        .onConflictDoUpdate({
+          target: psPlusCatalogSyncState.region,
+          set: {
+            tier: catalog.tier,
+            status: "ok",
+            itemCount: catalog.itemCount,
+            syncedAt: startedAt,
+            nextSyncAt: new Date(startedAt.getTime() + PS_PLUS_SYNC_INTERVAL_MS),
+            lastError: null,
+            updatedAt: startedAt,
+          },
+        });
+    });
+
+    const suggestionRows = await db.select().from(gameSuggestions);
+    let updatedSuggestionCount = 0;
+    for (const suggestion of suggestionRows) {
+      const update = buildPsPlusAvailabilityUpdate(suggestion, catalog.items, startedAt);
+      await db
+        .update(gameSuggestions)
+        .set(update)
+        .where(eq(gameSuggestions.id, suggestion.id));
+      updatedSuggestionCount += 1;
+    }
+
+    return {
+      mode: "database" as const,
+      skipped: false,
+      itemCount: catalog.itemCount,
+      updatedSuggestionCount,
+      nextSyncAt: new Date(startedAt.getTime() + PS_PLUS_SYNC_INTERVAL_MS).toISOString(),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown_playstation_store_error";
+    await db
+      .insert(psPlusCatalogSyncState)
+      .values({
+        region: PS_PLUS_DELUXE_REGION,
+        tier: PS_PLUS_DELUXE_TIER,
+        status: "error",
+        itemCount: state?.itemCount ?? 0,
+        syncedAt: state?.syncedAt ?? null,
+        nextSyncAt: new Date(startedAt.getTime() + 60 * 60 * 1000),
+        lastError: message,
+        updatedAt: startedAt,
+      })
+      .onConflictDoUpdate({
+        target: psPlusCatalogSyncState.region,
+        set: {
+          tier: PS_PLUS_DELUXE_TIER,
+          status: "error",
+          nextSyncAt: new Date(startedAt.getTime() + 60 * 60 * 1000),
+          lastError: message,
+          updatedAt: startedAt,
+        },
+      });
+
+    throw error;
+  }
+}
+
+async function refreshGameSuggestionPsPlusAvailability(suggestionId: string) {
+  const db = getDb();
+  if (isDemoMode || !db) {
+    return null;
+  }
+
+  try {
+    await ensureFreshPsPlusCatalog();
+  } catch (error) {
+    console.warn("[ps-plus] Failed to refresh catalog before checking suggestion.", {
+      suggestionId,
+      error,
+    });
+  }
+
+  const [suggestion] = await db
+    .select()
+    .from(gameSuggestions)
+    .where(eq(gameSuggestions.id, suggestionId))
+    .limit(1);
+  if (!suggestion) {
+    return null;
+  }
+
+  const catalog = await getCurrentPsPlusCatalogItems();
+  if (catalog.length === 0) {
+    return null;
+  }
+
+  const now = new Date();
+  await db
+    .update(gameSuggestions)
+    .set(buildPsPlusAvailabilityUpdate(suggestion, catalog, now))
+    .where(eq(gameSuggestions.id, suggestionId));
+
+  return (await listGameSuggestions(suggestion.viewerId)).find((entry) => entry.id === suggestionId) ?? null;
+}
+
+export async function syncPsPlusDeluxeCatalog({ force = false }: { force?: boolean } = {}) {
+  return ensureFreshPsPlusCatalog({ force });
 }
 
 function listDemoVideoSuggestions(viewerId?: string | null) {
@@ -5292,7 +5578,7 @@ export async function createGameSuggestion(input: {
 }) {
   const viewer = await withViewerById(input.viewerId);
   if (!viewer) {
-    throw new Error("Viewer nao encontrado.");
+    throw new Error("Viewer não encontrado.");
   }
 
   const name = input.name.trim();
@@ -5347,6 +5633,14 @@ export async function createGameSuggestion(input: {
       platforms,
       genres,
       howLongToBeat: null,
+      psPlusAvailable: false,
+      psPlusRegion: null,
+      psPlusTier: null,
+      psPlusProductId: null,
+      psPlusTitleId: null,
+      psPlusProductUrl: null,
+      psPlusCheckedAt: null,
+      psPlusLastSeenAt: null,
       status: "open",
       totalVotes: 0,
       createdAt,
@@ -5418,6 +5712,7 @@ export async function createGameSuggestion(input: {
       platforms,
       genres,
       ...buildHowLongToBeatColumns(howLongToBeat),
+      psPlusAvailable: false,
       status: "open",
       totalVotes: 0,
       createdAt,
@@ -5438,9 +5733,18 @@ export async function createGameSuggestion(input: {
 
   const created = (await listGameSuggestions(input.viewerId)).find((entry) => entry.id === suggestionId);
   if (!created) {
-    throw new Error("Falha ao criar sugestao.");
+    throw new Error("Falha ao criar sugestão.");
   }
-  return created;
+
+  try {
+    return (await refreshGameSuggestionPsPlusAvailability(suggestionId)) ?? created;
+  } catch (error) {
+    console.warn("[ps-plus] Failed to check new game suggestion availability.", {
+      suggestionId,
+      error,
+    });
+    return created;
+  }
 }
 
 export async function boostGameSuggestion(input: {
@@ -5685,7 +5989,16 @@ export async function updateGameSuggestionCatalog(input: {
   if (!result) {
     throw new Error("suggestion_not_found");
   }
-  return result;
+
+  try {
+    return (await refreshGameSuggestionPsPlusAvailability(input.suggestionId)) ?? result;
+  } catch (error) {
+    console.warn("[ps-plus] Failed to check updated game suggestion availability.", {
+      suggestionId: input.suggestionId,
+      error,
+    });
+    return result;
+  }
 }
 
 export async function createCreatorSuggestion(input: {

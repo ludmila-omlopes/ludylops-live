@@ -273,6 +273,34 @@ export function GameSuggestionCard({
                 {metadataText}
               </p>
             ) : null}
+            {suggestion.psPlusAvailable ? (
+              <div className="mt-3">
+                {suggestion.psPlusProductUrl ? (
+                  <a
+                    href={suggestion.psPlusProductUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="PlayStation Plus Deluxe"
+                    className="accent-button inline-flex h-6 items-center gap-1.5 rounded-[3px] border border-[var(--color-ink)] px-2 text-[10px] font-black leading-none"
+                  >
+                    <span className="flex h-4 w-4 items-center justify-center rounded-[3px] bg-[var(--color-admin)] text-[11px] font-black leading-none text-[var(--color-accent-ink)]">
+                      +
+                    </span>
+                    PlayStation Plus
+                  </a>
+                ) : (
+                  <span
+                    aria-label="PlayStation Plus Deluxe"
+                    className="accent-button inline-flex h-6 items-center gap-1.5 rounded-[3px] border border-[var(--color-ink)] px-2 text-[10px] font-black leading-none"
+                  >
+                    <span className="flex h-4 w-4 items-center justify-center rounded-[3px] bg-[var(--color-admin)] text-[11px] font-black leading-none text-[var(--color-accent-ink)]">
+                      +
+                    </span>
+                    PlayStation Plus
+                  </span>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {suggestion.description ? (
