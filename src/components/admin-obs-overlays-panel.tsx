@@ -41,6 +41,14 @@ const overlays = [
     demoHref: "/obs/bets?demo=1",
     apiHref: "/api/obs/bets/current",
   },
+  {
+    id: "wheel",
+    name: "Roleta no OBS",
+    description: "Overlay da roleta da live, com animação visual e resultado final mantido na tela.",
+    liveHref: "/obs/wheel",
+    demoHref: "/obs/wheel?demo=1",
+    apiHref: "/api/obs/wheel/current",
+  },
 ];
 
 export function AdminObsOverlaysPanel({
