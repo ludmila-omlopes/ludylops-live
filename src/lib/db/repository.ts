@@ -75,6 +75,10 @@ import { getCurrentGame } from "@/lib/current-game";
 import { normalizeYoutubeHandle } from "@/lib/youtube/identity";
 import { evaluateRedeemability } from "@/lib/redemptions/service";
 import {
+  resolveHowLongToBeatGame,
+  type HowLongToBeatResolution,
+} from "@/lib/howlongtobeat";
+import {
   AdminViewerChannelAttachResult,
   AdminViewerDirectoryRecord,
   AdminViewerLinkResult,
@@ -131,6 +135,8 @@ function shouldExcludeFromRanking(email: string | null) {
 }
 
 const DEFAULT_DEATH_COUNTER_KEY = "death_count";
+const HOWLONGTOBEAT_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const HOWLONGTOBEAT_REFRESH_BATCH_LIMIT = 3;
 
 const spendingHistoryLabels: Partial<Record<LedgerEntryRecord["kind"], string>> = {
   redemption_debit: "Resgate",
@@ -1752,6 +1758,7 @@ function buildBetWithOptions(params: {
 function serializeGameSuggestion(row: typeof gameSuggestions.$inferSelect): GameSuggestionRecord {
   const platforms = Array.isArray(row.platforms) ? row.platforms : [];
   const genres = Array.isArray(row.genres) ? row.genres : [];
+  const hltbFetchedAt = row.hltbFetchedAt ?? null;
 
   return {
     id: row.id,
@@ -1766,10 +1773,35 @@ function serializeGameSuggestion(row: typeof gameSuggestions.$inferSelect): Game
     releaseYear: row.releaseYear ?? null,
     platforms: platforms.filter((entry): entry is string => typeof entry === "string"),
     genres: genres.filter((entry): entry is string => typeof entry === "string"),
+    howLongToBeat: hltbFetchedAt
+      ? {
+          id: row.hltbId ?? null,
+          name: row.hltbName ?? null,
+          mainStoryMinutes: row.hltbMainStoryMinutes ?? null,
+          mainExtraMinutes: row.hltbMainExtraMinutes ?? null,
+          completionistMinutes: row.hltbCompletionistMinutes ?? null,
+          similarity: typeof row.hltbSimilarity === "number" ? row.hltbSimilarity / 100 : null,
+          fetchedAt: hltbFetchedAt.toISOString(),
+        }
+      : null,
     status: row.status as GameSuggestionRecord["status"],
     totalVotes: row.totalVotes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function buildHowLongToBeatColumns(resolution: HowLongToBeatResolution) {
+  return {
+    hltbId: resolution.match?.id ?? null,
+    hltbName: resolution.match?.name ?? null,
+    hltbMainStoryMinutes: resolution.match?.mainStoryMinutes ?? null,
+    hltbMainExtraMinutes: resolution.match?.mainExtraMinutes ?? null,
+    hltbCompletionistMinutes: resolution.match?.completionistMinutes ?? null,
+    hltbSimilarity: typeof resolution.match?.similarity === "number"
+      ? Math.round(resolution.match.similarity * 100)
+      : null,
+    hltbFetchedAt: resolution.fetchedAt,
   };
 }
 
@@ -2953,6 +2985,52 @@ function listDemoGameSuggestions(viewerId?: string | null) {
         boosts: viewerBoosts.filter((entry) => entry.suggestionId === suggestion.id),
       }),
     );
+}
+
+function shouldRefreshHowLongToBeat(row: typeof gameSuggestions.$inferSelect, now = Date.now()) {
+  if (!row.hltbFetchedAt) {
+    return true;
+  }
+
+  return now - row.hltbFetchedAt.getTime() > HOWLONGTOBEAT_CACHE_TTL_MS;
+}
+
+function getHowLongToBeatSearchTitle(row: typeof gameSuggestions.$inferSelect) {
+  return (row.canonicalName ?? row.name).trim();
+}
+
+async function refreshStaleHowLongToBeatRows(
+  db: NonNullable<ReturnType<typeof getDb>>,
+  rows: Array<typeof gameSuggestions.$inferSelect>,
+) {
+  const staleRows = rows
+    .filter((row) => shouldRefreshHowLongToBeat(row))
+    .slice(0, HOWLONGTOBEAT_REFRESH_BATCH_LIMIT);
+
+  if (staleRows.length === 0) {
+    return rows;
+  }
+
+  const refreshedRows = new Map<string, typeof gameSuggestions.$inferSelect>();
+
+  for (const row of staleRows) {
+    try {
+      const resolution = await resolveHowLongToBeatGame(getHowLongToBeatSearchTitle(row));
+      const [updated] = await db
+        .update(gameSuggestions)
+        .set(buildHowLongToBeatColumns(resolution))
+        .where(eq(gameSuggestions.id, row.id))
+        .returning();
+
+      if (updated) {
+        refreshedRows.set(updated.id, updated);
+      }
+    } catch {
+      // HLTB is best-effort data; stale cache must not block the recommendations list.
+    }
+  }
+
+  return rows.map((row) => refreshedRows.get(row.id) ?? row);
 }
 
 function listDemoVideoSuggestions(viewerId?: string | null) {
@@ -4968,6 +5046,8 @@ export async function listGameSuggestions(viewerId?: string | null) {
     throw error;
   }
 
+  suggestionRows = await refreshStaleHowLongToBeatRows(db, suggestionRows);
+
   const serializedSuggestions = suggestionRows.map(serializeGameSuggestion);
   const viewerIds = [...new Set(serializedSuggestions.map((entry) => entry.viewerId))];
   const suggestionViewers = viewerIds.length
@@ -5266,6 +5346,7 @@ export async function createGameSuggestion(input: {
       releaseYear: input.releaseYear ?? null,
       platforms,
       genres,
+      howLongToBeat: null,
       status: "open",
       totalVotes: 0,
       createdAt,
@@ -5287,6 +5368,7 @@ export async function createGameSuggestion(input: {
   }
 
   const createdAt = new Date();
+  const howLongToBeat = await resolveHowLongToBeatGame(displayName);
   await db.transaction(async (tx) => {
     const [existing] = await tx
       .select()
@@ -5335,6 +5417,7 @@ export async function createGameSuggestion(input: {
       releaseYear: input.releaseYear ?? null,
       platforms,
       genres,
+      ...buildHowLongToBeatColumns(howLongToBeat),
       status: "open",
       totalVotes: 0,
       createdAt,
@@ -5569,12 +5652,14 @@ export async function updateGameSuggestionCatalog(input: {
     suggestion.releaseYear = input.releaseYear ?? null;
     suggestion.platforms = platforms;
     suggestion.genres = genres;
+    suggestion.howLongToBeat = null;
     suggestion.updatedAt = new Date().toISOString();
 
     const viewer = store.viewers.find((entry) => entry.id === suggestion.viewerId) ?? null;
     return buildGameSuggestionWithMeta({ suggestion, viewer });
   }
 
+  const howLongToBeat = await resolveHowLongToBeatGame(canonicalName);
   const [updated] = await db
     .update(gameSuggestions)
     .set({
@@ -5586,6 +5671,7 @@ export async function updateGameSuggestionCatalog(input: {
       releaseYear: input.releaseYear ?? null,
       platforms,
       genres,
+      ...buildHowLongToBeatColumns(howLongToBeat),
       updatedAt: new Date(),
     })
     .where(eq(gameSuggestions.id, input.suggestionId))

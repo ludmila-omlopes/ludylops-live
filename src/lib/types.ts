@@ -493,10 +493,21 @@ export interface GameSuggestionRecord {
   releaseYear: number | null;
   platforms: string[];
   genres: string[];
+  howLongToBeat: GameHowLongToBeatRecord | null;
   status: GameSuggestionStatus;
   totalVotes: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface GameHowLongToBeatRecord {
+  id: string | null;
+  name: string | null;
+  mainStoryMinutes: number | null;
+  mainExtraMinutes: number | null;
+  completionistMinutes: number | null;
+  similarity: number | null;
+  fetchedAt: string;
 }
 
 export interface GameSuggestionBoostRecord {
