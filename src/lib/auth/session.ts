@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { adminEmails } from "@/lib/env";
+import { adminEmails, isDemoMode } from "@/lib/env";
 
 export async function requireSession() {
   const session = await auth();
@@ -13,6 +13,10 @@ export async function requireSession() {
 
 export async function requireAdminSession() {
   const session = await requireSession();
+  if (isDemoMode) {
+    return session;
+  }
+
   const email = session.user?.email?.toLowerCase();
   if (!email || !adminEmails.has(email)) {
     redirect("/");

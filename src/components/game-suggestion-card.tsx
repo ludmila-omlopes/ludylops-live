@@ -51,6 +51,13 @@ function formatCompletionTime(minutes: number | null) {
   return `${hours}h${String(remainingMinutes).padStart(2, "0")}`;
 }
 
+function formatMultiplier(value: number) {
+  return `${value.toLocaleString("pt-BR", {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}x`;
+}
+
 function buildHowLongToBeatTooltip(suggestion: GameSuggestionWithMeta) {
   const howLongToBeat = suggestion.howLongToBeat;
 
@@ -338,6 +345,16 @@ export function GameSuggestionCard({
             </span>
           </div>
 
+          {suggestion.appliedBoostModifiers.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {suggestion.appliedBoostModifiers.map((modifier) => (
+                <span key={modifier.key} className="retro-label neutral-chip">
+                  {modifier.label} {formatMultiplier(modifier.multiplier)}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
           <div className="mt-auto pt-5">
             <p className="mono text-xs opacity-75">
               Sugerido por {suggestion.suggestedBy}
@@ -418,12 +435,22 @@ export function GameSuggestionCard({
         </div>
 
         <aside className="flex items-start justify-between gap-4 border-t-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-5 md:min-w-36 md:flex-col md:border-l-1 md:border-t-0">
-          <p
-            className="text-3xl font-bold leading-none text-[var(--color-purple-bold)] sm:text-4xl"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {formatPipetz(suggestion.totalVotes)}
-          </p>
+          <div>
+            <p
+              className="text-3xl font-bold leading-none text-[var(--color-purple-bold)] sm:text-4xl"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {formatPipetz(suggestion.boostedScore)}
+            </p>
+            <p className="mono mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--color-ink-soft)]">
+              prioridade
+            </p>
+            {suggestion.boostedScore !== suggestion.totalVotes ? (
+              <p className="mono mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--color-ink-soft)]">
+                votos reais: {formatPipetz(suggestion.totalVotes)}
+              </p>
+            ) : null}
+          </div>
         </aside>
       </div>
 

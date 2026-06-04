@@ -78,6 +78,7 @@ import {
   ensureViewerFromSession,
   getViewerDashboard,
   getActiveQuoteOverlay,
+  getGameSuggestionBoostSettings,
   getLiveLikeGoalOverlayState,
   getObsOverlayAdminStatus,
   getSessionViewerState,
@@ -110,6 +111,7 @@ import {
   showQuoteOverlayForViewer,
   cancelQueuedQuoteOverlays,
   updateGameSuggestionStatus,
+  updateGameSuggestionBoostSettings,
   updateVideoSuggestionStatus,
 } from "@/lib/db/repository";
 import { GOOGLE_RISC_EVENT_TYPES } from "@/lib/google/risc";
@@ -2120,6 +2122,46 @@ describe("game suggestions", () => {
     const after = await getViewerDashboard("viewer_ana");
     expect(after?.balance.currentBalance).toBe(beforeBalance - 120);
     expect(after?.balance.lifetimeSpent).toBe(beforeSpent + 120);
+  });
+
+  it("persists game suggestion boost multipliers and applies them to priority", async () => {
+    expect(await getGameSuggestionBoostSettings()).toMatchObject({
+      psPlusMultiplier: 1,
+      shortGameMultiplier: 1,
+      adminSuggestionMultiplier: 1,
+    });
+
+    const settings = await updateGameSuggestionBoostSettings({
+      psPlusMultiplier: 2,
+      shortGameMultiplier: 1.5,
+      adminSuggestionMultiplier: 1,
+      updatedBy: "admin@example.com",
+    });
+
+    expect(settings).toMatchObject({
+      psPlusMultiplier: 2,
+      shortGameMultiplier: 1.5,
+      adminSuggestionMultiplier: 1,
+      updatedBy: "admin@example.com",
+    });
+
+    const suggestions = await listGameSuggestions();
+    const psPlusSuggestion = suggestions.find((entry) => entry.id === "gs-ps-plus-demo");
+    const shortSuggestion = suggestions.find((entry) => entry.id === "gs-2");
+
+    expect(psPlusSuggestion?.boostedScore).toBe(8200);
+    expect(psPlusSuggestion?.appliedBoostModifiers).toContainEqual({
+      key: "ps_plus",
+      label: "PS Plus",
+      multiplier: 2,
+    });
+    expect(shortSuggestion?.boostedScore).toBe(2700);
+    expect(shortSuggestion?.appliedBoostModifiers).toContainEqual({
+      key: "short_game",
+      label: "Menos de 10h",
+      multiplier: 1.5,
+    });
+    expect(suggestions[0]?.id).toBe("gs-ps-plus-demo");
   });
 
   it("blocks boost when the viewer has insufficient balance", async () => {

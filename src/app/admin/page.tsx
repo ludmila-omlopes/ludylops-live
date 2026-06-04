@@ -17,6 +17,7 @@ import { requireAdminSession } from "@/lib/auth/session";
 import {
   getBridgeStatus,
   getCatalog,
+  getGameSuggestionBoostSettings,
   getLeaderboard,
   getObsOverlayAdminStatus,
   getPipetzPricing,
@@ -43,7 +44,7 @@ const statusColorMap: Record<string, string> = {
 
 export default async function AdminPage() {
   await requireAdminSession();
-  const [catalog, leaderboard, bridge, liveStatus, currentGame, redemptions, bets, likeGoals, suggestions, videoSuggestions, recommendations, viewers, obsOverlayStatus, pricing, wheelConfig] = await Promise.all([
+  const [catalog, leaderboard, bridge, liveStatus, currentGame, redemptions, bets, likeGoals, suggestions, gameBoostSettings, videoSuggestions, recommendations, viewers, obsOverlayStatus, pricing, wheelConfig] = await Promise.all([
     getCatalog(),
     getLeaderboard(),
     getBridgeStatus(),
@@ -53,6 +54,7 @@ export default async function AdminPage() {
     listAdminBets(),
     listAdminLiveLikeGoals(),
     listAdminGameSuggestions(),
+    getGameSuggestionBoostSettings(),
     listAdminVideoSuggestions(),
     listAdminProductRecommendations(),
     listAdminViewerDirectory(),
@@ -94,7 +96,7 @@ export default async function AdminPage() {
             content: (
               <div className="space-y-6">
                 <AdminViewerLinksPanel entries={viewers} />
-                <AdminGameSuggestionsPanel suggestions={suggestions} />
+                <AdminGameSuggestionsPanel suggestions={suggestions} boostSettings={gameBoostSettings} />
                 <AdminVideoSuggestionsPanel suggestions={videoSuggestions} />
                 <AdminRecommendationsPanel recommendations={recommendations} />
               </div>

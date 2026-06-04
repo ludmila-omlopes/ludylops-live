@@ -102,7 +102,9 @@ import {
   CreatorSuggestionBoostRecord,
   CreatorSuggestionRecord,
   CreatorSuggestionWithMeta,
+  GameSuggestionAppliedBoostModifier,
   GameSuggestionBoostRecord,
+  GameSuggestionBoostSettingsRecord,
   GameSuggestionRecord,
   GameSuggestionWithMeta,
   GoogleAccountRecord,
@@ -260,12 +262,26 @@ const PIPETZ_PRICING_SETTING_KEYS = {
   videoSuggestionCost: "pricing_video_suggestion",
   quoteOverlayCost: "pricing_quote_overlay",
 } as const;
+const GAME_SUGGESTION_BOOST_SETTING_SCOPE_KEY = "game_suggestion_boosts";
+const GAME_SUGGESTION_BOOST_SETTING_KEYS = {
+  psPlusMultiplier: "game_boost_ps_plus",
+  shortGameMultiplier: "game_boost_short_game",
+  adminSuggestionMultiplier: "game_boost_admin",
+} as const;
+const GAME_SUGGESTION_BOOST_MULTIPLIER_STORAGE_FACTOR = 100;
 const PS_PLUS_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_PIPETZ_PRICING: PipetzPricingRecord = {
   gameSuggestionCost: GAME_SUGGESTION_CREATION_COST,
   videoSuggestionCost: VIDEO_SUGGESTION_CREATION_COST,
   quoteOverlayCost: QUOTE_OVERLAY_COST,
+  updatedAt: null,
+  updatedBy: null,
+};
+const DEFAULT_GAME_SUGGESTION_BOOST_SETTINGS: GameSuggestionBoostSettingsRecord = {
+  psPlusMultiplier: 1,
+  shortGameMultiplier: 1,
+  adminSuggestionMultiplier: 1,
   updatedAt: null,
   updatedBy: null,
 };
@@ -745,6 +761,159 @@ export async function updatePipetzPricing(input: {
   });
 
   return getPipetzPricing();
+}
+
+function serializeGameSuggestionBoostSettingRow(
+  row: StreamerbotCounterRecord | typeof streamerbotCounters.$inferSelect,
+) {
+  const metadata = row.metadata as Record<string, unknown>;
+
+  return {
+    multiplier: row.value / GAME_SUGGESTION_BOOST_MULTIPLIER_STORAGE_FACTOR,
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+    updatedBy: typeof metadata.updatedBy === "string" ? metadata.updatedBy : null,
+  };
+}
+
+function normalizeGameSuggestionBoostMultiplier(value: number) {
+  if (!Number.isFinite(value) || value < 0 || value > 10) {
+    throw new Error("invalid_multiplier");
+  }
+
+  return Math.round(value * GAME_SUGGESTION_BOOST_MULTIPLIER_STORAGE_FACTOR) /
+    GAME_SUGGESTION_BOOST_MULTIPLIER_STORAGE_FACTOR;
+}
+
+export async function getGameSuggestionBoostSettings(): Promise<GameSuggestionBoostSettingsRecord> {
+  const db = getDb();
+  const keys = Object.values(GAME_SUGGESTION_BOOST_SETTING_KEYS) as string[];
+  const settings = { ...DEFAULT_GAME_SUGGESTION_BOOST_SETTINGS };
+
+  if (isDemoMode || !db) {
+    for (const row of getDemoStore().streamerbotCounters.filter((entry) => keys.includes(entry.key))) {
+      const serialized = serializeGameSuggestionBoostSettingRow(row);
+      const field = Object.entries(GAME_SUGGESTION_BOOST_SETTING_KEYS).find(([, key]) => key === row.key)?.[0] as
+        | keyof typeof GAME_SUGGESTION_BOOST_SETTING_KEYS
+        | undefined;
+      if (!field) {
+        continue;
+      }
+
+      settings[field] = serialized.multiplier;
+      settings.updatedAt = serialized.updatedAt;
+      settings.updatedBy = serialized.updatedBy;
+    }
+
+    return settings;
+  }
+
+  try {
+    const rows = await db.select().from(streamerbotCounters).where(inArray(streamerbotCounters.key, keys));
+    for (const row of rows) {
+      const serialized = serializeGameSuggestionBoostSettingRow(row);
+      const field = Object.entries(GAME_SUGGESTION_BOOST_SETTING_KEYS).find(([, key]) => key === row.key)?.[0] as
+        | keyof typeof GAME_SUGGESTION_BOOST_SETTING_KEYS
+        | undefined;
+      if (!field) {
+        continue;
+      }
+
+      settings[field] = serialized.multiplier;
+      settings.updatedAt = serialized.updatedAt;
+      settings.updatedBy = serialized.updatedBy;
+    }
+  } catch (error) {
+    if (!isMissingStreamerbotCountersTableError(error)) {
+      throw error;
+    }
+  }
+
+  return settings;
+}
+
+export async function updateGameSuggestionBoostSettings(input: {
+  psPlusMultiplier: number;
+  shortGameMultiplier: number;
+  adminSuggestionMultiplier: number;
+  updatedBy: string | null;
+}): Promise<GameSuggestionBoostSettingsRecord> {
+  const db = getDb();
+  const updatedAt = new Date();
+  const values = {
+    psPlusMultiplier: normalizeGameSuggestionBoostMultiplier(input.psPlusMultiplier),
+    shortGameMultiplier: normalizeGameSuggestionBoostMultiplier(input.shortGameMultiplier),
+    adminSuggestionMultiplier: normalizeGameSuggestionBoostMultiplier(input.adminSuggestionMultiplier),
+  };
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    for (const [field, key] of Object.entries(GAME_SUGGESTION_BOOST_SETTING_KEYS)) {
+      const multiplier = values[field as keyof typeof values];
+      const value = Math.round(multiplier * GAME_SUGGESTION_BOOST_MULTIPLIER_STORAGE_FACTOR);
+      const existing = store.streamerbotCounters.find((entry) => entry.key === key);
+      if (existing) {
+        existing.value = value;
+        existing.updatedAt = updatedAt.toISOString();
+        existing.metadata = {
+          ...existing.metadata,
+          updatedBy: input.updatedBy,
+        };
+      } else {
+        store.streamerbotCounters.push({
+          key,
+          scopeType: PIPETZ_PRICING_SETTING_SCOPE_TYPE,
+          scopeKey: GAME_SUGGESTION_BOOST_SETTING_SCOPE_KEY,
+          value,
+          lastResetAt: null,
+          updatedAt: updatedAt.toISOString(),
+          metadata: {
+            setting: field,
+            scopeType: PIPETZ_PRICING_SETTING_SCOPE_TYPE,
+            scopeKey: GAME_SUGGESTION_BOOST_SETTING_SCOPE_KEY,
+            updatedBy: input.updatedBy,
+          },
+        });
+      }
+    }
+
+    return getGameSuggestionBoostSettings();
+  }
+
+  await db.transaction(async (tx) => {
+    for (const [field, key] of Object.entries(GAME_SUGGESTION_BOOST_SETTING_KEYS)) {
+      const multiplier = values[field as keyof typeof values];
+      const value = Math.round(multiplier * GAME_SUGGESTION_BOOST_MULTIPLIER_STORAGE_FACTOR);
+      await tx
+        .insert(streamerbotCounters)
+        .values({
+          key,
+          value,
+          lastResetAt: null,
+          updatedAt,
+          metadata: {
+            setting: field,
+            scopeType: PIPETZ_PRICING_SETTING_SCOPE_TYPE,
+            scopeKey: GAME_SUGGESTION_BOOST_SETTING_SCOPE_KEY,
+            updatedBy: input.updatedBy,
+          },
+        })
+        .onConflictDoUpdate({
+          target: streamerbotCounters.key,
+          set: {
+            value,
+            updatedAt,
+            metadata: {
+              setting: field,
+              scopeType: PIPETZ_PRICING_SETTING_SCOPE_TYPE,
+              scopeKey: GAME_SUGGESTION_BOOST_SETTING_SCOPE_KEY,
+              updatedBy: input.updatedBy,
+            },
+          },
+        });
+    }
+  });
+
+  return getGameSuggestionBoostSettings();
 }
 
 function sanitizePublicCounterSummaries(
@@ -2154,14 +2323,63 @@ function buildGameSuggestionWithMeta(params: {
   suggestion: GameSuggestionRecord;
   viewer: ViewerRecord | null;
   boosts?: GameSuggestionBoostRecord[];
+  boostSettings?: GameSuggestionBoostSettingsRecord;
 }): GameSuggestionWithMeta {
   const boosts = params.boosts ?? [];
+  const boostSettings = params.boostSettings ?? DEFAULT_GAME_SUGGESTION_BOOST_SETTINGS;
+  const appliedBoostModifiers = getAppliedGameSuggestionBoostModifiers(
+    params.suggestion,
+    params.viewer,
+    boostSettings,
+  );
+  const totalMultiplier = appliedBoostModifiers.reduce((product, entry) => product * entry.multiplier, 1);
+
   return {
     ...params.suggestion,
     suggestedBy: params.viewer?.youtubeDisplayName ?? "Viewer",
     suggestedByYoutubeHandle: params.viewer?.youtubeHandle ?? null,
     viewerBoostTotal: boosts.reduce((sum, entry) => sum + entry.amount, 0),
+    boostedScore: Math.round(params.suggestion.totalVotes * totalMultiplier),
+    appliedBoostModifiers,
   };
+}
+
+function getAppliedGameSuggestionBoostModifiers(
+  suggestion: GameSuggestionRecord,
+  viewer: ViewerRecord | null,
+  settings: GameSuggestionBoostSettingsRecord,
+): GameSuggestionAppliedBoostModifier[] {
+  const modifiers: GameSuggestionAppliedBoostModifier[] = [];
+
+  if (suggestion.psPlusAvailable) {
+    modifiers.push({
+      key: "ps_plus",
+      label: "PS Plus",
+      multiplier: settings.psPlusMultiplier,
+    });
+  }
+
+  if (
+    typeof suggestion.howLongToBeat?.mainStoryMinutes === "number" &&
+    suggestion.howLongToBeat.mainStoryMinutes > 0 &&
+    suggestion.howLongToBeat.mainStoryMinutes < 10 * 60
+  ) {
+    modifiers.push({
+      key: "short_game",
+      label: "Menos de 10h",
+      multiplier: settings.shortGameMultiplier,
+    });
+  }
+
+  if (viewer?.email && (isDemoMode || adminEmails.has(viewer.email.toLowerCase()))) {
+    modifiers.push({
+      key: "admin_suggestion",
+      label: "Enviada pelo admin",
+      multiplier: settings.adminSuggestionMultiplier,
+    });
+  }
+
+  return modifiers;
 }
 
 function buildVideoSuggestionWithMeta(params: {
@@ -3033,27 +3251,37 @@ export async function cancelQueuedQuoteOverlays(input: { updatedBy?: string | nu
   return getObsOverlayAdminStatus();
 }
 
-function listDemoGameSuggestions(viewerId?: string | null) {
+function sortGameSuggestionWithMeta(left: GameSuggestionWithMeta, right: GameSuggestionWithMeta) {
+  if (right.boostedScore !== left.boostedScore) {
+    return right.boostedScore - left.boostedScore;
+  }
+
+  if (right.totalVotes !== left.totalVotes) {
+    return right.totalVotes - left.totalVotes;
+  }
+
+  return +new Date(right.createdAt) - +new Date(left.createdAt);
+}
+
+function listDemoGameSuggestions(
+  viewerId?: string | null,
+  boostSettings: GameSuggestionBoostSettingsRecord = DEFAULT_GAME_SUGGESTION_BOOST_SETTINGS,
+) {
   const store = getDemoStore();
   const viewerBoosts = viewerId
     ? store.gameSuggestionBoosts.filter((entry) => entry.viewerId === viewerId)
     : [];
 
   return [...store.gameSuggestions]
-    .sort((a, b) => {
-      if (b.totalVotes !== a.totalVotes) {
-        return b.totalVotes - a.totalVotes;
-      }
-
-      return +new Date(b.createdAt) - +new Date(a.createdAt);
-    })
     .map((suggestion) =>
       buildGameSuggestionWithMeta({
         suggestion,
         viewer: getDemoViewerById(store, suggestion.viewerId),
         boosts: viewerBoosts.filter((entry) => entry.suggestionId === suggestion.id),
+        boostSettings,
       }),
-    );
+    )
+    .sort(sortGameSuggestionWithMeta);
 }
 
 function shouldRefreshHowLongToBeat(row: typeof gameSuggestions.$inferSelect, now = Date.now()) {
@@ -5382,22 +5610,24 @@ export async function listGameSuggestions(viewerId?: string | null) {
   const db = getDb();
 
   if (isDemoMode || !db) {
-    return listDemoGameSuggestions(viewerId);
+    return listDemoGameSuggestions(viewerId, await getGameSuggestionBoostSettings());
   }
 
   let suggestionRows: Array<typeof gameSuggestions.$inferSelect>;
   let boostRows: Array<typeof gameSuggestionBoosts.$inferSelect>;
+  let boostSettings: GameSuggestionBoostSettingsRecord;
 
   try {
-    [suggestionRows, boostRows] = await Promise.all([
+    [suggestionRows, boostRows, boostSettings] = await Promise.all([
       db.select().from(gameSuggestions).orderBy(desc(gameSuggestions.totalVotes), desc(gameSuggestions.createdAt)),
       viewerId
         ? db.select().from(gameSuggestionBoosts).where(eq(gameSuggestionBoosts.viewerId, viewerId))
         : Promise.resolve([]),
+      getGameSuggestionBoostSettings(),
     ]);
   } catch (error) {
     if (isMissingGameSuggestionSchemaError(error)) {
-      return listDemoGameSuggestions(viewerId);
+      return listDemoGameSuggestions(viewerId, await getGameSuggestionBoostSettings());
     }
     throw error;
   }
@@ -5412,13 +5642,16 @@ export async function listGameSuggestions(viewerId?: string | null) {
   const viewerMap = new Map(suggestionViewers.map((row) => [row.id, serializeViewer(row)]));
   const serializedBoosts = boostRows.map(serializeGameSuggestionBoost);
 
-  return serializedSuggestions.map((suggestion) =>
-    buildGameSuggestionWithMeta({
-      suggestion,
-      viewer: viewerMap.get(suggestion.viewerId) ?? null,
-      boosts: serializedBoosts.filter((entry) => entry.suggestionId === suggestion.id),
-    }),
-  );
+  return serializedSuggestions
+    .map((suggestion) =>
+      buildGameSuggestionWithMeta({
+        suggestion,
+        viewer: viewerMap.get(suggestion.viewerId) ?? null,
+        boosts: serializedBoosts.filter((entry) => entry.suggestionId === suggestion.id),
+        boostSettings,
+      }),
+    )
+    .sort(sortGameSuggestionWithMeta);
 }
 
 export async function listAdminGameSuggestions() {
@@ -5732,7 +5965,12 @@ export async function createGameSuggestion(input: {
       createdAt,
     });
 
-    return buildGameSuggestionWithMeta({ suggestion, viewer, boosts: [] });
+    return buildGameSuggestionWithMeta({
+      suggestion,
+      viewer,
+      boosts: [],
+      boostSettings: await getGameSuggestionBoostSettings(),
+    });
   }
 
   const createdAt = new Date();
@@ -5885,6 +6123,7 @@ export async function boostGameSuggestion(input: {
       boosts: store.gameSuggestionBoosts.filter(
         (entry) => entry.viewerId === input.viewerId && entry.suggestionId === suggestion.id,
       ),
+      boostSettings: await getGameSuggestionBoostSettings(),
     });
   }
 
@@ -5972,6 +6211,7 @@ export async function updateGameSuggestionStatus(input: {
     return buildGameSuggestionWithMeta({
       suggestion,
       viewer: getDemoViewerById(store, suggestion.viewerId),
+      boostSettings: await getGameSuggestionBoostSettings(),
     });
   }
 
@@ -6034,7 +6274,11 @@ export async function updateGameSuggestionCatalog(input: {
     suggestion.updatedAt = new Date().toISOString();
 
     const viewer = store.viewers.find((entry) => entry.id === suggestion.viewerId) ?? null;
-    return buildGameSuggestionWithMeta({ suggestion, viewer });
+    return buildGameSuggestionWithMeta({
+      suggestion,
+      viewer,
+      boostSettings: await getGameSuggestionBoostSettings(),
+    });
   }
 
   const howLongToBeat = await resolveHowLongToBeatGame(canonicalName, platforms[0] ?? null);
