@@ -232,6 +232,7 @@ const wheelColorSchema = z
   .string()
   .trim()
   .regex(/^#[0-9a-fA-F]{6}$/);
+
 export const wheelOptionSchema = z.object({
   id: z.string().trim().min(1).max(64).optional(),
   label: z.string().trim().min(1).max(80),
@@ -240,16 +241,20 @@ export const wheelOptionSchema = z.object({
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().min(0).max(999).default(0),
 });
+
 export const wheelConfigSchema = z.object({
   title: z.string().trim().min(1).max(80).default("Roleta da live"),
   spinDurationMs: z.number().int().min(2500).max(12000).default(5200),
   resultHoldSeconds: z.number().int().min(5).max(120).default(30),
   options: z.array(wheelOptionSchema).min(2).max(24),
 });
+
 export const wheelSpinRequestSchema = z.object({
   requestedBy: z.string().trim().min(1).max(255).optional(),
   source: z.string().trim().min(1).max(64).default("web"),
-});export const bridgeHeartbeatSchema = z.object({
+});
+
+export const bridgeHeartbeatSchema = z.object({
   bridgeId: z.string().min(1),
   machineKey: z.string().min(1),
   label: z.string().min(1),

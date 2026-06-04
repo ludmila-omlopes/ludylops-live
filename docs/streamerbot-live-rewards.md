@@ -26,6 +26,8 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
   - `payload.isLive`: `true` quando o evento veio da live monitorada
   - `occurredAt`: data em ISO
 - Critério de presença: viewers com ledger `presence_tick` na mesma `broadcastId` do evento de likes, desde o início da live até o momento em que a meta bateu.
+- Overlay do OBS: use `/obs/likes` como browser source. Para testar o visual sem live, use `/obs/likes?demo=1`.
+- Feed do overlay: `/api/obs/live-like-goals/current`, atualizado pelo último `like_count_update` recebido.
 
 ### Overlay da meta de likes
 

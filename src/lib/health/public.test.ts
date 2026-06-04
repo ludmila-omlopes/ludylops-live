@@ -7,6 +7,7 @@ const authReady = {
   status: "ready" as const,
   availableProviders: ["google"],
   googleOAuthConfigured: true,
+  googleOAuthCallbackUrls: ["https://example.test/api/auth/callback/google"],
   demoAuthEnabled: false,
   nextAuthSecretConfigured: true,
   usesFallbackSecret: false,

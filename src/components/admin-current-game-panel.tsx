@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -17,30 +17,57 @@ type GameSearchResult = {
   genres: string[];
 };
 
+export function shouldSkipGameSearch({
+  query,
+  selectedGameName,
+  currentGameName,
+}: {
+  query: string;
+  selectedGameName?: string | null;
+  currentGameName?: string | null;
+}) {
+  const normalizedQuery = query.trim();
+
+  return (
+    normalizedQuery.length < 2 ||
+    selectedGameName === normalizedQuery ||
+    currentGameName === normalizedQuery
+  );
+}
+
 export function AdminCurrentGamePanel({
   initialGame,
 }: {
   initialGame: CurrentGameRecord | null;
 }) {
   const router = useRouter();
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const [currentGame, setCurrentGame] = useState(initialGame);
   const [query, setQuery] = useState(initialGame?.name ?? "");
   const [results, setResults] = useState<GameSearchResult[]>([]);
   const [selectedGame, setSelectedGame] = useState<GameSearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [isResultsOpen, setIsResultsOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    const normalizedQuery = query.trim();
-    if (normalizedQuery.length < 2 || selectedGame?.name === normalizedQuery) {
+    if (
+      shouldSkipGameSearch({
+        query,
+        selectedGameName: selectedGame?.name,
+        currentGameName: currentGame?.name,
+      })
+    ) {
       setResults([]);
+      setIsResultsOpen(false);
       setIsSearching(false);
       return;
     }
 
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
+      const normalizedQuery = query.trim();
       setIsSearching(true);
       setFeedback(null);
 
@@ -61,9 +88,11 @@ export function AdminCurrentGamePanel({
         }
 
         setResults(payload.data ?? []);
+        setIsResultsOpen((payload.data ?? []).length > 0);
       } catch (error) {
         if ((error as DOMException).name !== "AbortError") {
           setResults([]);
+          setIsResultsOpen(false);
           setFeedback("Falha ao buscar jogos.");
         }
       } finally {
@@ -77,12 +106,33 @@ export function AdminCurrentGamePanel({
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [query, selectedGame]);
+  }, [currentGame, query, selectedGame]);
+
+  useEffect(() => {
+    if (!isResultsOpen) {
+      return;
+    }
+
+    function closeResultsOnOutsidePointer(event: PointerEvent) {
+      if (!(event.target instanceof Node) || searchContainerRef.current?.contains(event.target)) {
+        return;
+      }
+
+      setIsResultsOpen(false);
+    }
+
+    window.addEventListener("pointerdown", closeResultsOnOutsidePointer);
+
+    return () => {
+      window.removeEventListener("pointerdown", closeResultsOnOutsidePointer);
+    };
+  }, [isResultsOpen]);
 
   function selectGame(game: GameSearchResult) {
     setSelectedGame(game);
     setQuery(game.name);
     setResults([]);
+    setIsResultsOpen(false);
   }
 
   function saveGame() {
@@ -124,6 +174,7 @@ export function AdminCurrentGamePanel({
       setSelectedGame(null);
       setQuery(payload.data.name);
       setResults([]);
+      setIsResultsOpen(false);
       setFeedback("Jogo atual atualizado.");
       router.refresh();
     });
@@ -154,6 +205,7 @@ export function AdminCurrentGamePanel({
       setSelectedGame(null);
       setQuery("");
       setResults([]);
+      setIsResultsOpen(false);
       setFeedback("Jogo atual removido.");
       router.refresh();
     });
@@ -209,7 +261,7 @@ export function AdminCurrentGamePanel({
             )}
           </div>
 
-          <div className="relative mt-4">
+          <div ref={searchContainerRef} className="relative mt-4">
             <label className="mono text-[10px] uppercase tracking-[0.28em] text-[var(--color-ink-soft)]">
               Buscar no IGDB
             </label>
@@ -218,6 +270,8 @@ export function AdminCurrentGamePanel({
               onChange={(event) => {
                 setQuery(event.target.value);
                 setSelectedGame(null);
+                setResults([]);
+                setIsResultsOpen(false);
               }}
               placeholder="Ex.: Hades II"
               className="mt-2"
@@ -229,7 +283,7 @@ export function AdminCurrentGamePanel({
               </p>
             ) : null}
 
-            {!selectedGame && results.length > 0 ? (
+            {!selectedGame && isResultsOpen && results.length > 0 ? (
               <div className="absolute z-20 mt-2 grid max-h-72 w-full gap-2 overflow-auto border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-2 shadow-purple">
                 {results.map((game) => (
                   <button

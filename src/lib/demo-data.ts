@@ -584,6 +584,20 @@ export const demoGameSuggestionBoosts: GameSuggestionBoostRecord[] = [];
 
 export const demoCreatorSuggestions: CreatorSuggestionRecord[] = [
   {
+    id: "cs-featured-rosadiariogamer",
+    viewerId: "viewer_lia",
+    slug: "rosadiariogamer",
+    name: "Rosa Diário Gamer",
+    channelUrl: "https://www.youtube.com/@rosadiariogamer",
+    platform: "youtube",
+    category: "games",
+    reason: "Canal de games com energia próxima, presença de comunidade e um jeito gostoso de acompanhar gameplay.",
+    totalVotes: 1210,
+    status: "featured",
+    createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 61).toISOString(),
+    updatedAt: new Date(now.getTime() - 1000 * 60 * 60 * 61).toISOString(),
+  },
+  {
     id: "cs-featured-brksedu",
     viewerId: "viewer_lia",
     slug: "brksedu",

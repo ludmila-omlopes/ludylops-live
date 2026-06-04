@@ -14,6 +14,7 @@
     "db:push": "drizzle-kit push",
     "db:ensure-youtube-handle": "tsx scripts/ensure-youtube-handle-column.ts",
     "bridge:dev": "tsx bridge/src/index.ts",
+    "backfill:hltb": "tsx scripts/backfill-howlongtobeat.ts",
     "backfill:youtube-names": "tsx scripts/backfill-youtube-display-names.ts",
     "fix:users-ranking-state": "tsx scripts/fix-users-ranking-state.ts",
     "merge:duplicate-youtube-users": "tsx scripts/merge-duplicate-youtube-users.ts",
@@ -31,7 +32,6 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.1",
     "framer-motion": "^12.38.0",
-    "howlongtobeat": "^1.8.0",
     "lucide-react": "^1.7.0",
     "next": "16.2.1",
     "next-auth": "^5.0.0-beta.30",
@@ -60,10 +60,5 @@
     "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.1"
-  },
-  "overrides": {
-    "howlongtobeat": {
-      "axios": "^1.17.0"
-    }
   }
 }
