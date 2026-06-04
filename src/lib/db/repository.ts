@@ -122,6 +122,7 @@ import {
   QuoteRecord,
   ProductRecommendationRecord,
   RedemptionRecord,
+  SubscriberAlertRecord,
   StreamerbotEventType,
   StreamerbotCounterRecord,
   StreamerbotCounterSummaryRecord,
@@ -1700,6 +1701,42 @@ function buildLiveLikeGoalOverlayState(
       : 0,
     remainingLikes: goal ? Math.max(goal.targetLikeCount - currentLikeCount, 0) : null,
     isGoalReached: goal ? currentLikeCount >= goal.targetLikeCount : false,
+  };
+}
+
+function readSubscriberName(input: {
+  viewer?: ViewerRecord | null;
+  viewerExternalId?: string | null;
+  payload: Record<string, unknown>;
+}) {
+  return (
+    input.viewer?.youtubeDisplayName ||
+    readStringFromPayload(input.payload, "youtubeDisplayName") ||
+    readStringFromPayload(input.payload, "displayName") ||
+    readStringFromPayload(input.payload, "user") ||
+    input.viewerExternalId ||
+    "Nova pessoa"
+  );
+}
+
+function buildSubscriberAlert(input: {
+  eventId: string;
+  viewerExternalId: string | null;
+  payload: Record<string, unknown>;
+  occurredAt: string;
+  viewer?: ViewerRecord | null;
+}): SubscriberAlertRecord {
+  const youtubeHandle =
+    input.viewer?.youtubeHandle ??
+    normalizeYoutubeHandle(readStringFromPayload(input.payload, "youtubeHandle") ?? undefined);
+
+  return {
+    eventId: input.eventId,
+    viewerExternalId: input.viewerExternalId,
+    displayName: readSubscriberName(input),
+    youtubeHandle,
+    occurredAt: input.occurredAt,
+    broadcastId: readStringFromPayload(input.payload, "broadcastId"),
   };
 }
 
@@ -8511,6 +8548,87 @@ export async function getLiveLikeGoalOverlayState(): Promise<LiveLikeGoalOverlay
   return buildLiveLikeGoalOverlayState(goalRows.map(serializeLiveLikeGoal), latestEvent);
 }
 
+export async function listRecentSubscriberAlerts({
+  limit = 20,
+  since = new Date(Date.now() - 2 * 60 * 1000),
+}: {
+  limit?: number;
+  since?: Date;
+} = {}): Promise<SubscriberAlertRecord[]> {
+  const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 50);
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    return store.streamerbotEvents
+      .filter(
+        (entry) =>
+          entry.eventType === "channel_subscription" &&
+          new Date(entry.occurredAt).getTime() >= since.getTime(),
+      )
+      .sort((left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime())
+      .slice(0, safeLimit)
+      .reverse()
+      .map((entry) => {
+        const viewerExternalId =
+          typeof entry.payload.viewerExternalId === "string" ? entry.payload.viewerExternalId : null;
+        const viewer = viewerExternalId
+          ? store.viewers.find((candidate) => candidate.youtubeChannelId === viewerExternalId)
+          : null;
+
+        return buildSubscriberAlert({
+          eventId: entry.eventId,
+          viewerExternalId,
+          payload: entry.payload,
+          occurredAt: entry.occurredAt,
+          viewer,
+        });
+      });
+  }
+
+  const eventRows = await db
+    .select()
+    .from(streamerbotEventLog)
+    .where(
+      and(
+        eq(streamerbotEventLog.eventType, "channel_subscription"),
+        gte(streamerbotEventLog.occurredAt, since),
+      ),
+    )
+    .orderBy(desc(streamerbotEventLog.occurredAt))
+    .limit(safeLimit);
+
+  const viewerExternalIds = [
+    ...new Set(
+      eventRows
+        .map((entry) => entry.viewerExternalId)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+  const viewerRows =
+    viewerExternalIds.length > 0
+      ? await db
+          .select()
+          .from(users)
+          .where(inArray(users.youtubeChannelId, viewerExternalIds))
+      : [];
+  const viewersByChannelId = new Map(
+    viewerRows.map((viewer) => [viewer.youtubeChannelId, serializeViewer(viewer)]),
+  );
+
+  return eventRows
+    .reverse()
+    .map((entry) =>
+      buildSubscriberAlert({
+        eventId: entry.eventId,
+        viewerExternalId: entry.viewerExternalId,
+        payload: asRecord(entry.payload),
+        occurredAt: entry.occurredAt.toISOString(),
+        viewer: entry.viewerExternalId ? viewersByChannelId.get(entry.viewerExternalId) : null,
+      }),
+    );
+}
+
 export async function createLiveLikeGoal(input: {
   label?: string | null;
   targetLikeCount: number;
@@ -8775,7 +8893,12 @@ export async function ingestStreamerbotEvent(input: {
       eventId: input.eventId,
       eventType: input.eventType,
       balance: input.balance ?? null,
-      payload: eventLogPayload,
+      payload: {
+        ...eventLogPayload,
+        ...(input.viewerExternalId ? { viewerExternalId: input.viewerExternalId } : {}),
+        ...(input.youtubeDisplayName ? { youtubeDisplayName: input.youtubeDisplayName } : {}),
+        ...(youtubeHandle ? { youtubeHandle } : {}),
+      },
       occurredAt: input.occurredAt,
     });
 

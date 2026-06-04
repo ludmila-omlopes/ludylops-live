@@ -34,6 +34,14 @@ const overlays = [
     apiHref: "/api/obs/likes/current",
   },
   {
+    id: "subscribers",
+    name: "Novos inscritos no OBS",
+    description: "Overlay de nova inscrição, com imagem configurável, som de alerta e fila local para eventos consecutivos.",
+    liveHref: "/obs/subscribers",
+    demoHref: "/obs/subscribers?demo=1",
+    apiHref: "/api/obs/subscribers/current",
+  },
+  {
     id: "bets",
     name: "Apostas no OBS",
     description: "Overlay da aposta aberta, com pool, opções e distribuição dos votos atualizados automaticamente.",

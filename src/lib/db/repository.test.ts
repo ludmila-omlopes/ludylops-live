@@ -87,6 +87,7 @@ import {
   issueViewerLinkCode,
   listAdminProductRecommendations,
   listAdminViewerDirectory,
+  listRecentSubscriberAlerts,
   listBets,
   listGameSuggestions,
   listAdminGameSuggestions,
@@ -3440,6 +3441,67 @@ describe("ingestStreamerbotEvent", () => {
         targetLikeCount: 50,
       },
     });
+  });
+
+  it("lists recent subscriber alerts in chronological display order", async () => {
+    getDbMock.mockReturnValue(null);
+
+    await ingestStreamerbotEvent({
+      eventId: "sub-old",
+      eventType: "channel_subscription",
+      viewerExternalId: "yt_caio",
+      youtubeDisplayName: "Caio CRT",
+      youtubeHandle: "@caiocrt",
+      occurredAt: "2026-04-01T11:55:00.000Z",
+      payload: {
+        broadcastId: "live-sub-alerts",
+      },
+    });
+    await ingestStreamerbotEvent({
+      eventId: "sub-lia",
+      eventType: "channel_subscription",
+      viewerExternalId: "yt_lia",
+      youtubeDisplayName: "Lia Pixel",
+      youtubeHandle: "@liapixel",
+      occurredAt: "2026-04-01T12:00:01.000Z",
+      payload: {
+        broadcastId: "live-sub-alerts",
+      },
+    });
+    await ingestStreamerbotEvent({
+      eventId: "sub-ana",
+      eventType: "channel_subscription",
+      viewerExternalId: "yt_ana",
+      youtubeDisplayName: "Ana Neon",
+      youtubeHandle: "@ananeon",
+      occurredAt: "2026-04-01T12:00:03.000Z",
+      payload: {
+        broadcastId: "live-sub-alerts",
+      },
+    });
+
+    const alerts = await listRecentSubscriberAlerts({
+      since: new Date("2026-04-01T12:00:00.000Z"),
+    });
+
+    expect(alerts).toEqual([
+      {
+        eventId: "sub-lia",
+        viewerExternalId: "yt_lia",
+        displayName: "Lia Pixel",
+        youtubeHandle: "@liapixel",
+        occurredAt: "2026-04-01T12:00:01.000Z",
+        broadcastId: "live-sub-alerts",
+      },
+      {
+        eventId: "sub-ana",
+        viewerExternalId: "yt_ana",
+        displayName: "Ana Neon",
+        youtubeHandle: "@ananeon",
+        occurredAt: "2026-04-01T12:00:03.000Z",
+        broadcastId: "live-sub-alerts",
+      },
+    ]);
   });
 
 });
