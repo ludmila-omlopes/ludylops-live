@@ -146,7 +146,8 @@ function shouldExcludeFromRanking(email: string | null) {
 
 const DEFAULT_DEATH_COUNTER_KEY = "death_count";
 const HOWLONGTOBEAT_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
-const HOWLONGTOBEAT_REFRESH_BATCH_LIMIT = 3;
+const HOWLONGTOBEAT_MISSING_CACHE_TTL_MS = 1000 * 60 * 15;
+const HOWLONGTOBEAT_REFRESH_BATCH_LIMIT = 8;
 
 const spendingHistoryLabels: Partial<Record<LedgerEntryRecord["kind"], string>> = {
   redemption_debit: "Resgate",
@@ -1811,13 +1812,25 @@ function serializeGameSuggestion(row: typeof gameSuggestions.$inferSelect): Game
 }
 
 function buildHowLongToBeatColumns(resolution: HowLongToBeatResolution) {
+  if (!resolution.match) {
+    return {
+      hltbId: null,
+      hltbName: null,
+      hltbMainStoryMinutes: null,
+      hltbMainExtraMinutes: null,
+      hltbCompletionistMinutes: null,
+      hltbSimilarity: null,
+      hltbFetchedAt: resolution.fetchedAt,
+    };
+  }
+
   return {
-    hltbId: resolution.match?.id ?? null,
-    hltbName: resolution.match?.name ?? null,
-    hltbMainStoryMinutes: resolution.match?.mainStoryMinutes ?? null,
-    hltbMainExtraMinutes: resolution.match?.mainExtraMinutes ?? null,
-    hltbCompletionistMinutes: resolution.match?.completionistMinutes ?? null,
-    hltbSimilarity: typeof resolution.match?.similarity === "number"
+    hltbId: resolution.match.id,
+    hltbName: resolution.match.name,
+    hltbMainStoryMinutes: resolution.match.mainStoryMinutes,
+    hltbMainExtraMinutes: resolution.match.mainExtraMinutes,
+    hltbCompletionistMinutes: resolution.match.completionistMinutes,
+    hltbSimilarity: typeof resolution.match.similarity === "number"
       ? Math.round(resolution.match.similarity * 100)
       : null,
     hltbFetchedAt: resolution.fetchedAt,
@@ -3007,6 +3020,11 @@ function listDemoGameSuggestions(viewerId?: string | null) {
 }
 
 function shouldRefreshHowLongToBeat(row: typeof gameSuggestions.$inferSelect, now = Date.now()) {
+  const hasCompletionTime = row.hltbMainStoryMinutes || row.hltbMainExtraMinutes || row.hltbCompletionistMinutes;
+  if (!row.hltbId && !hasCompletionTime) {
+    return !row.hltbFetchedAt || now - row.hltbFetchedAt.getTime() > HOWLONGTOBEAT_MISSING_CACHE_TTL_MS;
+  }
+
   if (!row.hltbFetchedAt) {
     return true;
   }
@@ -3016,6 +3034,12 @@ function shouldRefreshHowLongToBeat(row: typeof gameSuggestions.$inferSelect, no
 
 function getHowLongToBeatSearchTitle(row: typeof gameSuggestions.$inferSelect) {
   return (row.canonicalName ?? row.name).trim();
+}
+
+function getHowLongToBeatPlatformName(platforms: unknown) {
+  return Array.isArray(platforms) && typeof platforms[0] === "string"
+    ? platforms[0]
+    : null;
 }
 
 async function refreshStaleHowLongToBeatRows(
@@ -3032,12 +3056,17 @@ async function refreshStaleHowLongToBeatRows(
 
   const refreshedRows = new Map<string, typeof gameSuggestions.$inferSelect>();
 
-  for (const row of staleRows) {
+  await Promise.all(staleRows.map(async (row) => {
     try {
-      const resolution = await resolveHowLongToBeatGame(getHowLongToBeatSearchTitle(row));
+      const resolution = await resolveHowLongToBeatGame(
+        getHowLongToBeatSearchTitle(row),
+        getHowLongToBeatPlatformName(row.platforms),
+      );
+      const howLongToBeatColumns = buildHowLongToBeatColumns(resolution);
+
       const [updated] = await db
         .update(gameSuggestions)
-        .set(buildHowLongToBeatColumns(resolution))
+        .set(howLongToBeatColumns)
         .where(eq(gameSuggestions.id, row.id))
         .returning();
 
@@ -3047,7 +3076,7 @@ async function refreshStaleHowLongToBeatRows(
     } catch {
       // HLTB is best-effort data; stale cache must not block the recommendations list.
     }
-  }
+  }));
 
   return rows.map((row) => refreshedRows.get(row.id) ?? row);
 }
@@ -3356,7 +3385,11 @@ function listDemoCreatorSuggestions(
     .filter((entry) => (featured ? entry.status === "featured" : entry.status !== "featured"))
     .sort((a, b) => {
       if (featured) {
-        return b.name.localeCompare(a.name, "pt-BR", { sensitivity: "base" });
+        if (b.totalVotes !== a.totalVotes) {
+          return b.totalVotes - a.totalVotes;
+        }
+
+        return +new Date(b.createdAt) - +new Date(a.createdAt);
       }
 
       if (b.totalVotes !== a.totalVotes) {
@@ -5459,7 +5492,11 @@ export async function listFeaturedCreatorSuggestions() {
       .select()
       .from(creatorSuggestions)
       .where(eq(creatorSuggestions.status, "featured"))
-      .orderBy(desc(creatorSuggestions.name));
+      .orderBy(
+        desc(creatorSuggestions.totalVotes),
+        desc(creatorSuggestions.createdAt),
+        desc(creatorSuggestions.name),
+      );
   } catch (error) {
     if (isMissingCreatorSuggestionSchemaError(error)) {
       return listDemoCreatorSuggestions(null, { featured: true });
@@ -5662,7 +5699,7 @@ export async function createGameSuggestion(input: {
   }
 
   const createdAt = new Date();
-  const howLongToBeat = await resolveHowLongToBeatGame(displayName);
+  const howLongToBeat = await resolveHowLongToBeatGame(displayName, platforms[0] ?? null);
   await db.transaction(async (tx) => {
     const [existing] = await tx
       .select()
@@ -5963,7 +6000,7 @@ export async function updateGameSuggestionCatalog(input: {
     return buildGameSuggestionWithMeta({ suggestion, viewer });
   }
 
-  const howLongToBeat = await resolveHowLongToBeatGame(canonicalName);
+  const howLongToBeat = await resolveHowLongToBeatGame(canonicalName, platforms[0] ?? null);
   const [updated] = await db
     .update(gameSuggestions)
     .set({

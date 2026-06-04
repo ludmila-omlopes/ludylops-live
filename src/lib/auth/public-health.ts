@@ -5,6 +5,7 @@ export type PublicAuthHealth = {
   status: "ready" | "degraded";
   availableProviders: string[];
   googleOAuthConfigured: boolean;
+  googleOAuthCallbackUrls: string[];
   demoAuthEnabled: boolean;
   nextAuthSecretConfigured: boolean;
   usesFallbackSecret: boolean;
@@ -12,10 +13,27 @@ export type PublicAuthHealth = {
   warnings: string[];
 };
 
+function normalizeBaseUrl(value: string) {
+  return value.trim().replace(/\/+$/, "");
+}
+
+export function getGoogleOAuthCallbackUrls(baseUrls: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      baseUrls
+        .filter((value): value is string => Boolean(value))
+        .map(normalizeBaseUrl)
+        .filter(Boolean)
+        .map((baseUrl) => `${baseUrl}/api/auth/callback/google`),
+    ),
+  );
+}
+
 export function getPublicAuthHealth(): PublicAuthHealth {
   const googleOAuthConfigured = Boolean(env.AUTH_GOOGLE_ID && env.AUTH_GOOGLE_SECRET);
   const googleOAuthPartialConfig = Boolean(env.AUTH_GOOGLE_ID || env.AUTH_GOOGLE_SECRET) && !googleOAuthConfigured;
   const nextAuthSecretConfigured = Boolean(env.NEXTAUTH_SECRET);
+  const googleOAuthCallbackUrls = getGoogleOAuthCallbackUrls([env.APP_URL, env.NEXT_PUBLIC_APP_URL]);
   const availableProviders = [
     ...(googleOAuthConfigured ? ["google"] : []),
     ...(isDemoAuthEnabled ? ["credentials"] : []),
@@ -34,6 +52,7 @@ export function getPublicAuthHealth(): PublicAuthHealth {
     status: failures.length === 0 ? "ready" : "degraded",
     availableProviders,
     googleOAuthConfigured,
+    googleOAuthCallbackUrls,
     demoAuthEnabled: isDemoAuthEnabled,
     nextAuthSecretConfigured,
     usesFallbackSecret: !nextAuthSecretConfigured,

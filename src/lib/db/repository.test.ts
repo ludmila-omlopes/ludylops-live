@@ -3361,6 +3361,14 @@ describe("ingestStreamerbotEvent", () => {
         presenceCriterion: "presence_tick desde o início da live",
       },
     });
+    await expect(getLiveLikeGoalOverlayState()).resolves.toMatchObject({
+      currentLikeCount: 30,
+      broadcastId: "live-like-goal-1",
+      goal: {
+        id: goal.id,
+        targetLikeCount: 30,
+      },
+    });
   });
 
   it("returns the initial like goal overlay state from the first active goal", async () => {

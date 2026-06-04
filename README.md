@@ -193,6 +193,14 @@ IGDB_CLIENT_SECRET=
 PS_PLUS_SYNC_SECRET=
 ```
 
+Checklist de deploy para Google OAuth:
+
+- Em `APP_URL` e `NEXT_PUBLIC_APP_URL`, use as URLs públicas finais do deploy, sem barra no fim.
+- No Google Cloud Console, em **Authorized redirect URIs**, cadastre uma callback para cada domínio público usado pelo app, no formato `https://seu-dominio/api/auth/callback/google`.
+- Para este projeto, o domínio principal deve ter `https://ludylops.live/api/auth/callback/google`; se o deploy da Vercel também for usado para login, cadastre também a URL equivalente de `*.vercel.app`.
+- Depois do deploy, confira `GET /api/health/public`: `data.auth.googleOAuthConfigured` deve ser `true` e `data.auth.googleOAuthCallbackUrls` mostra as callbacks esperadas.
+- Rode `npm run smoke:auth -- https://seu-dominio` para validar `/api/auth/providers` e o início do login antes de divulgar o deploy.
+
 Para Google Cross-Account Protection (RISC), configure também:
 
 ```env

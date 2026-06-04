@@ -335,6 +335,7 @@ export interface WheelOptionRecord {
   isActive: boolean;
   sortOrder: number;
 }
+
 export interface WheelSpinRecord {
   spinId: string;
   optionId: string;
@@ -346,6 +347,7 @@ export interface WheelSpinRecord {
   spinDurationMs: number;
   resultVisibleUntil: string;
 }
+
 export interface WheelConfigRecord {
   title: string;
   spinDurationMs: number;
@@ -354,7 +356,9 @@ export interface WheelConfigRecord {
   updatedAt: string | null;
   updatedBy: string | null;
   lastSpin: WheelSpinRecord | null;
-}export interface StreamerbotCounterRecord {
+}
+
+export interface StreamerbotCounterRecord {
   key: string;
   scopeType: string;
   scopeKey: string;
