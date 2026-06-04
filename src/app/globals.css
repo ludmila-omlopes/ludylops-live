@@ -867,6 +867,33 @@ a:focus-visible {
   transform-origin: bottom center;
 }
 
+@keyframes subscriberOverlayPop {
+  0% {
+    opacity: 0;
+    transform: translateY(54px) scale(0.9) rotate(-1.5deg);
+  }
+
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1.03) rotate(0.8deg);
+  }
+
+  82% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.98) rotate(0deg);
+  }
+}
+
+.subscriber-overlay-pop {
+  animation: subscriberOverlayPop 7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: bottom center;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

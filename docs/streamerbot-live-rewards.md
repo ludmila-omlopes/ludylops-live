@@ -5,7 +5,9 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
 ## Inscrição no canal
 
 - Trigger no Streamer.bot: `YouTube > General > New Subscriber`.
-- Observação da documentação oficial: esse trigger depende da integração do StreamElements configurada no Streamer.bot.
+- Observação da documentação oficial consultada em 2026-06-04: esse trigger depende da integração do StreamElements configurada no Streamer.bot.
+- Variáveis oficiais relevantes para a action: `userId`, `user`, `userName`, `userProfileUrl`, `broadcastId`, `isSubscribed` e `userIsSponsor`.
+- Script recomendado: `streamerbot/channel-subscription-reward.cs`.
 - Payload esperado pelo app:
   - `eventType`: `channel_subscription`
   - `viewerExternalId`: ID do canal do YouTube da pessoa inscrita
@@ -13,7 +15,21 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
   - `youtubeHandle`: handle, quando disponível
   - `occurredAt`: data em ISO
   - `payload.broadcastId`: opcional
-- Regra de pagamento: 2000 pipetz uma única vez por viewer. Se o Streamer.bot reenviar o evento, o `eventId` evita duplicidade; se outro evento chegar para o mesmo viewer, o app ignora porque já existe ledger `channel_subscription`.
+- Regra de pagamento: 2000 pipetz uma única vez por viewer. Se o Streamer.bot reenviar o mesmo `eventId`, o app evita duplicidade; se outro evento chegar para o mesmo viewer, o app ignora a nova recompensa porque já existe ledger `channel_subscription`.
+
+### Overlay de nova inscrição
+
+- Abra `/obs/subscribers` como Browser Source no OBS ou em ferramenta equivalente.
+- Use `/obs/subscribers?demo=1` para testar o visual e o som sem depender de eventos reais.
+- O overlay consulta `GET /api/obs/subscribers/current` a cada segundo e enfileira localmente os eventos novos recebidos nos últimos 2 minutos.
+- Cada alerta toca o som uma vez, fica visível por 7 segundos por padrão e sai automaticamente. Eventos consecutivos são exibidos em sequência.
+- Parâmetros opcionais do Browser Source:
+  - `imageUrl` ou `image`: imagem exibida no alerta. Exemplo: `/obs/subscribers?imageUrl=/selfie2.png`.
+  - `soundUrl` ou `sound`: arquivo de áudio do alerta. Sem esse parâmetro, o overlay usa um som sintético embutido.
+  - `durationMs` ou `duration`: duração em milissegundos, entre 3000 e 20000.
+  - `title`: texto do selo principal. Padrão: `Nova inscrição`.
+  - `subtitle`: texto abaixo do nome. Padrão: `chegou no canal`.
+  - `volume`: volume do `soundUrl`, de `0` a `1`.
 
 ## Metas de likes
 
@@ -27,7 +43,7 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
   - `occurredAt`: data em ISO
 - Critério de presença: viewers com ledger `presence_tick` na mesma `broadcastId` do evento de likes, desde o início da live até o momento em que a meta bateu.
 - Overlay do OBS: use `/obs/likes` como browser source. Para testar o visual sem live, use `/obs/likes?demo=1`.
-- Feed do overlay: `/api/obs/live-like-goals/current`, atualizado pelo último `like_count_update` recebido.
+- Feed do overlay: `/api/obs/likes/current`, atualizado pelo último `like_count_update` recebido.
 
 ### Overlay da meta de likes
 

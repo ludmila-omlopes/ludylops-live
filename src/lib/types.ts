@@ -482,6 +482,15 @@ export interface LiveLikeGoalOverlayStateRecord {
   isGoalReached: boolean;
 }
 
+export interface SubscriberAlertRecord {
+  eventId: string;
+  viewerExternalId: string | null;
+  displayName: string;
+  youtubeHandle: string | null;
+  occurredAt: string;
+  broadcastId: string | null;
+}
+
 export interface BetViewerPositionRecord {
   amount: number;
   optionId: string;
