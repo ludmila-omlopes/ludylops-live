@@ -44,7 +44,7 @@ export function normalizePsPlusGameName(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[™®©]/g, "")
+    .replace(/(?:[\u2122\u00ae\u00a9]|\u00e2\u20ac\u017e\u00a2|\u00c2[\u00ae\u00a9])/g, "")
     .replace(/\[[^\]]*(?:ps4|ps5|playstation)[^\]]*\]/gi, " ")
     .replace(/\([^)]*(?:ps4|ps5|playstation)[^)]*\)/gi, " ")
     .replace(/\b(?:ps4|ps5|ps4 e ps5|ps4 & ps5|playstation 4|playstation 5)\b/gi, " ")
@@ -160,16 +160,22 @@ export async function fetchPsPlusDeluxeCatalog({
   maxPages?: number;
 } = {}) {
   const firstPageHtml = await fetchCatalogPage(region, 1);
-  const pageCount = Math.min(extractPageCount(firstPageHtml, region), maxPages);
+  const discoveredPageCount = extractPageCount(firstPageHtml, region);
+  const pageLimit = discoveredPageCount > 1 ? Math.min(discoveredPageCount, maxPages) : maxPages;
   const items = new Map<string, PsPlusCatalogItem>();
 
   for (const item of parsePsPlusCatalogHtml(firstPageHtml, region)) {
     items.set(item.productId, item);
   }
 
-  for (let page = 2; page <= pageCount; page += 1) {
+  for (let page = 2; page <= pageLimit; page += 1) {
     const html = await fetchCatalogPage(region, page);
-    for (const item of parsePsPlusCatalogHtml(html, region)) {
+    const pageItems = parsePsPlusCatalogHtml(html, region);
+    if (pageItems.length === 0) {
+      break;
+    }
+
+    for (const item of pageItems) {
       items.set(item.productId, item);
     }
   }

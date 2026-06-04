@@ -1,12 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  fetchPsPlusDeluxeCatalog,
   findBestPsPlusCatalogMatch,
   normalizePsPlusGameName,
   parsePsPlusCatalogHtml,
 } from "@/lib/playstation/ps-plus";
 
+function buildCatalogTile(index: number, productId: string, name: string) {
+  return `
+    <div data-qa="ems-sdk-grid#productTile${index}" data-qa-index="${index}">
+      <a data-telemetry-meta="{&quot;id&quot;:&quot;${productId}&quot;,&quot;titleId&quot;:&quot;TITLE${index}&quot;,&quot;name&quot;:&quot;${name}&quot;}" href="/pt-br/product/${productId}">${name}</a>
+      <span>PS5</span><span>PS4</span><span>Extra</span>
+    </div>
+  `;
+}
+
 describe("PS Plus catalog helpers", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("normalizes PlayStation Store edition and platform suffixes", () => {
     expect(normalizePsPlusGameName("Grand Theft Auto V (PS4™ e PS5™)")).toBe(
       "grand theft auto v",
@@ -39,6 +53,27 @@ describe("PS Plus catalog helpers", () => {
         tier: "deluxe",
       },
     ]);
+  });
+
+  it("keeps fetching catalog pages until the first empty page when pagination links are absent", async () => {
+    const pageHtml = new Map([
+      ["1", `<ul>${buildCatalogTile(0, "product-1", "Celeste")}</ul>`],
+      ["2", `<ul>${buildCatalogTile(0, "product-2", "Dead Cells")}</ul>`],
+      ["3", "<ul></ul>"],
+    ]);
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const page = url.split("/").pop() ?? "1";
+      return new Response(pageHtml.get(page) ?? "<ul></ul>", { status: 200 });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const catalog = await fetchPsPlusDeluxeCatalog({ maxPages: 5 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(catalog.itemCount).toBe(2);
+    expect(catalog.items.map((item) => item.name)).toEqual(["Celeste", "Dead Cells"]);
   });
 
   it("matches by stored product id before falling back to normalized name", () => {
