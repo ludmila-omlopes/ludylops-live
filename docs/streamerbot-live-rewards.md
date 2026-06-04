@@ -24,7 +24,7 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
 - O overlay consulta `GET /api/obs/subscribers/current` a cada segundo e enfileira localmente os eventos novos recebidos nos últimos 2 minutos.
 - Cada alerta toca o som uma vez, fica visível por 7 segundos por padrão e sai automaticamente. Eventos consecutivos são exibidos em sequência.
 - Parâmetros opcionais do Browser Source:
-  - `imageUrl` ou `image`: imagem exibida no alerta. Exemplo: `/obs/subscribers?imageUrl=/selfie2.png`.
+  - `imageUrl` ou `image`: imagem exibida no alerta. Sem esse parâmetro, o overlay não mostra imagem.
   - `soundUrl` ou `sound`: arquivo de áudio do alerta. Sem esse parâmetro, o overlay usa um som sintético embutido.
   - `durationMs` ou `duration`: duração em milissegundos, entre 3000 e 20000.
   - `title`: texto do selo principal. Padrão: `Nova inscrição`.

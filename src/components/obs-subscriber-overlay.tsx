@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import type { SubscriberAlertRecord } from "@/lib/types";
 
 const DEFAULT_DURATION_MS = 7000;
-const DEFAULT_IMAGE_URL = "/selfie2.png";
 
 const DEMO_ALERTS: SubscriberAlertRecord[] = [
   {
@@ -104,7 +103,7 @@ export function ObsSubscriberOverlay() {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
   const durationMs = clampDuration(readParam(searchParams, ["durationMs", "duration"]));
-  const imageUrl = readParam(searchParams, ["imageUrl", "image"]) ?? DEFAULT_IMAGE_URL;
+  const imageUrl = readParam(searchParams, ["imageUrl", "image"]);
   const soundUrl = readParam(searchParams, ["soundUrl", "sound"]);
   const title = readParam(searchParams, ["title"]) ?? "Nova inscrição";
   const subtitle = readParam(searchParams, ["subtitle"]) ?? "chegou no canal";
@@ -206,21 +205,23 @@ export function ObsSubscriberOverlay() {
       {currentAlert ? (
         <section
           key={currentAlert.eventId}
-          className="subscriber-overlay-pop relative grid w-full max-w-[980px] overflow-hidden border-[4px] border-black bg-[#fff6db] text-black shadow-[12px_12px_0_#000] sm:grid-cols-[220px_1fr]"
+          className={`subscriber-overlay-pop relative grid w-full max-w-[980px] overflow-hidden border-[4px] border-black bg-[#fff6db] text-black shadow-[12px_12px_0_#000] ${imageUrl ? "sm:grid-cols-[220px_1fr]" : ""}`}
           style={{ animationDuration: `${durationMs}ms` }}
           aria-live="polite"
         >
           <div className="absolute inset-x-0 top-0 h-5 border-b-[4px] border-black bg-[repeating-linear-gradient(90deg,#000_0_28px,#ff66b3_28px_56px,#41d1ff_56px_84px,#00beae_84px_112px,#ffe066_112px_140px)]" />
 
-          <div className="relative flex min-h-[220px] items-center justify-center border-b-[4px] border-black bg-[#41d1ff] p-5 pt-10 sm:border-b-0 sm:border-r-[4px]">
-            <div className="absolute inset-4 border-[3px] border-black bg-[#ffe066]" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt=""
-              className="relative aspect-square w-full max-w-[170px] border-[4px] border-black bg-white object-cover shadow-[8px_8px_0_#000]"
-            />
-          </div>
+          {imageUrl ? (
+            <div className="relative flex min-h-[220px] items-center justify-center border-b-[4px] border-black bg-[#41d1ff] p-5 pt-10 sm:border-b-0 sm:border-r-[4px]">
+              <div className="absolute inset-4 border-[3px] border-black bg-[#ffe066]" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageUrl}
+                alt=""
+                className="relative aspect-square w-full max-w-[170px] border-[4px] border-black bg-white object-cover shadow-[8px_8px_0_#000]"
+              />
+            </div>
+          ) : null}
 
           <div className="relative flex flex-col gap-5 px-6 pb-6 pt-10 sm:px-10 sm:pb-10 sm:pt-12">
             <div className="flex flex-wrap items-center gap-3 text-[11px] font-black uppercase tracking-[0.22em] sm:text-xs">
