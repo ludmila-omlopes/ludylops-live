@@ -7,7 +7,7 @@ import { auth } from "@/auth";
 import { AppChrome } from "@/components/app-chrome";
 import { Providers } from "@/components/providers";
 import "./globals.css";
-import { adminEmails } from "@/lib/env";
+import { adminEmails, isDemoMode } from "@/lib/env";
 import { isStreamerbotLivestreamActive } from "@/lib/streamerbot/live-status";
 import { isThemeMode, themeCookieKey, themeStorageKey } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -71,7 +71,9 @@ export default async function RootLayout({
     auth(),
     isStreamerbotLivestreamActive(),
   ]);
-  const isAdmin = Boolean(session?.user?.email && adminEmails.has(session.user.email.toLowerCase()));
+  const isAdmin = Boolean(
+    session?.user?.email && (isDemoMode || adminEmails.has(session.user.email.toLowerCase())),
+  );
 
   return (
     <html

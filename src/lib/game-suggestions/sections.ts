@@ -2,6 +2,10 @@ import type { GameSuggestionWithMeta } from "@/lib/types";
 
 function sortGameSuggestions(items: GameSuggestionWithMeta[]) {
   return [...items].sort((a, b) => {
+    if (b.boostedScore !== a.boostedScore) {
+      return b.boostedScore - a.boostedScore;
+    }
+
     if (b.totalVotes !== a.totalVotes) {
       return b.totalVotes - a.totalVotes;
     }

@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { GameSuggestForm } from "@/components/game-suggest-form";
 import { GameSuggestionList } from "@/components/game-suggestion-list";
 import { getPipetzPricing, getViewerDashboard, listGameSuggestions } from "@/lib/db/repository";
-import { adminEmails } from "@/lib/env";
+import { adminEmails, isDemoMode } from "@/lib/env";
 
 export default async function JogosPage() {
   const session = await auth();
@@ -15,7 +15,9 @@ export default async function JogosPage() {
 
   const viewerBalance = dashboard?.balance.currentBalance ?? null;
   const canInteract = Boolean(activeViewerId && dashboard?.viewer.isLinked);
-  const isAdmin = Boolean(session?.user?.email && adminEmails.has(session.user.email.toLowerCase()));
+  const isAdmin = Boolean(
+    session?.user?.email && (isDemoMode || adminEmails.has(session.user.email.toLowerCase())),
+  );
 
   return (
     <div className="flex w-full flex-col">

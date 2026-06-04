@@ -327,6 +327,14 @@ export interface PipetzPricingRecord {
   updatedBy: string | null;
 }
 
+export interface GameSuggestionBoostSettingsRecord {
+  psPlusMultiplier: number;
+  shortGameMultiplier: number;
+  adminSuggestionMultiplier: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
 export interface WheelOptionRecord {
   id: string;
   label: string;
@@ -566,10 +574,20 @@ export interface GameSuggestionBoostRecord {
   createdAt: string;
 }
 
+export type GameSuggestionBoostModifierKey = "ps_plus" | "short_game" | "admin_suggestion";
+
+export interface GameSuggestionAppliedBoostModifier {
+  key: GameSuggestionBoostModifierKey;
+  label: string;
+  multiplier: number;
+}
+
 export interface GameSuggestionWithMeta extends GameSuggestionRecord {
   suggestedBy: string;
   suggestedByYoutubeHandle: string | null;
   viewerBoostTotal: number;
+  boostedScore: number;
+  appliedBoostModifiers: GameSuggestionAppliedBoostModifier[];
 }
 
 export interface VideoSuggestionRecord {

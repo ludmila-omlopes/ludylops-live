@@ -3,11 +3,11 @@ import { z } from "zod";
 export const gameSuggestionStatusSchema = z.enum(["open", "accepted", "played", "rejected"]);
 
 export const createGameSuggestionSchema = z.object({
-  name: z.string().trim().min(2, "Digite pelo menos 2 caracteres.").max(120, "Use no maximo 120 caracteres."),
+  name: z.string().trim().min(2, "Digite pelo menos 2 caracteres.").max(120, "Use no máximo 120 caracteres."),
   description: z
     .string()
     .trim()
-    .max(500, "Use no maximo 500 caracteres.")
+    .max(500, "Use no máximo 500 caracteres.")
     .optional()
     .transform((value) => (value ? value : undefined)),
   igdbId: z.number().int().positive().optional(),
@@ -33,6 +33,12 @@ export const updateGameSuggestionCatalogSchema = z.object({
   releaseYear: z.number().int().min(1950).max(2100).nullable().optional(),
   platforms: z.array(z.string().trim().min(1).max(80)).max(4).optional(),
   genres: z.array(z.string().trim().min(1).max(80)).max(3).optional(),
+});
+
+export const updateGameSuggestionBoostSettingsSchema = z.object({
+  psPlusMultiplier: z.number().min(0).max(10),
+  shortGameMultiplier: z.number().min(0).max(10),
+  adminSuggestionMultiplier: z.number().min(0).max(10),
 });
 
 export function validateGameSuggestionDraft(input: {

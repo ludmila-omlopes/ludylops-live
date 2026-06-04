@@ -4,8 +4,39 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import type { GameSuggestionWithMeta } from "@/lib/types";
+import { Input } from "@/components/ui/input";
+import type {
+  GameSuggestionBoostSettingsRecord,
+  GameSuggestionWithMeta,
+} from "@/lib/types";
 import { formatDateTime, formatPipetz } from "@/lib/utils";
+
+type BoostSettingField = keyof Pick<
+  GameSuggestionBoostSettingsRecord,
+  "psPlusMultiplier" | "shortGameMultiplier" | "adminSuggestionMultiplier"
+>;
+
+const boostSettingFields: Array<{
+  key: BoostSettingField;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: "psPlusMultiplier",
+    label: "Disponível na PS Plus",
+    description: "Aplica quando a sugestão aparece no catálogo PlayStation Plus.",
+  },
+  {
+    key: "shortGameMultiplier",
+    label: "Menos de 10h no HLTB",
+    description: "Aplica quando o tempo de história principal do HowLongToBeat fica abaixo de 10h.",
+  },
+  {
+    key: "adminSuggestionMultiplier",
+    label: "Enviada pelo admin",
+    description: "Aplica quando o viewer que enviou a sugestão usa um e-mail de admin.",
+  },
+];
 
 const statusLabels: Record<GameSuggestionWithMeta["status"], string> = {
   open: "Aberta",
@@ -32,19 +63,89 @@ function mapSuggestionError(message: string) {
   }
 }
 
+function toBoostFormState(settings: GameSuggestionBoostSettingsRecord) {
+  return {
+    psPlusMultiplier: String(settings.psPlusMultiplier),
+    shortGameMultiplier: String(settings.shortGameMultiplier),
+    adminSuggestionMultiplier: String(settings.adminSuggestionMultiplier),
+  };
+}
+
+function formatMultiplier(value: number) {
+  return `${value.toLocaleString("pt-BR", {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}x`;
+}
+
 export function AdminGameSuggestionsPanel({
   suggestions,
+  boostSettings: initialBoostSettings,
 }: {
   suggestions: GameSuggestionWithMeta[];
+  boostSettings: GameSuggestionBoostSettingsRecord;
 }) {
   const router = useRouter();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [boostSettings, setBoostSettings] = useState(initialBoostSettings);
+  const [boostForm, setBoostForm] = useState(toBoostFormState(initialBoostSettings));
   const [isPending, startTransition] = useTransition();
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const visibleSuggestions = showAllSuggestions
     ? suggestions
     : suggestions.slice(0, INITIAL_VISIBLE_GAME_SUGGESTIONS);
   const hiddenSuggestionCount = Math.max(suggestions.length - visibleSuggestions.length, 0);
+
+  function updateBoostField(field: BoostSettingField, value: string) {
+    setBoostForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function saveBoostSettings() {
+    const payload = {
+      psPlusMultiplier: Number(boostForm.psPlusMultiplier),
+      shortGameMultiplier: Number(boostForm.shortGameMultiplier),
+      adminSuggestionMultiplier: Number(boostForm.adminSuggestionMultiplier),
+    };
+
+    if (Object.values(payload).some((value) => !Number.isFinite(value) || value < 0 || value > 10)) {
+      setFeedback("Use multiplicadores entre 0 e 10.");
+      return;
+    }
+
+    setFeedback(null);
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/admin/game-suggestions/boost-settings", {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const result = (await response.json()) as {
+          ok?: boolean;
+          error?: string;
+          data?: GameSuggestionBoostSettingsRecord;
+        };
+
+        if (!response.ok || !result.ok || !result.data) {
+          setFeedback(result.error ?? "Falha ao salvar multiplicadores.");
+          return;
+        }
+
+        setBoostSettings(result.data);
+        setBoostForm(toBoostFormState(result.data));
+        setFeedback("Multiplicadores atualizados.");
+        router.refresh();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "Falha ao salvar multiplicadores.");
+      }
+    });
+  }
 
   function submitStatus(suggestionId: string, status: GameSuggestionWithMeta["status"]) {
     setFeedback(null);
@@ -72,119 +173,193 @@ export function AdminGameSuggestionsPanel({
     <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-8 sm:py-10">
       <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-            Jogos
-          </p>
-          <h2
-            className="mt-2 text-3xl uppercase"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Fila de sugestões
-          </h2>
-        </div>
-        {feedback ? (
-          <div className="retro-label neutral-chip">
-            {feedback}
-          </div>
-        ) : null}
-      </div>
-
-        <div className="mt-6 grid gap-3">
-        {suggestions.length === 0 ? (
-          <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
-            Nenhuma sugestão cadastrada.
-          </div>
-        ) : null}
-
-        {visibleSuggestions.map((suggestion) => (
-          <article key={suggestion.id} className="card-brutal-static p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-lg font-bold">{suggestion.name}</p>
-                  <span
-                    className="badge-brutal px-2 py-1 text-[10px] text-[var(--color-ink)]"
-                    style={{ backgroundColor: statusBgMap[suggestion.status] }}
-                  >
-                    {statusLabels[suggestion.status]}
-                  </span>
-                </div>
-                {suggestion.description ? (
-                  <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
-                    {suggestion.description}
-                  </p>
-                ) : null}
-                <p className="mono mt-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-ink-soft)]">
-                  por {suggestion.suggestedBy} . {formatDateTime(suggestion.createdAt)}
-                </p>
-              </div>
-
-              <span className="retro-label neutral-chip">
-                {formatPipetz(suggestion.totalVotes)}
-              </span>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {suggestion.status !== "accepted" ? (
-                <Button
-                  type="button"
-                  onClick={() => submitStatus(suggestion.id, "accepted")}
-                  disabled={isPending}
-                  variant="success"
-                  size="sm"
-                >
-                  Aceitar
-                </Button>
-              ) : null}
-              {suggestion.status !== "played" ? (
-                <Button
-                  type="button"
-                  onClick={() => submitStatus(suggestion.id, "played")}
-                  disabled={isPending}
-                  variant="neutral"
-                  size="sm"
-                >
-                  Marcar jogado
-                </Button>
-              ) : null}
-              {suggestion.status !== "rejected" ? (
-                <Button
-                  type="button"
-                  onClick={() => submitStatus(suggestion.id, "rejected")}
-                  disabled={isPending}
-                  variant="danger"
-                  size="sm"
-                >
-                  Rejeitar
-                </Button>
-              ) : null}
-              {suggestion.status !== "open" ? (
-                <Button
-                  type="button"
-                  onClick={() => submitStatus(suggestion.id, "open")}
-                  disabled={isPending}
-                  variant="info"
-                  size="sm"
-                >
-                  Reabrir
-                </Button>
-              ) : null}
-            </div>
-          </article>
-        ))}
-        {hiddenSuggestionCount > 0 || showAllSuggestions ? (
-          <div className="card-brutal-static flex justify-center p-4">
-            <Button
-              type="button"
-              onClick={() => setShowAllSuggestions((current) => !current)}
-              variant="neutral"
-              size="sm"
+          <div>
+            <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
+              Jogos
+            </p>
+            <h2
+              className="mt-2 text-3xl uppercase"
+              style={{ fontFamily: "var(--font-display)" }}
             >
-              {showAllSuggestions ? "Ver menos" : `Ver mais ${hiddenSuggestionCount}`}
+              Fila de sugestões
+            </h2>
+          </div>
+          {feedback ? (
+            <div className="retro-label neutral-chip">
+              {feedback}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-6 panel surface-section p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
+                Boosts automáticos
+              </p>
+              <h3
+                className="mt-2 text-2xl font-bold uppercase"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Multiplicadores
+              </h3>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--color-ink-soft)]">
+                Quando mais de um critério se aplica, os multiplicadores são multiplicados entre si.
+                A pontuação efetiva é arredondada e usada para ordenar as sugestões.
+              </p>
+            </div>
+            {boostSettings.updatedAt ? (
+              <span className="text-sm font-bold text-[var(--color-ink-soft)]">
+                Atualizado em {formatDateTime(boostSettings.updatedAt)}
+                {boostSettings.updatedBy ? ` por ${boostSettings.updatedBy}` : ""}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-3">
+            {boostSettingFields.map((field) => (
+              <label key={field.key} className="card-brutal-static surface-card grid gap-3 p-4">
+                <div>
+                  <span className="text-sm font-black uppercase tracking-[0.14em]">
+                    {field.label}
+                  </span>
+                  <p className="mt-1 text-sm leading-6 text-[var(--color-ink-soft)]">
+                    {field.description}
+                  </p>
+                </div>
+                <span className="retro-label accent-chip w-fit">
+                  atual {formatMultiplier(boostSettings[field.key])}
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={10}
+                  step={0.05}
+                  value={boostForm[field.key]}
+                  onChange={(event) => updateBoostField(field.key, event.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+
+          <div className="mt-5">
+            <Button type="button" onClick={saveBoostSettings} disabled={isPending} variant="success" size="sm">
+              {isPending ? "Salvando..." : "Salvar multiplicadores"}
             </Button>
           </div>
-        ) : null}
+        </div>
+
+        <div className="mt-6 grid gap-3">
+          {suggestions.length === 0 ? (
+            <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
+              Nenhuma sugestão cadastrada.
+            </div>
+          ) : null}
+
+          {visibleSuggestions.map((suggestion) => (
+            <article key={suggestion.id} className="card-brutal-static p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-lg font-bold">{suggestion.name}</p>
+                    <span
+                      className="badge-brutal px-2 py-1 text-[10px] text-[var(--color-ink)]"
+                      style={{ backgroundColor: statusBgMap[suggestion.status] }}
+                    >
+                      {statusLabels[suggestion.status]}
+                    </span>
+                  </div>
+                  {suggestion.description ? (
+                    <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
+                      {suggestion.description}
+                    </p>
+                  ) : null}
+                  <p className="mono mt-2 text-[10px] uppercase tracking-[0.18em] text-[var(--color-ink-soft)]">
+                    por {suggestion.suggestedBy} . {formatDateTime(suggestion.createdAt)}
+                  </p>
+                  {suggestion.appliedBoostModifiers.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {suggestion.appliedBoostModifiers.map((modifier) => (
+                        <span key={modifier.key} className="retro-label neutral-chip">
+                          {modifier.label} {formatMultiplier(modifier.multiplier)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid justify-items-end gap-2">
+                  <span className="retro-label accent-chip">
+                    prioridade {formatPipetz(suggestion.boostedScore)}
+                  </span>
+                  {suggestion.boostedScore !== suggestion.totalVotes ? (
+                    <span className="mono text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--color-ink-soft)]">
+                      votos reais {formatPipetz(suggestion.totalVotes)}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {suggestion.status !== "accepted" ? (
+                  <Button
+                    type="button"
+                    onClick={() => submitStatus(suggestion.id, "accepted")}
+                    disabled={isPending}
+                    variant="success"
+                    size="sm"
+                  >
+                    Aceitar
+                  </Button>
+                ) : null}
+                {suggestion.status !== "played" ? (
+                  <Button
+                    type="button"
+                    onClick={() => submitStatus(suggestion.id, "played")}
+                    disabled={isPending}
+                    variant="neutral"
+                    size="sm"
+                  >
+                    Marcar jogado
+                  </Button>
+                ) : null}
+                {suggestion.status !== "rejected" ? (
+                  <Button
+                    type="button"
+                    onClick={() => submitStatus(suggestion.id, "rejected")}
+                    disabled={isPending}
+                    variant="danger"
+                    size="sm"
+                  >
+                    Rejeitar
+                  </Button>
+                ) : null}
+                {suggestion.status !== "open" ? (
+                  <Button
+                    type="button"
+                    onClick={() => submitStatus(suggestion.id, "open")}
+                    disabled={isPending}
+                    variant="info"
+                    size="sm"
+                  >
+                    Reabrir
+                  </Button>
+                ) : null}
+              </div>
+            </article>
+          ))}
+          {hiddenSuggestionCount > 0 || showAllSuggestions ? (
+            <div className="card-brutal-static flex justify-center p-4">
+              <Button
+                type="button"
+                onClick={() => setShowAllSuggestions((current) => !current)}
+                variant="neutral"
+                size="sm"
+              >
+                {showAllSuggestions ? "Ver menos" : `Ver mais ${hiddenSuggestionCount}`}
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

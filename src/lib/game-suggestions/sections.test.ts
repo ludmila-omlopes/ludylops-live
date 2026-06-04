@@ -7,6 +7,7 @@ function suggestion(input: {
   id: string;
   status: GameSuggestionWithMeta["status"];
   totalVotes: number;
+  boostedScore?: number;
   createdAt: string;
 }): GameSuggestionWithMeta {
   return {
@@ -38,6 +39,8 @@ function suggestion(input: {
     suggestedBy: "Ludy",
     suggestedByYoutubeHandle: null,
     viewerBoostTotal: 0,
+    boostedScore: input.boostedScore ?? input.totalVotes,
+    appliedBoostModifiers: [],
   };
 }
 
@@ -65,5 +68,29 @@ describe("getVisibleGameSuggestionSections", () => {
 
     expect(sections.recommendedSuggestions.map((entry) => entry.id)).toEqual(["open-newer", "open-older"]);
     expect(sections.playedSuggestions.map((entry) => entry.id)).toEqual(["played-higher", "played-newer"]);
+  });
+
+  it("orders by effective boosted score before raw votes", () => {
+    const sections = getVisibleGameSuggestionSections([
+      suggestion({
+        id: "raw-higher",
+        status: "open",
+        totalVotes: 100,
+        boostedScore: 100,
+        createdAt: "2026-01-01T10:00:00.000Z",
+      }),
+      suggestion({
+        id: "boosted-priority",
+        status: "open",
+        totalVotes: 80,
+        boostedScore: 120,
+        createdAt: "2026-01-02T10:00:00.000Z",
+      }),
+    ]);
+
+    expect(sections.recommendedSuggestions.map((entry) => entry.id)).toEqual([
+      "boosted-priority",
+      "raw-higher",
+    ]);
   });
 });
