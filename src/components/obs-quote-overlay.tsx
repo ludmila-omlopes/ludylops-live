@@ -19,6 +19,13 @@ type QuoteOverlayPayload = {
   expiresAt: string;
 };
 
+type LiveStatusPayload = {
+  isLive: boolean;
+};
+
+const QUOTE_POLL_INTERVAL_MS = 200;
+const LIVE_STATUS_POLL_INTERVAL_MS = 5_000;
+
 const DEMO_OVERLAY: QuoteOverlayPayload = {
   slot: "obs_main",
   overlayId: "demo-overlay",
@@ -83,6 +90,7 @@ export function ObsQuoteOverlay() {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
   const [liveOverlay, setLiveOverlay] = useState<QuoteOverlayPayload | null>(null);
+  const [isLive, setIsLive] = useState(false);
   const lastPlayedOverlayId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -91,6 +99,72 @@ export function ObsQuoteOverlay() {
     }
 
     let cancelled = false;
+    let timeout: number | undefined;
+
+    async function loadLiveStatus() {
+      try {
+        const response = await fetch("/api/obs/live-status", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          if (!cancelled) {
+            setIsLive(false);
+            setLiveOverlay(null);
+          }
+          return;
+        }
+
+        const payload = (await response.json()) as {
+          ok: boolean;
+          data: LiveStatusPayload;
+        };
+
+        if (!cancelled) {
+          setIsLive(Boolean(payload.data?.isLive));
+          if (!payload.data?.isLive) {
+            setLiveOverlay(null);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setIsLive(false);
+          setLiveOverlay(null);
+        }
+      }
+    }
+
+    function scheduleLiveStatus() {
+      timeout = window.setTimeout(() => {
+        void loadLiveStatus().finally(() => {
+          if (!cancelled) {
+            scheduleLiveStatus();
+          }
+        });
+      }, LIVE_STATUS_POLL_INTERVAL_MS);
+    }
+
+    void loadLiveStatus().finally(() => {
+      if (!cancelled) {
+        scheduleLiveStatus();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      if (timeout) {
+        window.clearTimeout(timeout);
+      }
+    };
+  }, [isDemo]);
+
+  useEffect(() => {
+    if (isDemo || !isLive) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let timeout: number | undefined;
 
     async function loadOverlay() {
       try {
@@ -117,16 +191,29 @@ export function ObsQuoteOverlay() {
       }
     }
 
-    void loadOverlay();
-    const interval = window.setInterval(() => {
-      void loadOverlay();
-    }, 1000);
+    function scheduleOverlay() {
+      timeout = window.setTimeout(() => {
+        void loadOverlay().finally(() => {
+          if (!cancelled) {
+            scheduleOverlay();
+          }
+        });
+      }, QUOTE_POLL_INTERVAL_MS);
+    }
+
+    void loadOverlay().finally(() => {
+      if (!cancelled) {
+        scheduleOverlay();
+      }
+    });
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      if (timeout) {
+        window.clearTimeout(timeout);
+      }
     };
-  }, [isDemo]);
+  }, [isDemo, isLive]);
 
   const overlay = isDemo ? DEMO_OVERLAY : liveOverlay;
 
