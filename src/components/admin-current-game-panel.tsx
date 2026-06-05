@@ -215,10 +215,7 @@ export function AdminCurrentGamePanel({
 
   return (
     <div className="panel surface-section p-6">
-      <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-        Landing page
-      </p>
-      <h2 className="mt-2 text-2xl font-bold uppercase" style={{ fontFamily: "var(--font-display)" }}>
+      <h2 className="text-2xl font-bold uppercase" style={{ fontFamily: "var(--font-display)" }}>
         Jogo atual da live
       </h2>
       <p className="mt-3 text-sm leading-7 text-[var(--color-ink-soft)]">

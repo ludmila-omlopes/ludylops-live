@@ -64,6 +64,8 @@ const statusTone: Record<BetStatus, string> = {
   cancelled: "bg-[var(--color-rose)]",
 };
 
+const INITIAL_VISIBLE_BETS = 5;
+
 function lifecycleRows(bet: BetWithOptionsRecord) {
   return [
     { label: "Criada", value: bet.createdAt },
@@ -105,6 +107,7 @@ export function AdminBetsPanel({
   const [optionsText, setOptionsText] = useState("Sim\nNão");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [resolveSelections, setResolveSelections] = useState<Record<string, string>>({});
+  const [showAllBets, setShowAllBets] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   async function runAction(url: string, body?: Record<string, unknown>) {
@@ -200,6 +203,8 @@ export function AdminBetsPanel({
   const unresolvedPool = bets
     .filter((bet) => bet.status === "open" || bet.status === "locked")
     .reduce((sum, bet) => sum + bet.totalPool, 0);
+  const visibleBets = showAllBets ? bets : bets.slice(0, INITIAL_VISIBLE_BETS);
+  const hiddenBetCount = Math.max(bets.length - visibleBets.length, 0);
 
   const content = (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
@@ -286,7 +291,7 @@ export function AdminBetsPanel({
           </div>
         ) : null}
 
-        {bets.map((bet) => {
+        {visibleBets.map((bet) => {
           const canLock = evaluateBetLifecycleAction({ action: "lock", status: bet.status }).canTransition;
           const canResolve = evaluateBetLifecycleAction({
             action: "resolve",
@@ -468,6 +473,18 @@ export function AdminBetsPanel({
             </article>
           );
         })}
+        {hiddenBetCount > 0 || showAllBets ? (
+          <div className="card-brutal-static flex justify-center p-4">
+            <Button
+              type="button"
+              onClick={() => setShowAllBets((current) => !current)}
+              variant="neutral"
+              size="sm"
+            >
+              {showAllBets ? "Ver menos" : `Ver mais ${hiddenBetCount}`}
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -477,11 +494,8 @@ export function AdminBetsPanel({
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-              Apostas
-            </p>
             <h2
-              className="mt-2 text-3xl uppercase"
+              className="text-3xl uppercase"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Auditoria da live
@@ -499,11 +513,8 @@ export function AdminBetsPanel({
       <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-accent-ink-soft)]">
-              Apostas
-            </p>
             <h2
-              className="mt-2 text-3xl uppercase"
+              className="text-3xl uppercase"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Auditoria da live

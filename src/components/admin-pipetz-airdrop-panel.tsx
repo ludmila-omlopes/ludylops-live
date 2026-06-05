@@ -128,10 +128,7 @@ export function AdminPipetzAirdropPanel({
     <section className="panel surface-section p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-            Airdrop
-          </p>
-          <h2 className="mt-2 text-3xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
+          <h2 className="text-3xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
             Dar pipetz
           </h2>
         </div>

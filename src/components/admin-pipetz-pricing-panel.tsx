@@ -17,18 +17,18 @@ const pricingFields: Array<{
 }> = [
   {
     key: "gameSuggestionCost",
-    label: "Sugestao de jogo",
-    description: "Valor cobrado quando alguem indica um novo jogo.",
+    label: "Sugestão de jogo",
+    description: "Valor cobrado quando alguém indica um novo jogo.",
   },
   {
     key: "videoSuggestionCost",
-    label: "Sugestao de video",
-    description: "Valor cobrado para enviar um novo video do YouTube.",
+    label: "Sugestão de vídeo",
+    description: "Valor cobrado para enviar um novo vídeo do YouTube.",
   },
   {
     key: "quoteOverlayCost",
     label: "Quote no OBS",
-    description: "Valor cobrado por !quoteobs e pelo botao publico de OBS.",
+    description: "Valor cobrado por !quoteobs e pelo botão público de OBS.",
   },
 ];
 
@@ -87,16 +87,16 @@ export function AdminPipetzPricingPanel({
         };
 
         if (!response.ok || !result.ok || !result.data) {
-          setFeedback(result.error ?? "Falha ao salvar precos.");
+          setFeedback(result.error ?? "Falha ao salvar preços.");
           return;
         }
 
         setPricing(result.data);
         setForm(toFormState(result.data));
-        setFeedback("Precos atualizados.");
+        setFeedback("Preços atualizados.");
         router.refresh();
       } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "Falha ao salvar precos.");
+        setFeedback(error instanceof Error ? error.message : "Falha ao salvar preços.");
       }
     });
   }
@@ -105,14 +105,11 @@ export function AdminPipetzPricingPanel({
     <div className="panel surface-section p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-            Precos Pipetz
-          </p>
           <h2
-            className="mt-2 text-2xl font-bold uppercase"
+            className="text-2xl font-bold uppercase"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Acoes pagas
+            Ações pagas
           </h2>
         </div>
         {feedback ? <div className="retro-label neutral-chip">{feedback}</div> : null}
@@ -147,7 +144,7 @@ export function AdminPipetzPricingPanel({
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Button type="button" onClick={savePricing} disabled={isPending} variant="success" size="sm">
-          {isPending ? "Salvando..." : "Salvar precos"}
+          {isPending ? "Salvando..." : "Salvar preços"}
         </Button>
         {pricing.updatedAt ? (
           <span className="text-sm font-bold text-[var(--color-ink-soft)]">

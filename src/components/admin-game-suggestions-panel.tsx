@@ -81,9 +81,11 @@ function formatMultiplier(value: number) {
 export function AdminGameSuggestionsPanel({
   suggestions,
   boostSettings: initialBoostSettings,
+  embedded = false,
 }: {
   suggestions: GameSuggestionWithMeta[];
   boostSettings: GameSuggestionBoostSettingsRecord;
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -169,16 +171,12 @@ export function AdminGameSuggestionsPanel({
     });
   }
 
-  return (
-    <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-8 sm:py-10">
-      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
+  const content = (
+    <>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-              Jogos
-            </p>
             <h2
-              className="mt-2 text-3xl uppercase"
+              className="text-3xl uppercase"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Fila de sugestões
@@ -361,6 +359,17 @@ export function AdminGameSuggestionsPanel({
             </div>
           ) : null}
         </div>
+    </>
+  );
+
+  if (embedded) {
+    return <section className="space-y-6">{content}</section>;
+  }
+
+  return (
+    <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-8 sm:py-10">
+      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
+        {content}
       </div>
     </section>
   );

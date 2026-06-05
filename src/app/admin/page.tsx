@@ -62,16 +62,18 @@ export default async function AdminPage() {
     getPipetzPricing(),
     getWheelConfig(),
   ]);
+  const openBetCount = bets.filter((bet) => bet.status === "open").length;
+  const queuedRedemptionCount = redemptions.filter((entry) => entry.status === "queued").length;
+  const activeWheelOptionCount = wheelConfig.options.filter(
+    (option) => option.isActive && option.label.trim(),
+  ).length;
 
   return (
     <div className="flex w-full flex-col">
       <section className="landing-plane surface-hero py-8 sm:py-10">
         <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
-          <p className="mono text-xs font-bold uppercase tracking-[0.32em] text-[var(--color-ink-soft)]">
-            Painel operacional
-          </p>
           <h1
-            className="mt-3 text-4xl uppercase sm:text-6xl"
+            className="text-4xl uppercase sm:text-6xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
             Admin Pipetz
@@ -80,64 +82,141 @@ export default async function AdminPage() {
       </section>
 
       <AdminDashboardTabs
-        tabs={[
+        sections={[
+          {
+            id: "live",
+            title: "Live e OBS",
+            items: [
+              {
+                id: "status-live",
+                label: "Status da live",
+                description: "Bridge, modo manual e estado efetivo.",
+                badge: liveStatus.isLive ? "ao vivo" : "offline",
+                content: <LiveStatusPanel bridge={bridge} initialStatus={liveStatus} />,
+              },
+              {
+                id: "overlays",
+                label: "Overlays",
+                description: "Browser sources, fila e links do OBS.",
+                badge: `${obsOverlayStatus.pendingCount}`,
+                content: <AdminObsOverlaysPanel initialStatus={obsOverlayStatus} embedded />,
+              },
+              {
+                id: "roleta",
+                label: "Roleta",
+                description: "Prêmios, pesos e overlay da roleta.",
+                badge: `${activeWheelOptionCount}`,
+                content: <AdminWheelPanel initialConfig={wheelConfig} />,
+              },
+              {
+                id: "jogo-atual",
+                label: "Jogo atual",
+                description: "Capa e metadados da landing page.",
+                badge: currentGame ? "ativo" : undefined,
+                content: <AdminCurrentGamePanel initialGame={currentGame} />,
+              },
+              {
+                id: "metas-likes",
+                label: "Metas de likes",
+                description: "Recompensas automáticas da live.",
+                badge: `${likeGoals.length}`,
+                content: <AdminLiveLikeGoalsPanel initialGoals={likeGoals} />,
+              },
+            ],
+          },
           {
             id: "apostas",
-            label: "Apostas",
-            description: "Ciclo de vida, travas e pagamentos.",
-            badge: `${bets.length}`,
-            content: <AdminBetsPanel bets={bets} embedded />,
+            title: "Apostas",
+            items: [
+              {
+                id: "apostas-live",
+                label: "Apostas da live",
+                description: "Ciclo de vida, travas e pagamentos.",
+                badge: `${openBetCount}/${bets.length}`,
+                content: <AdminBetsPanel bets={bets} embedded />,
+              },
+            ],
           },
           {
             id: "comunidade",
-            label: "Comunidade",
-            description: "Vínculos, indicações e recomendações.",
-            badge: `${suggestions.length + videoSuggestions.length + recommendations.length}`,
-            content: (
-              <div className="space-y-6">
-                <AdminViewerLinksPanel entries={viewers} />
-                <AdminGameSuggestionsPanel suggestions={suggestions} boostSettings={gameBoostSettings} />
-                <AdminVideoSuggestionsPanel suggestions={videoSuggestions} />
-                <AdminRecommendationsPanel recommendations={recommendations} />
-              </div>
-            ),
-          },
-          {
-            id: "operacao",
-            label: "Operação",
-            description: "Live, overlays, mortes e preços.",
-            badge: liveStatus.isLive ? "ao vivo" : "offline",
-            content: (
-              <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-                <div className="space-y-6">
-                  <LiveStatusPanel bridge={bridge} initialStatus={liveStatus} />
-                  <AdminWheelPanel initialConfig={wheelConfig} />
-                  <AdminCurrentGamePanel initialGame={currentGame} />
-                  <AdminPipetzPricingPanel initialPricing={pricing} />
-                  <AdminLiveLikeGoalsPanel initialGoals={likeGoals} />
-                </div>
-                <AdminObsOverlaysPanel initialStatus={obsOverlayStatus} />
-              </div>
-            ),
+            title: "Comunidade",
+            items: [
+              {
+                id: "vinculos",
+                label: "Vínculos",
+                description: "Contas Google e canais do YouTube.",
+                badge: `${viewers.length}`,
+                content: <AdminViewerLinksPanel entries={viewers} embedded />,
+              },
+              {
+                id: "sugestoes-jogos",
+                label: "Sugestões de jogos",
+                description: "Fila, prioridade e multiplicadores.",
+                badge: `${suggestions.length}`,
+                content: (
+                  <AdminGameSuggestionsPanel
+                    suggestions={suggestions}
+                    boostSettings={gameBoostSettings}
+                    embedded
+                  />
+                ),
+              },
+              {
+                id: "videos",
+                label: "Vídeos",
+                description: "Sugestões para reação em live.",
+                badge: `${videoSuggestions.length}`,
+                content: <AdminVideoSuggestionsPanel suggestions={videoSuggestions} embedded />,
+              },
+              {
+                id: "produtos",
+                label: "Produtos",
+                description: "Recomendações públicas e links.",
+                badge: `${recommendations.length}`,
+                content: <AdminRecommendationsPanel recommendations={recommendations} />,
+              },
+            ],
           },
           {
             id: "pipetz",
-            label: "Pipetz",
-            description: "Fila, ranking, airdrop e catálogo.",
-            badge: `${redemptions.length}`,
-            content: (
-              <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-                <div className="space-y-6">
+            title: "Pipetz",
+            items: [
+              {
+                id: "precos",
+                label: "Preços",
+                description: "Custos de ações pagas.",
+                content: <AdminPipetzPricingPanel initialPricing={pricing} />,
+              },
+              {
+                id: "airdrop",
+                label: "Airdrop",
+                description: "Distribuição manual de pipetz.",
+                content: <AdminPipetzAirdropPanel viewers={viewers} />,
+              },
+              {
+                id: "fila-resgates",
+                label: "Fila de resgates",
+                description: "Últimos resgates e status.",
+                badge: `${queuedRedemptionCount}/${redemptions.length}`,
+                content: (
                   <div className="panel surface-section p-6">
-                    <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-                      Fila recente
-                    </p>
+                    <h2
+                      className="text-3xl uppercase"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      Fila de resgates
+                    </h2>
                     <div className="mt-6 grid gap-3">
-                      {redemptions.slice(0, 6).map((entry) => {
+                      {redemptions.length === 0 ? (
+                        <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
+                          Nenhum resgate recente.
+                        </div>
+                      ) : null}
+                      {redemptions.slice(0, 10).map((entry) => {
                         const statusBg = statusColorMap[entry.status] ?? "var(--color-paper)";
                         return (
                           <div key={entry.id} className="card-brutal-static p-4">
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
                               <span
                                 className="badge-brutal px-2 py-1 text-[10px] text-[var(--color-ink)]"
                                 style={{ backgroundColor: statusBg }}
@@ -156,21 +235,35 @@ export default async function AdminPage() {
                       })}
                     </div>
                   </div>
+                ),
+              },
+              {
+                id: "ranking",
+                label: "Ranking",
+                description: "Top viewers por saldo.",
+                badge: `${leaderboard.length}`,
+                content: (
                   <div className="panel surface-section p-6">
-                    <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
+                    <h2
+                      className="text-3xl uppercase"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
                       Ranking de pipetz
-                    </p>
+                    </h2>
                     <div className="mt-6">
-                      <LeaderboardTable entries={leaderboard.slice(0, 10)} />
+                      <LeaderboardTable entries={leaderboard.slice(0, 20)} />
                     </div>
                   </div>
-                </div>
-                <div className="space-y-6">
-                  <AdminPipetzAirdropPanel viewers={viewers} />
-                  <RedemptionGrid items={catalog} expanded staticCards />
-                </div>
-              </div>
-            ),
+                ),
+              },
+              {
+                id: "catalogo",
+                label: "Catálogo",
+                description: "Resgates disponíveis na loja.",
+                badge: `${catalog.length}`,
+                content: <RedemptionGrid items={catalog} expanded staticCards />,
+              },
+            ],
           },
         ]}
       />
