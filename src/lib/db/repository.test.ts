@@ -2164,6 +2164,21 @@ describe("game suggestions", () => {
     expect(suggestions[0]?.id).toBe("gs-ps-plus-demo");
   });
 
+  it("exposes persisted Steam price metadata for game suggestions", async () => {
+    const suggestions = await listGameSuggestions();
+    const celeste = suggestions.find((entry) => entry.id === "gs-2");
+
+    expect(celeste?.steamStore).toMatchObject({
+      appId: 504230,
+      currency: "BRL",
+      initialPriceCents: 3699,
+      finalPriceCents: 924,
+      discountPercent: 75,
+      isFree: false,
+      matchConfidence: "exact_name",
+    });
+  });
+
   it("blocks boost when the viewer has insufficient balance", async () => {
     await expect(
       boostGameSuggestion({

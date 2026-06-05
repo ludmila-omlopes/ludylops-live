@@ -550,10 +550,25 @@ export interface GameSuggestionRecord {
   psPlusProductUrl: string | null;
   psPlusCheckedAt: string | null;
   psPlusLastSeenAt: string | null;
+  steamStore: GameSteamStoreRecord | null;
   status: GameSuggestionStatus;
   totalVotes: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface GameSteamStoreRecord {
+  appId: number;
+  name: string;
+  storeUrl: string;
+  currency: string | null;
+  initialPriceCents: number | null;
+  finalPriceCents: number | null;
+  discountPercent: number | null;
+  isFree: boolean;
+  matchConfidence: "app_id" | "exact_name" | string;
+  checkedAt: string;
+  lastPriceAt: string | null;
 }
 
 export interface GameHowLongToBeatRecord {

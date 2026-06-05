@@ -64,7 +64,7 @@ import {
   demoVideoSuggestions,
   demoViewers,
 } from "@/lib/demo-data";
-import { adminEmails, isDemoMode } from "@/lib/env";
+import { adminEmails, env, isDemoMode } from "@/lib/env";
 import { CREATOR_SUGGESTION_CREATION_COST } from "@/lib/creator-suggestions/constants";
 import { GAME_SUGGESTION_CREATION_COST } from "@/lib/game-suggestions/constants";
 import { VIDEO_SUGGESTION_CREATION_COST } from "@/lib/video-suggestions/constants";
@@ -89,6 +89,12 @@ import {
   type PsPlusCatalogItem,
 } from "@/lib/playstation/ps-plus";
 import {
+  resolveSteamGamePrice,
+  STEAM_DEFAULT_COUNTRY_CODE,
+  STEAM_DEFAULT_LANGUAGE,
+  type SteamPriceResolution,
+} from "@/lib/steam/store";
+import {
   AdminViewerChannelAttachResult,
   AdminViewerDirectoryRecord,
   AdminViewerLinkResult,
@@ -105,6 +111,7 @@ import {
   GameSuggestionAppliedBoostModifier,
   GameSuggestionBoostRecord,
   GameSuggestionBoostSettingsRecord,
+  GameSteamStoreRecord,
   GameSuggestionRecord,
   GameSuggestionWithMeta,
   GoogleAccountRecord,
@@ -270,6 +277,8 @@ const GAME_SUGGESTION_BOOST_SETTING_KEYS = {
 } as const;
 const GAME_SUGGESTION_BOOST_MULTIPLIER_STORAGE_FACTOR = 100;
 const PS_PLUS_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const STEAM_PRICE_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const STEAM_PRICE_REFRESH_BATCH_LIMIT = 20;
 
 const DEFAULT_PIPETZ_PRICING: PipetzPricingRecord = {
   gameSuggestionCost: GAME_SUGGESTION_CREATION_COST,
@@ -1977,6 +1986,7 @@ function serializeGameSuggestion(row: typeof gameSuggestions.$inferSelect): Game
   const platforms = Array.isArray(row.platforms) ? row.platforms : [];
   const genres = Array.isArray(row.genres) ? row.genres : [];
   const hltbFetchedAt = row.hltbFetchedAt ?? null;
+  const steamStore = serializeSteamStore(row);
 
   return {
     id: row.id,
@@ -2010,10 +2020,31 @@ function serializeGameSuggestion(row: typeof gameSuggestions.$inferSelect): Game
     psPlusProductUrl: row.psPlusProductUrl ?? null,
     psPlusCheckedAt: row.psPlusCheckedAt?.toISOString() ?? null,
     psPlusLastSeenAt: row.psPlusLastSeenAt?.toISOString() ?? null,
+    steamStore,
     status: row.status as GameSuggestionRecord["status"],
     totalVotes: row.totalVotes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function serializeSteamStore(row: typeof gameSuggestions.$inferSelect): GameSteamStoreRecord | null {
+  if (!row.steamAppId || !row.steamName || !row.steamStoreUrl || !row.steamCheckedAt) {
+    return null;
+  }
+
+  return {
+    appId: row.steamAppId,
+    name: row.steamName,
+    storeUrl: row.steamStoreUrl,
+    currency: row.steamCurrency ?? null,
+    initialPriceCents: row.steamInitialPrice ?? null,
+    finalPriceCents: row.steamFinalPrice ?? null,
+    discountPercent: row.steamDiscountPercent ?? null,
+    isFree: row.steamIsFree,
+    matchConfidence: row.steamMatchConfidence ?? "exact_name",
+    checkedAt: row.steamCheckedAt.toISOString(),
+    lastPriceAt: row.steamLastPriceAt?.toISOString() ?? null,
   };
 }
 
@@ -3346,6 +3377,97 @@ async function refreshStaleHowLongToBeatRows(
   return rows.map((row) => refreshedRows.get(row.id) ?? row);
 }
 
+function getSteamStoreCountryCode() {
+  return env.STEAM_STORE_COUNTRY_CODE ?? STEAM_DEFAULT_COUNTRY_CODE;
+}
+
+function getSteamStoreLanguage() {
+  return env.STEAM_STORE_LANGUAGE ?? STEAM_DEFAULT_LANGUAGE;
+}
+
+function buildSteamPriceColumns(resolution: SteamPriceResolution) {
+  const match = resolution.match;
+  if (!match) {
+    return {
+      steamAppId: null,
+      steamName: null,
+      steamStoreUrl: null,
+      steamCurrency: null,
+      steamInitialPrice: null,
+      steamFinalPrice: null,
+      steamDiscountPercent: null,
+      steamIsFree: false,
+      steamMatchConfidence: null,
+      steamCheckedAt: resolution.checkedAt,
+      steamLastPriceAt: null,
+      updatedAt: resolution.checkedAt,
+    };
+  }
+
+  const hasPrice = match.isFree || typeof match.finalPriceCents === "number";
+
+  return {
+    steamAppId: match.appId,
+    steamName: match.name,
+    steamStoreUrl: match.storeUrl,
+    steamCurrency: match.currency,
+    steamInitialPrice: match.initialPriceCents,
+    steamFinalPrice: match.finalPriceCents,
+    steamDiscountPercent: match.discountPercent,
+    steamIsFree: match.isFree,
+    steamMatchConfidence: match.matchConfidence,
+    steamCheckedAt: resolution.checkedAt,
+    steamLastPriceAt: hasPrice ? resolution.checkedAt : null,
+    updatedAt: resolution.checkedAt,
+  };
+}
+
+function getSteamSearchCandidate(row: typeof gameSuggestions.$inferSelect) {
+  return {
+    name: row.name,
+    canonicalName: row.canonicalName,
+    linkUrl: row.linkUrl,
+    steamAppId: row.steamAppId,
+    steamStoreUrl: row.steamStoreUrl,
+  };
+}
+
+function shouldRefreshSteamPrice(row: typeof gameSuggestions.$inferSelect, now = Date.now()) {
+  if (!row.steamCheckedAt) {
+    return true;
+  }
+
+  return now - row.steamCheckedAt.getTime() > STEAM_PRICE_SYNC_INTERVAL_MS;
+}
+
+async function refreshGameSuggestionSteamPrice(suggestionId: string) {
+  const db = getDb();
+  if (isDemoMode || !db) {
+    return null;
+  }
+
+  const [suggestion] = await db
+    .select()
+    .from(gameSuggestions)
+    .where(eq(gameSuggestions.id, suggestionId))
+    .limit(1);
+  if (!suggestion) {
+    return null;
+  }
+
+  const resolution = await resolveSteamGamePrice(getSteamSearchCandidate(suggestion), {
+    countryCode: getSteamStoreCountryCode(),
+    language: getSteamStoreLanguage(),
+  });
+
+  await db
+    .update(gameSuggestions)
+    .set(buildSteamPriceColumns(resolution))
+    .where(eq(gameSuggestions.id, suggestionId));
+
+  return (await listGameSuggestions(suggestion.viewerId)).find((entry) => entry.id === suggestionId) ?? null;
+}
+
 function buildPsPlusCatalogItemId(region: string, productId: string) {
   return `${region}:${productId}`.slice(0, 160);
 }
@@ -3611,6 +3733,81 @@ async function refreshGameSuggestionPsPlusAvailability(suggestionId: string) {
 
 export async function syncPsPlusDeluxeCatalog({ force = false }: { force?: boolean } = {}) {
   return ensureFreshPsPlusCatalog({ force });
+}
+
+export async function syncSteamGameSuggestionPrices({
+  force = false,
+  limit = STEAM_PRICE_REFRESH_BATCH_LIMIT,
+}: {
+  force?: boolean;
+  limit?: number;
+} = {}) {
+  const db = getDb();
+  if (isDemoMode || !db) {
+    return {
+      mode: "demo" as const,
+      skipped: true,
+      reason: "demo_mode",
+      inspectedCount: 0,
+      updatedCount: 0,
+      unresolvedCount: 0,
+      failedCount: 0,
+    };
+  }
+
+  const rows = await db
+    .select()
+    .from(gameSuggestions)
+    .where(inArray(gameSuggestions.status, ["open", "accepted", "played"]));
+  const now = Date.now();
+  const batchLimit = Number.isInteger(limit) && limit > 0 ? limit : STEAM_PRICE_REFRESH_BATCH_LIMIT;
+  const staleRows = rows
+    .filter((row) => force || shouldRefreshSteamPrice(row, now))
+    .sort((left, right) => {
+      const leftCheckedAt = left.steamCheckedAt?.getTime() ?? 0;
+      const rightCheckedAt = right.steamCheckedAt?.getTime() ?? 0;
+      return leftCheckedAt - rightCheckedAt;
+    })
+    .slice(0, batchLimit);
+
+  let updatedCount = 0;
+  let unresolvedCount = 0;
+  let failedCount = 0;
+
+  for (const row of staleRows) {
+    try {
+      const resolution = await resolveSteamGamePrice(getSteamSearchCandidate(row), {
+        countryCode: getSteamStoreCountryCode(),
+        language: getSteamStoreLanguage(),
+      });
+
+      await db
+        .update(gameSuggestions)
+        .set(buildSteamPriceColumns(resolution))
+        .where(eq(gameSuggestions.id, row.id));
+
+      if (resolution.match) {
+        updatedCount += 1;
+      } else {
+        unresolvedCount += 1;
+      }
+    } catch (error) {
+      failedCount += 1;
+      console.warn("[steam] Failed to refresh game suggestion price.", {
+        suggestionId: row.id,
+        error,
+      });
+    }
+  }
+
+  return {
+    mode: "database" as const,
+    skipped: staleRows.length === 0,
+    inspectedCount: staleRows.length,
+    updatedCount,
+    unresolvedCount,
+    failedCount,
+  };
 }
 
 function listDemoVideoSuggestions(viewerId?: string | null) {
@@ -5948,6 +6145,7 @@ export async function createGameSuggestion(input: {
       psPlusProductUrl: null,
       psPlusCheckedAt: null,
       psPlusLastSeenAt: null,
+      steamStore: null,
       status: "open",
       totalVotes: 0,
       createdAt,
@@ -6048,15 +6246,27 @@ export async function createGameSuggestion(input: {
     throw new Error("Falha ao criar sugestão.");
   }
 
+  let result = created;
+
   try {
-    return (await refreshGameSuggestionPsPlusAvailability(suggestionId)) ?? created;
+    result = (await refreshGameSuggestionPsPlusAvailability(suggestionId)) ?? result;
   } catch (error) {
     console.warn("[ps-plus] Failed to check new game suggestion availability.", {
       suggestionId,
       error,
     });
-    return created;
   }
+
+  try {
+    result = (await refreshGameSuggestionSteamPrice(suggestionId)) ?? result;
+  } catch (error) {
+    console.warn("[steam] Failed to check new game suggestion price.", {
+      suggestionId,
+      error,
+    });
+  }
+
+  return result;
 }
 
 export async function boostGameSuggestion(input: {
@@ -6271,6 +6481,7 @@ export async function updateGameSuggestionCatalog(input: {
     suggestion.platforms = platforms;
     suggestion.genres = genres;
     suggestion.howLongToBeat = null;
+    suggestion.steamStore = null;
     suggestion.updatedAt = new Date().toISOString();
 
     const viewer = store.viewers.find((entry) => entry.id === suggestion.viewerId) ?? null;
@@ -6308,15 +6519,27 @@ export async function updateGameSuggestionCatalog(input: {
     throw new Error("suggestion_not_found");
   }
 
+  let refreshedResult = result;
+
   try {
-    return (await refreshGameSuggestionPsPlusAvailability(input.suggestionId)) ?? result;
+    refreshedResult = (await refreshGameSuggestionPsPlusAvailability(input.suggestionId)) ?? refreshedResult;
   } catch (error) {
     console.warn("[ps-plus] Failed to check updated game suggestion availability.", {
       suggestionId: input.suggestionId,
       error,
     });
-    return result;
   }
+
+  try {
+    refreshedResult = (await refreshGameSuggestionSteamPrice(input.suggestionId)) ?? refreshedResult;
+  } catch (error) {
+    console.warn("[steam] Failed to check updated game suggestion price.", {
+      suggestionId: input.suggestionId,
+      error,
+    });
+  }
+
+  return refreshedResult;
 }
 
 export async function createCreatorSuggestion(input: {
