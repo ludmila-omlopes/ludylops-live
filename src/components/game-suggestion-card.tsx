@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Clock3 } from "lucide-react";
+import { BadgeDollarSign, Clock3 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,44 @@ function formatMultiplier(value: number) {
     minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
     maximumFractionDigits: 2,
   })}x`;
+}
+
+function formatSteamPriceCents(value: number, currency: string | null) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: currency ?? "BRL",
+  }).format(value / 100);
+}
+
+function getSteamPriceLabel(suggestion: GameSuggestionWithMeta) {
+  const steamStore = suggestion.steamStore;
+  if (!steamStore) {
+    return null;
+  }
+
+  if (steamStore.isFree) {
+    return "Grátis";
+  }
+
+  if (typeof steamStore.finalPriceCents !== "number") {
+    return null;
+  }
+
+  return formatSteamPriceCents(steamStore.finalPriceCents, steamStore.currency);
+}
+
+function getSteamOriginalPriceLabel(suggestion: GameSuggestionWithMeta) {
+  const steamStore = suggestion.steamStore;
+  if (
+    !steamStore ||
+    typeof steamStore.initialPriceCents !== "number" ||
+    typeof steamStore.finalPriceCents !== "number" ||
+    steamStore.initialPriceCents <= steamStore.finalPriceCents
+  ) {
+    return null;
+  }
+
+  return formatSteamPriceCents(steamStore.initialPriceCents, steamStore.currency);
 }
 
 function buildHowLongToBeatTooltip(suggestion: GameSuggestionWithMeta) {
@@ -237,6 +275,8 @@ export function GameSuggestionCard({
   const completionMinutes = suggestion.howLongToBeat?.mainStoryMinutes ?? null;
   const howLongToBeatTooltip = buildHowLongToBeatTooltip(suggestion);
   const howLongToBeatTooltipId = `hltb-times-${suggestion.id}`;
+  const steamPriceLabel = getSteamPriceLabel(suggestion);
+  const steamOriginalPriceLabel = getSteamOriginalPriceLabel(suggestion);
   const metadataText = [
     ...metadata.map(String),
     suggestion.igdbId ? `IGDB #${suggestion.igdbId}` : null,
@@ -306,6 +346,28 @@ export function GameSuggestionCard({
                     PlayStation Plus
                   </span>
                 )}
+              </div>
+            ) : null}
+            {steamPriceLabel ? (
+              <div className="mt-3">
+                <a
+                  href={suggestion.steamStore?.storeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Preço na Steam: ${steamPriceLabel}`}
+                  className="inline-flex h-7 items-center gap-1.5 rounded-[3px] border border-[var(--color-ink)] bg-[var(--color-sky)] px-2 text-[10px] font-black leading-none text-[var(--color-ink)] shadow-[2px_2px_0_var(--color-ink)]"
+                >
+                  <BadgeDollarSign className="h-4 w-4" aria-hidden="true" />
+                  Steam {steamPriceLabel}
+                  {steamOriginalPriceLabel ? (
+                    <span className="line-through opacity-70">{steamOriginalPriceLabel}</span>
+                  ) : null}
+                  {suggestion.steamStore?.discountPercent ? (
+                    <span className="rounded-[3px] bg-[var(--color-ink)] px-1 py-0.5 text-[var(--color-paper)]">
+                      -{suggestion.steamStore.discountPercent}%
+                    </span>
+                  ) : null}
+                </a>
               </div>
             ) : null}
           </div>

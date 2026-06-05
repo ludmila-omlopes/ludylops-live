@@ -32,6 +32,7 @@ function suggestion(input: {
     psPlusProductUrl: null,
     psPlusCheckedAt: null,
     psPlusLastSeenAt: null,
+    steamStore: null,
     status: input.status,
     totalVotes: input.totalVotes,
     createdAt: input.createdAt,

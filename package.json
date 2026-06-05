@@ -15,6 +15,7 @@
     "db:ensure-youtube-handle": "tsx scripts/ensure-youtube-handle-column.ts",
     "bridge:dev": "tsx bridge/src/index.ts",
     "backfill:hltb": "tsx scripts/backfill-howlongtobeat.ts",
+    "backfill:steam": "tsx scripts/backfill-steam-prices.ts",
     "backfill:youtube-names": "tsx scripts/backfill-youtube-display-names.ts",
     "fix:users-ranking-state": "tsx scripts/fix-users-ranking-state.ts",
     "merge:duplicate-youtube-users": "tsx scripts/merge-duplicate-youtube-users.ts",

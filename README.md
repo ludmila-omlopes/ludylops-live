@@ -104,6 +104,14 @@ Para comandos e C# actions, confira a documentação oficial do Streamer.bot ant
 
 Proteja a chamada com `Authorization: Bearer $PS_PLUS_SYNC_SECRET` e configure um agendador externo para chamar esse endpoint uma vez por dia. A criação/correção de indicações também tenta atualizar o índice quando ele está vencido, mas continua funcionando se a PlayStation Store estiver indisponível.
 
+### Steam
+
+- `POST /api/internal/steam/sync`: atualiza os metadados e preços Steam das indicações de jogos visíveis na página.
+
+Proteja a chamada com `Authorization: Bearer $STEAM_SYNC_SECRET` e configure um agendador externo para chamar esse endpoint uma vez por dia. O sync usa `STEAM_STORE_COUNTRY_CODE=BR` e `STEAM_STORE_LANGUAGE=brazilian` por padrão; a criação/correção de indicações também tenta resolver a Steam em modo de melhor esforço.
+
+A API oficial da Steam documenta a consulta de catálogo/lista de apps, mas preço por região/moeda fica encapsulado em `src/lib/steam/store.ts` porque depende dos endpoints públicos da Store usados para busca e detalhes. Se a Store mudar formato ou política, o ajuste fica isolado nessa camada.
+
 ## Bridge local
 
 A bridge roda no PC da live e liga o app hospedado ao Streamer.bot local.
@@ -192,6 +200,9 @@ STREAM_YOUTUBE_CHANNEL_ID=
 IGDB_CLIENT_ID=
 IGDB_CLIENT_SECRET=
 PS_PLUS_SYNC_SECRET=
+STEAM_SYNC_SECRET=
+STEAM_STORE_COUNTRY_CODE=BR
+STEAM_STORE_LANGUAGE=brazilian
 ```
 
 Checklist de deploy para Google OAuth:
