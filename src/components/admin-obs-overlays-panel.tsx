@@ -61,8 +61,10 @@ const overlays = [
 
 export function AdminObsOverlaysPanel({
   initialStatus,
+  embedded = false,
 }: {
   initialStatus: ObsOverlayAdminStatusRecord;
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(initialStatus);
@@ -108,15 +110,10 @@ export function AdminObsOverlaysPanel({
     });
   }
 
-  return (
-    <section className="landing-plane landing-divider bg-[var(--color-paper)] py-8 sm:py-10">
-      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
-        <div className="panel surface-section p-6">
-          <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-            Overlays do OBS
-          </p>
+  const content = (
+    <div className="panel surface-section p-6">
           <h2
-            className="mt-3 text-3xl uppercase sm:text-4xl"
+            className="text-3xl uppercase sm:text-4xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
             Seus browser sources
@@ -286,6 +283,16 @@ export function AdminObsOverlaysPanel({
             ))}
           </div>
         </div>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <section className="landing-plane landing-divider bg-[var(--color-paper)] py-8 sm:py-10">
+      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
+        {content}
       </div>
     </section>
   );

@@ -25,6 +25,8 @@ const statusBgMap: Record<AdminVideoSuggestionStatus, string> = {
   rejected: "var(--color-periwinkle)",
 };
 
+const INITIAL_VISIBLE_VIDEO_SUGGESTIONS = 6;
+
 function mapSuggestionError(message: string) {
   switch (message) {
     case "suggestion_not_found":
@@ -36,12 +38,19 @@ function mapSuggestionError(message: string) {
 
 export function AdminVideoSuggestionsPanel({
   suggestions,
+  embedded = false,
 }: {
   suggestions: VideoSuggestionWithMeta[];
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  const visibleSuggestions = showAllSuggestions
+    ? suggestions
+    : suggestions.slice(0, INITIAL_VISIBLE_VIDEO_SUGGESTIONS);
+  const hiddenSuggestionCount = Math.max(suggestions.length - visibleSuggestions.length, 0);
 
   function submitStatus(suggestionId: string, status: AdminVideoSuggestionStatus) {
     setFeedback(null);
@@ -65,16 +74,12 @@ export function AdminVideoSuggestionsPanel({
     });
   }
 
-  return (
-    <section className="landing-plane landing-divider bg-[var(--color-sky)] py-8 sm:py-10">
-      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
+  const content = (
+    <>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-              Vídeos
-            </p>
             <h2
-              className="mt-2 text-3xl uppercase"
+              className="text-3xl uppercase"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Fila de reações
@@ -94,7 +99,7 @@ export function AdminVideoSuggestionsPanel({
             </div>
           ) : null}
 
-          {suggestions.map((suggestion) => {
+          {visibleSuggestions.map((suggestion) => {
             const normalizedStatus = normalizeVideoSuggestionStatus(suggestion.status);
             const actions = getVideoSuggestionAdminActions(suggestion.status);
 
@@ -173,7 +178,30 @@ export function AdminVideoSuggestionsPanel({
               </article>
             );
           })}
+          {hiddenSuggestionCount > 0 || showAllSuggestions ? (
+            <div className="card-brutal-static flex justify-center p-4">
+              <Button
+                type="button"
+                onClick={() => setShowAllSuggestions((current) => !current)}
+                variant="neutral"
+                size="sm"
+              >
+                {showAllSuggestions ? "Ver menos" : `Ver mais ${hiddenSuggestionCount}`}
+              </Button>
+            </div>
+          ) : null}
         </div>
+    </>
+  );
+
+  if (embedded) {
+    return <section className="space-y-6">{content}</section>;
+  }
+
+  return (
+    <section className="landing-plane landing-divider bg-[var(--color-sky)] py-8 sm:py-10">
+      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
+        {content}
       </div>
     </section>
   );

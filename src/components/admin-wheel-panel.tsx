@@ -109,10 +109,7 @@ export function AdminWheelPanel({ initialConfig }: { initialConfig: WheelConfigR
     <section className="panel surface-section p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-            Roleta da live
-          </p>
-          <h2 className="mt-2 text-3xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
+          <h2 className="text-3xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
             Prêmios do chat
           </h2>
         </div>

@@ -92,8 +92,10 @@ function maskEmail(email: string | null | undefined) {
 
 export function AdminViewerLinksPanel({
   entries,
+  embedded = false,
 }: {
   entries: AdminViewerDirectoryRecord[];
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [googleViewerId, setGoogleViewerId] = useState("");
@@ -190,7 +192,7 @@ export function AdminViewerLinksPanel({
           return;
         }
 
-        setFeedback("Usuarios vinculados com sucesso.");
+        setFeedback("Usuários vinculados com sucesso.");
         setGoogleViewerId("");
         setYoutubeViewerId("");
         setConfirmationText("");
@@ -243,16 +245,12 @@ export function AdminViewerLinksPanel({
     });
   }
 
-  return (
-    <section className="landing-plane landing-divider bg-[var(--color-lilac)] py-8 sm:py-10">
-      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
+  const content = (
+    <>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-              Usuarios
-            </p>
             <h2
-              className="mt-2 text-3xl uppercase"
+              className="text-3xl uppercase"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Vínculos Google + YouTube
@@ -274,7 +272,7 @@ export function AdminViewerLinksPanel({
             <div className="mt-4 grid gap-4">
               <label className="grid gap-2">
                 <span className="text-sm font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">
-                  Usuario Google
+                  Usuário Google
                 </span>
                 <Select value={googleViewerId || null} onValueChange={(value) => setGoogleViewerId(value ?? "")}>
                   <SelectTrigger className="w-full">
@@ -304,7 +302,7 @@ export function AdminViewerLinksPanel({
 
               <label className="grid gap-2">
                 <span className="text-sm font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">
-                  Usuario YouTube
+                  Usuário YouTube
                 </span>
                 <Select value={youtubeViewerId || null} onValueChange={(value) => setYoutubeViewerId(value ?? "")}>
                   <SelectTrigger className="w-full">
@@ -549,14 +547,15 @@ export function AdminViewerLinksPanel({
           </Button>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-[var(--radius)] border-[3px] border-[var(--color-ink)] shadow-[4px_4px_0_var(--shadow-color)]">
-          <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_120px_120px] gap-3 border-b-[3px] border-[var(--color-ink)] bg-[var(--color-blue)] px-4 py-3 text-xs font-bold uppercase tracking-[0.18em]">
-            <span>Usuario</span>
-            <span>Conta Google</span>
-            <span>Status</span>
-            <span>Saldo</span>
-          </div>
-          <div>
+        <div className="mt-6 overflow-x-auto rounded-[var(--radius)] border-[3px] border-[var(--color-ink)] shadow-[4px_4px_0_var(--shadow-color)]">
+          <div className="min-w-[760px]">
+            <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_120px_120px] gap-3 border-b-[3px] border-[var(--color-ink)] bg-[var(--color-blue)] px-4 py-3 text-xs font-bold uppercase tracking-[0.18em]">
+              <span>Usuário</span>
+              <span>Conta Google</span>
+              <span>Status</span>
+              <span>Saldo</span>
+            </div>
+            <div>
             {visibleEntries.map((entry) => {
               const status = getViewerStatus(entry);
 
@@ -583,7 +582,7 @@ export function AdminViewerLinksPanel({
                       {entry.googleAccountId
                         ? entry.googleAccountActiveViewerId === entry.id
                           ? "viewer ativo da conta"
-                          : "viewer secundario da conta"
+                          : "viewer secundário da conta"
                         : entry.isSyntheticYoutubeChannel
                           ? "sessão sem conta vinculada"
                           : "canal sem conta Google"}
@@ -608,20 +607,32 @@ export function AdminViewerLinksPanel({
                 </div>
               );
             })}
-          </div>
-          {hiddenViewerCount > 0 || showAllViewers ? (
-            <div className="border-t-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] px-4 py-4">
-              <Button
-                type="button"
-                onClick={() => setShowAllViewers((current) => !current)}
-                variant="neutral"
-                size="sm"
-              >
-                {showAllViewers ? "Ver menos" : `Ver mais ${hiddenViewerCount}`}
-              </Button>
             </div>
-          ) : null}
+            {hiddenViewerCount > 0 || showAllViewers ? (
+              <div className="border-t-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] px-4 py-4">
+                <Button
+                  type="button"
+                  onClick={() => setShowAllViewers((current) => !current)}
+                  variant="neutral"
+                  size="sm"
+                >
+                  {showAllViewers ? "Ver menos" : `Ver mais ${hiddenViewerCount}`}
+                </Button>
+              </div>
+            ) : null}
+            </div>
         </div>
+    </>
+  );
+
+  if (embedded) {
+    return <section className="space-y-6">{content}</section>;
+  }
+
+  return (
+    <section className="landing-plane landing-divider bg-[var(--color-lilac)] py-8 sm:py-10">
+      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
+        {content}
       </div>
     </section>
   );

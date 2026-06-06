@@ -156,7 +156,7 @@ export function AdminRecommendationsPanel({
         await runAction("/api/admin/recommendations", "POST", parsed.data);
 
         resetForm();
-        setFeedback("Recomendacao adicionada.");
+        setFeedback("Recomendação adicionada.");
         router.refresh();
       } catch (error) {
         setFeedback(
@@ -175,7 +175,7 @@ export function AdminRecommendationsPanel({
         });
         setFieldErrors({});
         setConfirmingDeleteId(null);
-        setFeedback(item.isActive ? "Recomendacao desativada." : "Recomendacao ativada.");
+        setFeedback(item.isActive ? "Recomendação desativada." : "Recomendação ativada.");
         router.refresh();
       } catch (error) {
         setFeedback(
@@ -246,7 +246,7 @@ export function AdminRecommendationsPanel({
         await runAction(`/api/admin/recommendations/${item.id}`, "DELETE");
         setFieldErrors({});
         setConfirmingDeleteId(null);
-        setFeedback("Recomendacao excluida.");
+        setFeedback("Recomendação excluída.");
         router.refresh();
       } catch (error) {
         setFeedback(
@@ -260,11 +260,8 @@ export function AdminRecommendationsPanel({
     <section className="panel bg-[var(--color-periwinkle)] p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-            Indicações
-          </p>
           <h2
-            className="mt-2 text-3xl uppercase"
+            className="text-3xl uppercase"
             style={{ fontFamily: "var(--font-display)" }}
           >
             Produtos recomendados
