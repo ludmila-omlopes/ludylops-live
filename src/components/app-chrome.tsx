@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, ChevronDown } from "lucide-react";
 
 import { AuthButtons } from "@/components/auth-buttons";
+import { BuyMeACoffeeButton } from "@/components/buy-me-a-coffee-button";
 import { LivestreamIndicator } from "@/components/livestream-indicator";
 import { hasUsableAppSession } from "@/lib/auth/session-state";
 import type { ThemeMode } from "@/lib/theme";
@@ -313,6 +314,7 @@ export function AppChrome({
           >
             Termos de Serviço
           </Link>
+          <BuyMeACoffeeButton />
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-black uppercase tracking-[0.08em] text-[var(--color-ink)]">
               Siga a Ludylops
