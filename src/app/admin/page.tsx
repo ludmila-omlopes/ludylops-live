@@ -1,4 +1,5 @@
 import { AdminObsOverlaysPanel } from "@/components/admin-obs-overlays-panel";
+import { AdminStreamerbotScriptsPanel } from "@/components/admin-streamerbot-scripts-panel";
 import { AdminCurrentGamePanel } from "@/components/admin-current-game-panel";
 import { AdminDashboardTabs } from "@/components/admin-dashboard-tabs";
 import { AdminBetsPanel } from "@/components/admin-bets-panel";
@@ -30,6 +31,7 @@ import {
   listAdminRedemptions,
 } from "@/lib/db/repository";
 import { getStreamerbotLivestreamStatus } from "@/lib/streamerbot/live-status";
+import { listStreamerbotScripts } from "@/lib/streamerbot/scripts.server";
 import { getCurrentGame } from "@/lib/current-game";
 import { formatDateTime, formatPipetz } from "@/lib/utils";
 import { getWheelConfig } from "@/lib/wheel";
@@ -44,7 +46,25 @@ const statusColorMap: Record<string, string> = {
 
 export default async function AdminPage() {
   await requireAdminSession();
-  const [catalog, leaderboard, bridge, liveStatus, currentGame, redemptions, bets, likeGoals, suggestions, gameBoostSettings, videoSuggestions, recommendations, viewers, obsOverlayStatus, pricing, wheelConfig] = await Promise.all([
+  const [
+    catalog,
+    leaderboard,
+    bridge,
+    liveStatus,
+    currentGame,
+    redemptions,
+    bets,
+    likeGoals,
+    suggestions,
+    gameBoostSettings,
+    videoSuggestions,
+    recommendations,
+    viewers,
+    obsOverlayStatus,
+    pricing,
+    wheelConfig,
+    streamerbotScripts,
+  ] = await Promise.all([
     getCatalog(),
     getLeaderboard(),
     getBridgeStatus(),
@@ -61,6 +81,7 @@ export default async function AdminPage() {
     getObsOverlayAdminStatus(),
     getPipetzPricing(),
     getWheelConfig(),
+    Promise.resolve(listStreamerbotScripts()),
   ]);
   const openBetCount = bets.filter((bet) => bet.status === "open").length;
   const queuedRedemptionCount = redemptions.filter((entry) => entry.status === "queued").length;
@@ -100,6 +121,13 @@ export default async function AdminPage() {
                 description: "Browser sources, fila e links do OBS.",
                 badge: `${obsOverlayStatus.pendingCount}`,
                 content: <AdminObsOverlaysPanel initialStatus={obsOverlayStatus} embedded />,
+              },
+              {
+                id: "streamerbot",
+                label: "Streamer.bot",
+                description: "Scripts C#, triggers e globals da integração.",
+                badge: `${streamerbotScripts.length}`,
+                content: <AdminStreamerbotScriptsPanel scripts={streamerbotScripts} />,
               },
               {
                 id: "roleta",
