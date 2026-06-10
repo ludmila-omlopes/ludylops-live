@@ -256,6 +256,12 @@ body {
   transition: background-color 180ms ease, color 180ms ease, background 180ms ease;
 }
 
+html:has(body[data-obs-overlay="true"]),
+body[data-obs-overlay="true"] {
+  overflow: hidden;
+  height: 100%;
+}
+
 body[data-obs-overlay="true"] {
   background: transparent !important;
 }
