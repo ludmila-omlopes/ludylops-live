@@ -11,8 +11,8 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 
 | Plan | Title | Priority | Effort | Depends on | Issue | Status |
 |------|-------|----------|--------|------------|-------|--------|
-| 001  | CI verification baseline (lint, typecheck, tests, build) | P1 | S | — | [#136](https://github.com/ludmila-omlopes/ludylops-live/issues/136) | TODO |
-| 002  | Fail closed in production when auth-critical env vars missing | P1 | S | 001 | [#137](https://github.com/ludmila-omlopes/ludylops-live/issues/137) | TODO |
+| 001  | CI verification baseline (lint, typecheck, tests, build) | P1 | S | — | [#136](https://github.com/ludmila-omlopes/ludylops-live/issues/136) | DONE (PR #143) |
+| 002  | Fail closed in production when auth-critical env vars missing | P1 | S | 001 | [#137](https://github.com/ludmila-omlopes/ludylops-live/issues/137) | DONE |
 | 003  | Route-level tests for bridge + Streamer.bot endpoints | P1 | M | 001 | [#138](https://github.com/ludmila-omlopes/ludylops-live/issues/138) | TODO |
 | 004  | Bridge redemption claim/complete/fail idempotency | P1 | M | 003 | [#139](https://github.com/ludmila-omlopes/ludylops-live/issues/139) | TODO |
 | 005  | redeemItem balance overdraw + stock oversell guards | P1 | S | 001 | [#140](https://github.com/ludmila-omlopes/ludylops-live/issues/140) | TODO |
