@@ -207,6 +207,7 @@ STEAM_STORE_LANGUAGE=brazilian
 
 Checklist de deploy para Google OAuth:
 
+- Em produção, o app não inicia sem `NEXTAUTH_SECRET` configurado; defina o valor no ambiente de deploy antes de publicar.
 - Em `APP_URL` e `NEXT_PUBLIC_APP_URL`, use as URLs públicas finais do deploy, sem barra no fim.
 - No Google Cloud Console, em **Authorized redirect URIs**, cadastre uma callback para cada domínio público usado pelo app, no formato `https://seu-dominio/api/auth/callback/google`.
 - Para este projeto, o domínio principal deve ter `https://ludylops.live/api/auth/callback/google`; se o deploy da Vercel também for usado para login, cadastre também a URL equivalente de `*.vercel.app`.
