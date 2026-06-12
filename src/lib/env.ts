@@ -60,13 +60,19 @@ export const adminEmails = new Set(
 
 export const isDemoMode = !env.DATABASE_URL;
 export const isDemoAuthEnabled = isDemoMode;
-export const authSecret =
-  env.NEXTAUTH_SECRET ?? (isProduction ? "pipetz-production-demo-secret" : "dev-secret");
 
-const missingProductionEnv = [
-  !env.DATABASE_URL ? "DATABASE_URL" : null,
-  !env.NEXTAUTH_SECRET ? "NEXTAUTH_SECRET" : null,
-].filter((entry): entry is string => Boolean(entry));
+if (isProduction && !env.NEXTAUTH_SECRET) {
+  throw new Error(
+    "[env] NEXTAUTH_SECRET is required in production. " +
+      "Set it in the deployment environment before starting the app.",
+  );
+}
+
+export const authSecret = env.NEXTAUTH_SECRET ?? "dev-secret";
+
+const missingProductionEnv = [!env.DATABASE_URL ? "DATABASE_URL" : null].filter(
+  (entry): entry is string => Boolean(entry),
+);
 
 if (isProduction && missingProductionEnv.length > 0) {
   console.warn(

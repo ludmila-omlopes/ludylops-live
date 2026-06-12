@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { adminEmails, isDemoMode } from "@/lib/env";
+import { adminEmails, isDemoMode, isProduction } from "@/lib/env";
 export { isTrustedAppMutationRequest } from "@/lib/request-origin";
 
 export function ok(data: unknown, init?: ResponseInit) {
@@ -33,7 +33,7 @@ export async function requireAdminApiSession() {
   if (!session?.user?.email) {
     return null;
   }
-  if (isDemoMode) {
+  if (isDemoMode && !isProduction) {
     return session;
   }
 
