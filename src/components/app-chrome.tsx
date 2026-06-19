@@ -302,6 +302,18 @@ export function AppChrome({
 
       <footer className="border-t-[3px] border-[var(--color-ink)] bg-[var(--color-paper)]">
         <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-5 text-sm font-medium text-[var(--color-ink-soft)] sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10">
+          <p>
+            feito com carinho por{" "}
+            <a
+              href="https://ludylops.com"
+              target="_blank"
+              rel="noreferrer"
+              className="font-black text-[var(--color-ink)] underline decoration-[3px] underline-offset-4"
+            >
+              ludylops
+            </a>{" "}
+            <span aria-hidden="true">🩷</span>
+          </p>
           <Link
             href="/privacy"
             className="w-fit font-black uppercase tracking-[0.08em] text-[var(--color-ink)] underline decoration-[3px] underline-offset-4"
