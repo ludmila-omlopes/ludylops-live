@@ -9928,17 +9928,17 @@ export async function bridgeClaim(redemptionId: string, bridgeId: string) {
     return redemption;
   }
 
-  await db
+  const [claimed] = await db
     .update(redemptions)
     .set({
       status: "executing",
       claimedByBridgeId: bridgeId,
       bridgeAttemptCount: sql`${redemptions.bridgeAttemptCount} + 1`,
     })
-    .where(eq(redemptions.id, redemptionId));
+    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.status, "queued")))
+    .returning();
 
-  const [redemption] = await db.select().from(redemptions).where(eq(redemptions.id, redemptionId)).limit(1);
-  return redemption ?? null;
+  return claimed ?? null;
 }
 
 export async function bridgeComplete(redemptionId: string) {
@@ -9949,21 +9949,31 @@ export async function bridgeComplete(redemptionId: string) {
     if (!redemption) {
       return null;
     }
+    if (redemption.status === "completed") {
+      return redemption;
+    }
+    if (redemption.status !== "executing") {
+      return null;
+    }
     redemption.status = "completed";
     redemption.executedAt = new Date().toISOString();
     return redemption;
   }
 
-  await db
+  const [completed] = await db
     .update(redemptions)
     .set({
       status: "completed",
       executedAt: new Date(),
     })
-    .where(eq(redemptions.id, redemptionId));
+    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.status, "executing")))
+    .returning();
 
+  if (completed) {
+    return completed;
+  }
   const [redemption] = await db.select().from(redemptions).where(eq(redemptions.id, redemptionId)).limit(1);
-  return redemption ?? null;
+  return redemption?.status === "completed" ? redemption : null;
 }
 
 export async function bridgeFail(redemptionId: string, failureReason: string) {
@@ -9973,6 +9983,11 @@ export async function bridgeFail(redemptionId: string, failureReason: string) {
     const redemption = store.redemptions.find((entry) => entry.id === redemptionId);
     if (!redemption) {
       return null;
+    }
+    if (!["queued", "executing"].includes(redemption.status)) {
+      return redemption.status === "failed" || redemption.status === "completed" || redemption.status === "cancelled"
+        ? redemption
+        : null;
     }
 
     redemption.status = "failed";
@@ -9988,7 +10003,7 @@ export async function bridgeFail(redemptionId: string, failureReason: string) {
       kind: "redemption_refund",
       amount: redemption.costAtPurchase,
       source: "bridge",
-      externalEventId: null,
+      externalEventId: `redemption_refund:${redemptionId}`,
       metadata: { redemptionId, failureReason },
     });
     return redemption;
@@ -10000,14 +10015,24 @@ export async function bridgeFail(redemptionId: string, failureReason: string) {
   }
 
   await db.transaction(async (tx) => {
-    await tx
+    const [failed] = await tx
       .update(redemptions)
       .set({
         status: "failed",
         failedAt: new Date(),
         failureReason,
       })
-      .where(eq(redemptions.id, redemptionId));
+      .where(
+        and(
+          eq(redemptions.id, redemptionId),
+          inArray(redemptions.status, ["queued", "executing"]),
+        ),
+      )
+      .returning();
+
+    if (!failed) {
+      return;
+    }
 
     await tx
       .update(viewerBalances)
@@ -10023,7 +10048,7 @@ export async function bridgeFail(redemptionId: string, failureReason: string) {
       kind: "redemption_refund",
       amount: redemption.costAtPurchase,
       source: "bridge",
-      externalEventId: null,
+      externalEventId: `redemption_refund:${redemptionId}`,
       metadata: { redemptionId, failureReason },
     });
   });
