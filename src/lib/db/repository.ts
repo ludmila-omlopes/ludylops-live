@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
 
 import {
   calculateHouseBetEntries,
@@ -8642,14 +8642,24 @@ export async function redeemItem({
       queuedAt: new Date(redemption.queuedAt),
     });
 
-    await tx
+    const [debited] = await tx
       .update(viewerBalances)
       .set({
         currentBalance: sql`${viewerBalances.currentBalance} - ${item.cost}`,
         lifetimeSpent: sql`${viewerBalances.lifetimeSpent} + ${item.cost}`,
         lastSyncedAt: new Date(),
       })
-      .where(eq(viewerBalances.viewerId, dashboard.viewer.id));
+      .where(
+        and(
+          eq(viewerBalances.viewerId, dashboard.viewer.id),
+          gte(viewerBalances.currentBalance, item.cost),
+        ),
+      )
+      .returning({ viewerId: viewerBalances.viewerId });
+
+    if (!debited) {
+      throw new Error("saldo_insuficiente");
+    }
 
     await tx.insert(pointLedger).values({
       id: randomUUID(),
@@ -8662,12 +8672,17 @@ export async function redeemItem({
     });
 
     if (item.stock !== null) {
-      await tx
+      const [stocked] = await tx
         .update(catalogItems)
         .set({
-          stock: item.stock - 1,
+          stock: sql`${catalogItems.stock} - 1`,
         })
-        .where(eq(catalogItems.id, item.id));
+        .where(and(eq(catalogItems.id, item.id), gt(catalogItems.stock, 0)))
+        .returning({ id: catalogItems.id });
+
+      if (!stocked) {
+        throw new Error("sem_estoque");
+      }
     }
   });
 
