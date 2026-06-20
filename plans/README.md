@@ -16,7 +16,7 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 003  | Route-level tests for bridge + Streamer.bot endpoints | P1 | M | 001 | [#138](https://github.com/ludmila-omlopes/ludylops-live/issues/138) | DONE |
 | 004  | Bridge redemption claim/complete/fail idempotency | P1 | M | 003 | [#139](https://github.com/ludmila-omlopes/ludylops-live/issues/139) | DONE |
 | 005  | redeemItem balance overdraw + stock oversell guards | P1 | S | 001 | [#140](https://github.com/ludmila-omlopes/ludylops-live/issues/140) | DONE |
-| 006  | Hardening batch: timing-safe sync auth, dep vulns, FK indexes | P2 | M | 001 | [#141](https://github.com/ludmila-omlopes/ludylops-live/issues/141) | BLOCKED (migration generation includes unrelated historical schema changes) |
+| 006  | Hardening batch: timing-safe sync auth, dep vulns, FK indexes | P2 | M | 001 | [#141](https://github.com/ludmila-omlopes/ludylops-live/issues/141) | DONE (manual index migration generated; not applied) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
