@@ -1,6 +1,7 @@
 import { env } from "@/lib/env";
 import { fail, ok } from "@/lib/api";
 import { syncPsPlusDeluxeCatalog } from "@/lib/db/repository";
+import { timingSafeStringEqual } from "@/lib/secure-compare";
 
 function isAuthorized(request: Request) {
   const secret = env.PS_PLUS_SYNC_SECRET;
@@ -9,7 +10,7 @@ function isAuthorized(request: Request) {
   }
 
   const authorization = request.headers.get("authorization");
-  return authorization === `Bearer ${secret}`;
+  return authorization !== null && timingSafeStringEqual(authorization, `Bearer ${secret}`);
 }
 
 export async function POST(request: Request) {
