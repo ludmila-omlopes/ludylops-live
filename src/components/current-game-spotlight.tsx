@@ -33,10 +33,7 @@ export function CurrentGameSpotlight({
           </div>
 
           <div className="flex flex-col justify-center p-6 sm:p-8">
-            <p className="mono text-[11px] font-black uppercase tracking-[0.28em] text-[var(--color-ink-soft)]">
-              jogando agora
-            </p>
-            <h2 className="mt-3 text-4xl uppercase leading-[0.9] sm:text-5xl" style={{ fontFamily: "var(--font-display)" }}>
+            <h2 className="text-4xl uppercase leading-[0.9] sm:text-5xl" style={{ fontFamily: "var(--font-display)" }}>
               {game.name}
             </h2>
             {metadata ? (

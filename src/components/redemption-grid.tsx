@@ -40,10 +40,7 @@ export function RedemptionGrid({
     <>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="mono text-xs uppercase tracking-[0.32em] text-[var(--color-ink-soft)]">
-            Resgates disponíveis
-          </p>
-          <h2 className="mt-2 text-3xl font-bold uppercase" style={{ fontFamily: "var(--font-display)" }}>
+          <h2 className="text-3xl font-bold uppercase" style={{ fontFamily: "var(--font-display)" }}>
             {expanded ? "Todos os resgates" : "Resgates em destaque"}
           </h2>
         </div>

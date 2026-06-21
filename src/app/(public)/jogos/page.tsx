@@ -1,5 +1,4 @@
 import { auth } from "@/auth";
-import { GameSuggestForm } from "@/components/game-suggest-form";
 import { GameSuggestionList } from "@/components/game-suggestion-list";
 import { getPipetzPricing, getViewerDashboard, listGameSuggestions } from "@/lib/db/repository";
 import { adminEmails, isDemoMode } from "@/lib/env";
@@ -39,32 +38,15 @@ export default async function JogosPage() {
       </section>
 
       <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-8 dark:bg-[var(--surface-card-alt)] sm:py-10">
-        <div className="mx-auto grid w-full max-w-[1500px] gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.75fr)] lg:px-10">
-          <div>
-            <div className="mb-4 flex items-center gap-2">
-              <h2
-                className="text-2xl font-bold uppercase"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Sugestões da galera
-              </h2>
-            </div>
-            <GameSuggestionList
-              suggestions={suggestions}
-              loggedIn={Boolean(session?.user)}
-              canInteract={canInteract}
-              isAdmin={isAdmin}
-              viewerBalance={viewerBalance}
-            />
-          </div>
-          <div className="self-start lg:sticky lg:top-24">
-            <GameSuggestForm
-              loggedIn={Boolean(session?.user)}
-              canSuggest={canInteract}
-              viewerBalance={viewerBalance}
-              creationCost={pricing.gameSuggestionCost}
-            />
-          </div>
+        <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
+          <GameSuggestionList
+            suggestions={suggestions}
+            loggedIn={Boolean(session?.user)}
+            canInteract={canInteract}
+            isAdmin={isAdmin}
+            viewerBalance={viewerBalance}
+            creationCost={pricing.gameSuggestionCost}
+          />
         </div>
       </section>
     </div>

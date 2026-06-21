@@ -14,10 +14,7 @@ export function ViewerChannelListCard({
     <section className="landing-plane landing-divider bg-[var(--color-paper)] py-8 sm:py-10">
       <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
         <div>
-          <p className="mono text-[10px] uppercase tracking-[0.28em] text-[var(--color-ink-soft)]">
-            Conta Google
-          </p>
-          <h2 className="mt-3 text-3xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
+          <h2 className="text-3xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
             Canais vinculados
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--color-ink-soft)]">

@@ -9,7 +9,9 @@ import type {
   GameSuggestionBoostSettingsRecord,
   GameSuggestionWithMeta,
 } from "@/lib/types";
-import { formatDateTime, formatPipetz } from "@/lib/utils";
+import { cn, formatDateTime, formatPipetz } from "@/lib/utils";
+
+type GameSuggestionStatus = GameSuggestionWithMeta["status"];
 
 type BoostSettingField = keyof Pick<
   GameSuggestionBoostSettingsRecord,
@@ -44,6 +46,15 @@ const statusLabels: Record<GameSuggestionWithMeta["status"], string> = {
   played: "Jogada",
   rejected: "Rejeitada",
 };
+
+const statusFilterOptions: Array<{ status: GameSuggestionStatus; label: string }> = [
+  { status: "open", label: "Abertas" },
+  { status: "accepted", label: "Aceitas" },
+  { status: "played", label: "Já jogadas" },
+  { status: "rejected", label: "Recusadas" },
+];
+
+const DEFAULT_VISIBLE_STATUSES: GameSuggestionStatus[] = ["open", "accepted"];
 
 const statusBgMap: Record<GameSuggestionWithMeta["status"], string> = {
   open: "var(--color-sky)",
@@ -93,10 +104,21 @@ export function AdminGameSuggestionsPanel({
   const [boostForm, setBoostForm] = useState(toBoostFormState(initialBoostSettings));
   const [isPending, startTransition] = useTransition();
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
+  const [visibleStatuses, setVisibleStatuses] = useState<GameSuggestionStatus[]>(DEFAULT_VISIBLE_STATUSES);
+  const filteredSuggestions = suggestions.filter((suggestion) => visibleStatuses.includes(suggestion.status));
   const visibleSuggestions = showAllSuggestions
-    ? suggestions
-    : suggestions.slice(0, INITIAL_VISIBLE_GAME_SUGGESTIONS);
-  const hiddenSuggestionCount = Math.max(suggestions.length - visibleSuggestions.length, 0);
+    ? filteredSuggestions
+    : filteredSuggestions.slice(0, INITIAL_VISIBLE_GAME_SUGGESTIONS);
+  const hiddenSuggestionCount = Math.max(filteredSuggestions.length - visibleSuggestions.length, 0);
+
+  function toggleStatusFilter(status: GameSuggestionStatus) {
+    setShowAllSuggestions(false);
+    setVisibleStatuses((currentStatuses) =>
+      currentStatuses.includes(status)
+        ? currentStatuses.filter((currentStatus) => currentStatus !== status)
+        : [...currentStatuses, status]
+    );
+  }
 
   function updateBoostField(field: BoostSettingField, value: string) {
     setBoostForm((current) => ({
@@ -192,11 +214,8 @@ export function AdminGameSuggestionsPanel({
         <div className="mt-6 panel surface-section p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-                Boosts automáticos
-              </p>
               <h3
-                className="mt-2 text-2xl font-bold uppercase"
+                className="text-2xl font-bold uppercase"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 Multiplicadores
@@ -247,10 +266,52 @@ export function AdminGameSuggestionsPanel({
           </div>
         </div>
 
+        <div className="mt-6 panel surface-section p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h3
+                className="text-2xl font-bold uppercase"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Status das sugestões
+              </h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {statusFilterOptions.map((option) => {
+                const isChecked = visibleStatuses.includes(option.status);
+                const statusCount = suggestions.filter((suggestion) => suggestion.status === option.status).length;
+
+                return (
+                  <label
+                    key={option.status}
+                    className={cn(
+                      "badge-brutal flex cursor-pointer items-center gap-2 px-3 py-2 text-xs text-[var(--color-ink)] transition hover:-translate-y-0.5",
+                      isChecked ? "bg-[var(--color-mint)]" : "bg-[var(--color-paper)] opacity-70"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-[var(--color-mint)]"
+                      checked={isChecked}
+                      onChange={() => toggleStatusFilter(option.status)}
+                    />
+                    <span>{option.label}</span>
+                    <span className="mono text-[10px]">({statusCount})</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         <div className="mt-6 grid gap-3">
           {suggestions.length === 0 ? (
             <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
               Nenhuma sugestão cadastrada.
+            </div>
+          ) : filteredSuggestions.length === 0 ? (
+            <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
+              Nenhuma sugestão corresponde aos filtros selecionados.
             </div>
           ) : null}
 

@@ -78,9 +78,8 @@ export default function PrivacyPage() {
       <section className="panel surface-hero p-6 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <span className="retro-label accent-chip">documento público</span>
             <h1
-              className="mt-4 text-4xl uppercase leading-[0.9] sm:text-5xl"
+              className="text-4xl uppercase leading-[0.9] sm:text-5xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Política de privacidade
@@ -111,11 +110,8 @@ export default function PrivacyPage() {
                 : "bg-[var(--color-mint)] text-[var(--color-accent-ink)]"
           }`}
         >
-          <p className={`mono text-[11px] uppercase tracking-[0.24em] ${ index % 3 === 0 ? "text-[var(--color-ink-soft)]" : "text-[var(--color-accent-ink-soft)]" }`}>
-            seção {String(index + 1).padStart(2, "0")}
-          </p>
           <h2
-            className="mt-3 text-3xl uppercase leading-none sm:text-4xl"
+            className="text-3xl uppercase leading-none sm:text-4xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {section.title}

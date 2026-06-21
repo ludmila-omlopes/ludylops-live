@@ -40,11 +40,8 @@ export default async function QuotesPage() {
         <div className="bg-dots-light pointer-events-none absolute inset-0 opacity-20" />
         <div className="relative mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
           <div>
-            <p className="mono text-xs font-bold uppercase tracking-[0.32em] text-[var(--color-ink-soft)]">
-              Quotes da live
-            </p>
             <h1
-              className="mt-3 text-4xl uppercase sm:text-6xl lg:text-7xl"
+              className="text-4xl uppercase sm:text-6xl lg:text-7xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Todas as frases registradas.

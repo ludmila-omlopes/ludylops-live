@@ -16,11 +16,8 @@ export function PipetzBalanceCard({
       <div className="relative mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-              Meus Pipetz
-            </p>
             <h1
-              className={`mt-2 uppercase text-[var(--color-ink)] ${compact ? "text-2xl" : "text-4xl sm:text-5xl"}`}
+              className={`uppercase text-[var(--color-ink)] ${compact ? "text-2xl" : "text-4xl sm:text-5xl"}`}
               style={{ fontFamily: "var(--font-display)" }}
             >
               {displayName}
