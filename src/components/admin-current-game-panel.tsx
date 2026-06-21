@@ -44,6 +44,7 @@ export function AdminCurrentGamePanel({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [currentGame, setCurrentGame] = useState(initialGame);
   const [query, setQuery] = useState(initialGame?.name ?? "");
+  const [customCoverUrl, setCustomCoverUrl] = useState(initialGame?.coverImageUrl ?? "");
   const [results, setResults] = useState<GameSearchResult[]>([]);
   const [selectedGame, setSelectedGame] = useState<GameSearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -131,6 +132,7 @@ export function AdminCurrentGamePanel({
   function selectGame(game: GameSearchResult) {
     setSelectedGame(game);
     setQuery(game.name);
+    setCustomCoverUrl(game.coverImageUrl ?? "");
     setResults([]);
     setIsResultsOpen(false);
   }
@@ -153,7 +155,7 @@ export function AdminCurrentGamePanel({
           igdbId: selectedGame.igdbId,
           name: selectedGame.name,
           releaseYear: selectedGame.releaseYear,
-          coverImageUrl: selectedGame.coverImageUrl,
+          coverImageUrl: customCoverUrl.trim() || selectedGame.coverImageUrl,
           platforms: selectedGame.platforms,
           genres: selectedGame.genres,
         }),
@@ -204,6 +206,7 @@ export function AdminCurrentGamePanel({
       setCurrentGame(null);
       setSelectedGame(null);
       setQuery("");
+      setCustomCoverUrl("");
       setResults([]);
       setIsResultsOpen(false);
       setFeedback("Jogo atual removido.");
@@ -212,6 +215,7 @@ export function AdminCurrentGamePanel({
   }
 
   const previewGame = selectedGame ?? currentGame;
+  const previewCoverUrl = customCoverUrl.trim() || previewGame?.coverImageUrl || null;
 
   return (
     <div className="panel surface-section p-6">
@@ -224,9 +228,9 @@ export function AdminCurrentGamePanel({
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[150px_1fr]">
         <div className="min-h-48 border-2 border-[var(--color-ink)] bg-[var(--color-lavender)]">
-          {previewGame?.coverImageUrl ? (
+          {previewCoverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewGame.coverImageUrl} alt="" className="h-full min-h-48 w-full object-cover" />
+            <img src={previewCoverUrl} alt="" className="h-full min-h-48 w-full object-cover" />
           ) : (
             <div className="flex h-full min-h-48 items-center justify-center px-4 text-center text-sm font-black uppercase text-[var(--color-ink-soft)]">
               Sem capa
@@ -309,6 +313,21 @@ export function AdminCurrentGamePanel({
                 ))}
               </div>
             ) : null}
+          </div>
+
+          <div className="mt-4">
+            <label className="mono text-[10px] uppercase tracking-[0.28em] text-[var(--color-ink-soft)]">
+              Capa personalizada (URL)
+            </label>
+            <Input
+              value={customCoverUrl}
+              onChange={(event) => setCustomCoverUrl(event.target.value)}
+              placeholder="https://image.api.playstation.com/..."
+              className="mt-2"
+            />
+            <p className="mt-2 text-xs leading-5 text-[var(--color-ink-soft)]">
+              Opcional. Cole uma imagem em alta qualidade (ex.: arte da PS Store) para usar no lugar da capa do IGDB.
+            </p>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">

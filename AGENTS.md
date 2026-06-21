@@ -16,6 +16,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - If a file already contains mojibake such as `IndicaÃ§Ãµes`, `vocÃª`, or `Ã¡`, fix the affected copy instead of copying the corrupted text forward.
 - When using `apply_patch`, write Portuguese copy with the intended accents directly in the patch and verify the rendered page or relevant source after editing.
 
+# Website Voice (No Self-Reference)
+
+The website must never refer to itself or describe its own interface, and it is not selling or promoting itself to the user.
+
+- Write user-facing copy about the viewer, the streamer, and what happens in the live — never about the site, its pages, panels, dashboards, navigation, or how it compares to other tools or interfaces.
+- Avoid self-referential or self-marketing phrasing such as `sem atravessar um painel cheio de números`, `a página inicial mostra...`, or `o que move a página`. Speak directly to the viewer and the live experience instead.
+
 # GitHub PR Linking
 
 When creating a GitHub PR, explicitly state which issue it closes in the PR description so GitHub links it automatically.
