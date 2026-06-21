@@ -73,11 +73,8 @@ export function AdminStreamerbotScriptsPanel({
     <div className="panel surface-section p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-            Streamer.bot
-          </p>
           <h2
-            className="mt-2 text-2xl font-bold uppercase"
+            className="text-2xl font-bold uppercase"
             style={{ fontFamily: "var(--font-display)" }}
           >
             Códigos C# da integração

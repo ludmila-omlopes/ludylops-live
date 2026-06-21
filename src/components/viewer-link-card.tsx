@@ -93,10 +93,7 @@ export function ViewerLinkCard({
     <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-8 sm:py-10">
       <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
         <div className="card-brutal-static bg-[var(--color-paper)] p-6 sm:p-8">
-          <p className="mono text-[10px] uppercase tracking-[0.28em] text-[var(--color-ink-soft)]">
-            Vínculo da live
-          </p>
-          <h2 className="mt-3 text-3xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
+          <h2 className="text-3xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
             {alreadyLinked ? "Adicionar outro canal do YouTube." : "Vincule seu canal do YouTube."}
           </h2>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--color-ink-soft)] sm:text-base">

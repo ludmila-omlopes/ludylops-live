@@ -23,11 +23,8 @@ export default async function VideosPage() {
       <section className="landing-plane surface-hero relative overflow-hidden py-8 sm:py-10">
         <div className="bg-dots-light pointer-events-none absolute inset-0 opacity-20" />
         <div className="relative mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
-          <p className="mono text-xs font-bold uppercase tracking-[0.32em] text-[var(--color-ink-soft)]">
-            Sugestões de vídeos
-          </p>
           <h1
-            className="mt-3 text-4xl uppercase sm:text-6xl lg:text-7xl"
+            className="text-4xl uppercase sm:text-6xl lg:text-7xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
             Me diz ao que reagir.

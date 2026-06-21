@@ -100,11 +100,8 @@ export function DeathCounterGamePanel({
 
   return (
     <div className="panel surface-section p-6">
-      <p className="mono text-xs uppercase tracking-[0.3em] text-[var(--color-ink-soft)]">
-        Contador de mortes
-      </p>
       <h2
-        className="mt-2 text-2xl font-bold uppercase"
+        className="text-2xl font-bold uppercase"
         style={{ fontFamily: "var(--font-display)" }}
       >
         Jogo ativo

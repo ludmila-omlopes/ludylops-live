@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { XIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { GAME_SUGGESTION_CREATION_COST } from "@/lib/game-suggestions/constants";
 import { validateGameSuggestionDraft } from "@/lib/game-suggestions/service";
-import { formatPipetz } from "@/lib/utils";
+import { cn, formatPipetz } from "@/lib/utils";
 
 type GameSearchResult = {
   igdbId: number;
@@ -37,11 +38,17 @@ export function GameSuggestForm({
   canSuggest = false,
   viewerBalance,
   creationCost = GAME_SUGGESTION_CREATION_COST,
+  titleId,
+  onRequestClose,
+  className,
 }: {
   loggedIn?: boolean;
   canSuggest?: boolean;
   viewerBalance?: number | null;
   creationCost?: number;
+  titleId?: string;
+  onRequestClose?: () => void;
+  className?: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -188,7 +195,10 @@ export function GameSuggestForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="panel surface-section relative overflow-hidden border-2 p-5 text-[var(--color-ink)] sm:p-6"
+      className={cn(
+        "panel surface-section relative overflow-hidden border-2 p-5 text-[var(--color-ink)] sm:p-6",
+        className,
+      )}
     >
       <div className="bg-dots-light pointer-events-none absolute inset-0 opacity-15" />
 
@@ -196,6 +206,7 @@ export function GameSuggestForm({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3
+              id={titleId}
               className="text-lg font-bold uppercase"
               style={{ fontFamily: "var(--font-display)" }}
             >
@@ -213,6 +224,17 @@ export function GameSuggestForm({
               <span className="retro-label neutral-chip !rounded-none !border !shadow-none">
                 saldo {formatPipetz(viewerBalance)}
               </span>
+            ) : null}
+            {onRequestClose ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="neutral"
+                aria-label="Fechar popup de sugestão"
+                onClick={onRequestClose}
+              >
+                <XIcon className="size-4" aria-hidden="true" />
+              </Button>
             ) : null}
           </div>
         </div>
@@ -256,7 +278,7 @@ export function GameSuggestForm({
 
             {searchFailed ? (
               <p className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
-                busca indisponivel; voce ainda pode enviar pelo nome
+                busca indisponível; você ainda pode enviar pelo nome
               </p>
             ) : null}
 

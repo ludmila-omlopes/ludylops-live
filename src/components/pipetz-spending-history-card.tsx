@@ -13,9 +13,6 @@ export function PipetzSpendingHistoryCard({
       <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="mono text-xs uppercase tracking-[0.24em] text-[var(--color-ink-soft)]">
-              Histórico
-            </p>
             <h2 className="text-2xl uppercase text-[var(--color-ink)]" style={{ fontFamily: "var(--font-display)" }}>
               Gastos de pipetz
             </h2>

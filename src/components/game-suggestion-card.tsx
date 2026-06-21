@@ -6,7 +6,7 @@ import { BadgeDollarSign, Clock3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { GameSuggestionWithMeta } from "@/lib/types";
-import { formatPipetz } from "@/lib/utils";
+import { cn, formatPipetz } from "@/lib/utils";
 
 type GameSearchResult = {
   igdbId: number;
@@ -16,6 +16,8 @@ type GameSearchResult = {
   platforms: string[];
   genres: string[];
 };
+
+export type GameSuggestionViewMode = "list" | "grid";
 
 function mapSuggestionError(message: string) {
   switch (message) {
@@ -111,6 +113,7 @@ function buildHowLongToBeatTooltip(suggestion: GameSuggestionWithMeta) {
 
 export function GameSuggestionCard({
   suggestion,
+  viewMode = "list",
   loggedIn = false,
   canBoost = false,
   canEditCatalog = false,
@@ -119,6 +122,7 @@ export function GameSuggestionCard({
 }: {
   suggestion: GameSuggestionWithMeta;
   index?: number;
+  viewMode?: GameSuggestionViewMode;
   loggedIn?: boolean;
   canBoost?: boolean;
   canEditCatalog?: boolean;
@@ -283,20 +287,44 @@ export function GameSuggestionCard({
   ]
     .filter(Boolean)
     .join(" / ");
+  const isGridMode = viewMode === "grid";
 
   return (
-    <article className="card-brutal relative overflow-hidden bg-[var(--color-paper)] p-0">
-      <div className="grid gap-0 md:grid-cols-[minmax(150px,190px)_1fr_auto]">
-        <div className="relative min-h-64 border-b-2 border-[var(--color-ink)] bg-[var(--color-paper)] md:min-h-0 md:border-b-0 md:border-r-1">
+    <article
+      className={cn(
+        "card-brutal relative overflow-hidden bg-[var(--color-paper)] p-0",
+        isGridMode && "self-start",
+      )}
+    >
+      <div
+        className={cn(
+          "grid gap-0",
+          !isGridMode && "md:grid-cols-[minmax(150px,190px)_1fr_auto]",
+        )}
+      >
+        <div
+          className={cn(
+            "relative border-b-2 border-[var(--color-ink)] bg-[var(--color-paper)]",
+            isGridMode ? "aspect-[4/3]" : "min-h-64 md:min-h-0 md:border-b-0 md:border-r-1",
+          )}
+        >
           {suggestion.coverImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={suggestion.coverImageUrl}
               alt={`Capa de ${displayName}`}
-              className="h-full min-h-64 w-full object-cover md:min-h-0"
+              className={cn(
+                "h-full w-full object-cover",
+                !isGridMode && "min-h-64 md:min-h-0",
+              )}
             />
           ) : (
-            <div className="flex h-full min-h-64 w-full items-center justify-center bg-[var(--color-lavender)] px-4 text-center md:min-h-0">
+            <div
+              className={cn(
+                "flex h-full w-full items-center justify-center bg-[var(--color-lavender)] px-4 text-center",
+                !isGridMode && "min-h-64 md:min-h-0",
+              )}
+            >
               <span
                 className="text-xl font-bold uppercase"
                 style={{ fontFamily: "var(--font-display)" }}
@@ -310,7 +338,10 @@ export function GameSuggestionCard({
         <div className="flex min-w-0 flex-col p-5 sm:p-6">
           <div className="min-w-0">
             <h3
-              className="text-2xl font-bold leading-none sm:text-3xl"
+              className={cn(
+                "font-bold leading-none",
+                isGridMode ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl",
+              )}
               style={{ fontFamily: "var(--font-display)" }}
             >
               {displayName}
@@ -496,7 +527,12 @@ export function GameSuggestionCard({
           ) : null}
         </div>
 
-        <aside className="flex items-start justify-between gap-4 border-t-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-5 md:min-w-36 md:flex-col md:border-l-1 md:border-t-0">
+        <aside
+          className={cn(
+            "flex items-start justify-between gap-4 border-t-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-5",
+            !isGridMode && "md:min-w-36 md:flex-col md:border-l-1 md:border-t-0",
+          )}
+        >
           <div>
             <p
               className="text-3xl font-bold leading-none text-[var(--color-purple-bold)] sm:text-4xl"

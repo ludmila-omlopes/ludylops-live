@@ -10,11 +10,8 @@ export default async function RankingPage() {
         <div className="bg-dots-light pointer-events-none absolute inset-0 opacity-15" />
         <div className="relative mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
           <div>
-            <p className="mono text-xs font-bold uppercase tracking-[0.32em]">
-              🏆 Ranking de pipetz
-            </p>
             <h1
-              className="mt-3 text-4xl uppercase sm:text-6xl lg:text-7xl"
+              className="text-4xl uppercase sm:text-6xl lg:text-7xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Quem ta mandando na live.
