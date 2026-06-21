@@ -76,6 +76,11 @@ export type ProductRecommendationLinkKind =
   | "external"
   | "affiliate";
 
+export type ProductRecommendationModerationStatus =
+  | "pending"
+  | "approved"
+  | "rejected";
+
 export interface ViewerRecord {
   id: string;
   googleUserId: string | null;
@@ -673,6 +678,7 @@ export interface ProductRecommendationRecord {
   href: string;
   storeLabel: string;
   linkKind: ProductRecommendationLinkKind;
+  moderationStatus: ProductRecommendationModerationStatus;
   isActive: boolean;
   sortOrder: number;
   createdAt: string;

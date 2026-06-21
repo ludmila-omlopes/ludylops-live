@@ -2330,9 +2330,22 @@ function isQuoteOverlayActive(overlay: QuoteOverlayStateRecord | null, now = Dat
   return new Date(overlay.expiresAt).getTime() > now;
 }
 
-function serializeProductRecommendation(
-  row: typeof productRecommendations.$inferSelect,
-): ProductRecommendationRecord {
+type SerializableProductRecommendationRow = Omit<
+  typeof productRecommendations.$inferSelect,
+  "moderationStatus"
+> & {
+  moderationStatus?: string | null;
+};
+
+function normalizeProductRecommendationModerationStatus(
+  value: string | null | undefined,
+): ProductRecommendationRecord["moderationStatus"] {
+  return value === "pending" || value === "approved" || value === "rejected"
+    ? value
+    : "approved";
+}
+
+function serializeProductRecommendation(row: SerializableProductRecommendationRow): ProductRecommendationRecord {
   return {
     id: row.id,
     slug: row.slug,
@@ -2343,6 +2356,7 @@ function serializeProductRecommendation(
     href: row.href,
     storeLabel: row.storeLabel,
     linkKind: row.linkKind as ProductRecommendationRecord["linkKind"],
+    moderationStatus: normalizeProductRecommendationModerationStatus(row.moderationStatus),
     isActive: row.isActive,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
@@ -6022,7 +6036,9 @@ export async function listProductRecommendations(options?: {
     const store = getDemoStore();
     const source = includeInactive
       ? store.productRecommendations
-      : store.productRecommendations.filter((entry) => entry.isActive);
+      : store.productRecommendations.filter(
+          (entry) => entry.isActive && (entry.moderationStatus ?? "approved") === "approved",
+        );
 
     return [...source].sort((a, b) => {
       if (a.sortOrder !== b.sortOrder) {
@@ -6041,23 +6057,79 @@ export async function listProductRecommendations(options?: {
       : await db
           .select()
           .from(productRecommendations)
-          .where(eq(productRecommendations.isActive, true))
+          .where(
+            and(
+              eq(productRecommendations.isActive, true),
+              eq(productRecommendations.moderationStatus, "approved"),
+            ),
+          )
           .orderBy(productRecommendations.sortOrder, productRecommendations.name);
 
     return rows.map(serializeProductRecommendation);
   } catch (error) {
     if (isMissingProductRecommendationSchemaError(error)) {
-      const store = getDemoStore();
-      const source = includeInactive
-        ? store.productRecommendations
-        : store.productRecommendations.filter((entry) => entry.isActive);
+      try {
+        const legacyRows = includeInactive
+          ? await db
+              .select({
+                id: productRecommendations.id,
+                slug: productRecommendations.slug,
+                name: productRecommendations.name,
+                category: productRecommendations.category,
+                context: productRecommendations.context,
+                imageUrl: productRecommendations.imageUrl,
+                href: productRecommendations.href,
+                storeLabel: productRecommendations.storeLabel,
+                linkKind: productRecommendations.linkKind,
+                isActive: productRecommendations.isActive,
+                sortOrder: productRecommendations.sortOrder,
+                createdAt: productRecommendations.createdAt,
+                updatedAt: productRecommendations.updatedAt,
+              })
+              .from(productRecommendations)
+              .orderBy(productRecommendations.sortOrder, productRecommendations.name)
+          : await db
+              .select({
+                id: productRecommendations.id,
+                slug: productRecommendations.slug,
+                name: productRecommendations.name,
+                category: productRecommendations.category,
+                context: productRecommendations.context,
+                imageUrl: productRecommendations.imageUrl,
+                href: productRecommendations.href,
+                storeLabel: productRecommendations.storeLabel,
+                linkKind: productRecommendations.linkKind,
+                isActive: productRecommendations.isActive,
+                sortOrder: productRecommendations.sortOrder,
+                createdAt: productRecommendations.createdAt,
+                updatedAt: productRecommendations.updatedAt,
+              })
+              .from(productRecommendations)
+              .where(eq(productRecommendations.isActive, true))
+              .orderBy(productRecommendations.sortOrder, productRecommendations.name);
 
-      return [...source].sort((a, b) => {
-        if (a.sortOrder !== b.sortOrder) {
-          return a.sortOrder - b.sortOrder;
+        return legacyRows.map((row) =>
+          serializeProductRecommendation({ ...row, moderationStatus: "approved" }),
+        );
+      } catch (legacyError) {
+        if (!isMissingProductRecommendationSchemaError(legacyError)) {
+          throw legacyError;
         }
-        return a.name.localeCompare(b.name);
-      });
+
+        const store = getDemoStore();
+        const source = includeInactive
+          ? store.productRecommendations
+          : store.productRecommendations.filter(
+              (entry) => entry.isActive && (entry.moderationStatus ?? "approved") === "approved",
+            );
+
+        return [...source].sort((a, b) => {
+          if (a.sortOrder !== b.sortOrder) {
+            return a.sortOrder - b.sortOrder;
+          }
+          return a.name.localeCompare(b.name);
+        });
+      }
     }
     throw error;
   }
@@ -8769,6 +8841,7 @@ export async function upsertProductRecommendation(input: ProductRecommendationRe
         href: input.href,
         storeLabel: input.storeLabel,
         linkKind: input.linkKind,
+        moderationStatus: input.moderationStatus,
         isActive: input.isActive,
         sortOrder: input.sortOrder,
         createdAt: new Date(input.createdAt),
@@ -8785,6 +8858,7 @@ export async function upsertProductRecommendation(input: ProductRecommendationRe
           href: input.href,
           storeLabel: input.storeLabel,
           linkKind: input.linkKind,
+          moderationStatus: input.moderationStatus,
           isActive: input.isActive,
           sortOrder: input.sortOrder,
           updatedAt: new Date(input.updatedAt),
@@ -8809,8 +8883,12 @@ export async function upsertProductRecommendation(input: ProductRecommendationRe
 }
 
 export async function createProductRecommendationFromInput(
-  input: Omit<ProductRecommendationRecord, "id" | "slug" | "createdAt" | "updatedAt"> & {
+  input: Omit<
+    ProductRecommendationRecord,
+    "id" | "slug" | "createdAt" | "updatedAt" | "moderationStatus"
+  > & {
     slug?: string;
+    moderationStatus?: ProductRecommendationRecord["moderationStatus"];
   },
 ) {
   const now = new Date().toISOString();
@@ -8824,6 +8902,7 @@ export async function createProductRecommendationFromInput(
     href: input.href.trim(),
     storeLabel: input.storeLabel.trim(),
     linkKind: input.linkKind,
+    moderationStatus: input.moderationStatus ?? "approved",
     isActive: input.isActive,
     sortOrder: input.sortOrder,
     createdAt: now,
@@ -8842,10 +8921,32 @@ export async function createProductRecommendationFromInput(
   return upsertProductRecommendation(item);
 }
 
+export async function createProductRecommendationSubmission(
+  input: Pick<
+    ProductRecommendationRecord,
+    "name" | "category" | "context" | "imageUrl" | "href" | "storeLabel"
+  >,
+) {
+  const baseSlug = slugify(input.name);
+  if (!baseSlug) {
+    throw new Error("invalid_slug");
+  }
+
+  return createProductRecommendationFromInput({
+    ...input,
+    slug: `${baseSlug}-${shortCode(6).toLowerCase()}`,
+    linkKind: "external",
+    moderationStatus: "pending",
+    isActive: false,
+    sortOrder: 0,
+  });
+}
+
 export async function updateProductRecommendationStatus(input: {
   recommendationId: string;
   isActive?: boolean;
   category?: ProductRecommendationRecord["category"];
+  moderationStatus?: ProductRecommendationRecord["moderationStatus"];
 }) {
   const db = getDb();
   const updatedAt = new Date();
@@ -8863,6 +8964,14 @@ export async function updateProductRecommendationStatus(input: {
     if (input.category !== undefined) {
       recommendation.category = input.category;
     }
+    if (input.moderationStatus !== undefined) {
+      recommendation.moderationStatus = input.moderationStatus;
+      if (input.moderationStatus === "approved" && input.isActive === undefined) {
+        recommendation.isActive = true;
+      } else if (input.moderationStatus === "rejected") {
+        recommendation.isActive = false;
+      }
+    }
     recommendation.updatedAt = updatedAt.toISOString();
     return recommendation;
   }
@@ -8876,6 +8985,14 @@ export async function updateProductRecommendationStatus(input: {
     }
     if (input.category !== undefined) {
       changes.category = input.category;
+    }
+    if (input.moderationStatus !== undefined) {
+      changes.moderationStatus = input.moderationStatus;
+      if (input.moderationStatus === "approved" && input.isActive === undefined) {
+        changes.isActive = true;
+      } else if (input.moderationStatus === "rejected") {
+        changes.isActive = false;
+      }
     }
 
     const [updated] = await db
@@ -8902,6 +9019,14 @@ export async function updateProductRecommendationStatus(input: {
       }
       if (input.category !== undefined) {
         recommendation.category = input.category;
+      }
+      if (input.moderationStatus !== undefined) {
+        recommendation.moderationStatus = input.moderationStatus;
+        if (input.moderationStatus === "approved" && input.isActive === undefined) {
+          recommendation.isActive = true;
+        } else if (input.moderationStatus === "rejected") {
+          recommendation.isActive = false;
+        }
       }
       recommendation.updatedAt = updatedAt.toISOString();
       return recommendation;

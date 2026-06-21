@@ -72,6 +72,7 @@ import {
   createLiveLikeGoal,
   createVideoSuggestion,
   createProductRecommendationFromInput,
+  createProductRecommendationSubmission,
   deleteProductRecommendation,
   applyGoogleCrossAccountProtectionEvent,
   claimViewerLinkCodeFromStreamerbot,
@@ -87,6 +88,7 @@ import {
   ingestStreamerbotEvent,
   issueViewerLinkCode,
   listAdminProductRecommendations,
+  listProductRecommendations,
   listAdminViewerDirectory,
   listRecentSubscriberAlerts,
   listBets,
@@ -112,6 +114,7 @@ import {
   cancelQueuedQuoteOverlays,
   updateGameSuggestionStatus,
   updateGameSuggestionBoostSettings,
+  updateProductRecommendationStatus,
   updateVideoSuggestionStatus,
 } from "@/lib/db/repository";
 import { GOOGLE_RISC_EVENT_TYPES } from "@/lib/google/risc";
@@ -3587,6 +3590,61 @@ describe("product recommendations", () => {
 
     expect(deleted.id).toBe(created.id);
     expect(recommendations.some((entry) => entry.id === created.id)).toBe(false);
+  });
+
+  it("keeps public submissions pending and hidden until approval", async () => {
+    const submitted = await createProductRecommendationSubmission({
+      name: "Suporte de mesa",
+      category: "perifericos",
+      context: "Ajuda a organizar controles e acessórios no setup.",
+      imageUrl: "/uploads/suporte-mesa.jpg",
+      href: "https://example.com/suporte-mesa",
+      storeLabel: "Loja Teste",
+    });
+
+    expect(submitted.moderationStatus).toBe("pending");
+    expect(submitted.isActive).toBe(false);
+    expect(await listProductRecommendations()).not.toContainEqual(
+      expect.objectContaining({ id: submitted.id }),
+    );
+
+    await updateProductRecommendationStatus({
+      recommendationId: submitted.id,
+      moderationStatus: "approved",
+    });
+
+    expect(await listProductRecommendations()).toContainEqual(
+      expect.objectContaining({
+        id: submitted.id,
+        moderationStatus: "approved",
+        isActive: true,
+      }),
+    );
+  });
+
+  it("keeps rejected submissions hidden from the public list", async () => {
+    const submitted = await createProductRecommendationSubmission({
+      name: "Cabo USB-C",
+      category: "perifericos",
+      context: "Cabo resistente para carregar acessórios da mesa.",
+      imageUrl: "/uploads/cabo-usb-c.jpg",
+      href: "https://example.com/cabo-usb-c",
+      storeLabel: "Loja Teste",
+    });
+
+    const rejected = await updateProductRecommendationStatus({
+      recommendationId: submitted.id,
+      moderationStatus: "rejected",
+    });
+
+    expect(rejected.moderationStatus).toBe("rejected");
+    expect(rejected.isActive).toBe(false);
+    expect(await listAdminProductRecommendations()).toContainEqual(
+      expect.objectContaining({ id: submitted.id, moderationStatus: "rejected" }),
+    );
+    expect(await listProductRecommendations()).not.toContainEqual(
+      expect.objectContaining({ id: submitted.id }),
+    );
   });
 
   it("rejects deleting an unknown recommendation", async () => {
