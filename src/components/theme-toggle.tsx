@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { Moon, Sun } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -54,12 +55,17 @@ export function ThemeToggle({ initialTheme = null }: { initialTheme?: ThemeMode 
       onClick={handleToggle}
       variant="accent"
       size="xs"
-      className="min-w-[104px]"
+      className="min-w-0 px-3 sm:min-w-[104px]"
       aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
       aria-pressed={isDark}
       suppressHydrationWarning
     >
-      <span className="mono tracking-[0.18em]" suppressHydrationWarning>
+      {isDark ? (
+        <Sun className="size-4" aria-hidden="true" />
+      ) : (
+        <Moon className="size-4" aria-hidden="true" />
+      )}
+      <span className="mono hidden tracking-[0.18em] sm:inline" suppressHydrationWarning>
         {isDark ? "LIGHT ->" : "DARK ->"}
       </span>
     </Button>
