@@ -17,6 +17,18 @@ import type { ProductRecommendationRecord } from "@/lib/types";
 
 const INITIAL_VISIBLE_RECOMMENDATIONS = 6;
 
+const moderationStatusLabels: Record<ProductRecommendationRecord["moderationStatus"], string> = {
+  pending: "Pendente",
+  approved: "Aprovado",
+  rejected: "Rejeitado",
+};
+
+const moderationStatusBgMap: Record<ProductRecommendationRecord["moderationStatus"], string> = {
+  pending: "var(--color-yellow)",
+  approved: "var(--color-mint)",
+  rejected: "var(--color-rose)",
+};
+
 function mapRecommendationError(message: string) {
   switch (message) {
     case "recommendation_slug_exists":
@@ -51,6 +63,25 @@ export function AdminRecommendationsPanel({
   const [pendingCategories, setPendingCategories] = useState<Record<string, string>>({});
   const [showAllRecommendations, setShowAllRecommendations] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const sortedRecommendations = [...recommendations].sort((left, right) => {
+    if (left.moderationStatus !== right.moderationStatus) {
+      if (left.moderationStatus === "pending") {
+        return -1;
+      }
+      if (right.moderationStatus === "pending") {
+        return 1;
+      }
+    }
+
+    if (left.sortOrder !== right.sortOrder) {
+      return left.sortOrder - right.sortOrder;
+    }
+
+    return left.name.localeCompare(right.name, "pt-BR");
+  });
+  const pendingSubmissionCount = recommendations.filter(
+    (item) => item.moderationStatus === "pending",
+  ).length;
   const pendingCategoryChanges = recommendations
     .map((item) => ({
       item,
@@ -64,9 +95,9 @@ export function AdminRecommendationsPanel({
     ],
   );
   const visibleRecommendations = showAllRecommendations
-    ? recommendations
-    : recommendations.slice(0, INITIAL_VISIBLE_RECOMMENDATIONS);
-  const hiddenRecommendationCount = Math.max(recommendations.length - visibleRecommendations.length, 0);
+    ? sortedRecommendations
+    : sortedRecommendations.slice(0, INITIAL_VISIBLE_RECOMMENDATIONS);
+  const hiddenRecommendationCount = Math.max(sortedRecommendations.length - visibleRecommendations.length, 0);
 
   function resetForm() {
     setName("");
@@ -185,6 +216,33 @@ export function AdminRecommendationsPanel({
     });
   }
 
+  function updateModerationStatus(
+    item: ProductRecommendationRecord,
+    moderationStatus: ProductRecommendationRecord["moderationStatus"],
+  ) {
+    setFeedback(null);
+    startTransition(async () => {
+      try {
+        await runAction(`/api/admin/recommendations/${item.id}`, "PATCH", {
+          moderationStatus,
+          isActive: moderationStatus === "approved" ? true : false,
+        });
+        setFieldErrors({});
+        setConfirmingDeleteId(null);
+        setFeedback(
+          moderationStatus === "approved"
+            ? "Recomendação aprovada."
+            : "Recomendação rejeitada.",
+        );
+        router.refresh();
+      } catch (error) {
+        setFeedback(
+          error instanceof Error ? mapRecommendationError(error.message) : "Falha ao moderar recomendação.",
+        );
+      }
+    });
+  }
+
   function updatePendingCategory(item: ProductRecommendationRecord, nextCategory: string) {
     setFeedback(null);
     setPendingCategories((current) => {
@@ -266,6 +324,13 @@ export function AdminRecommendationsPanel({
           >
             Produtos recomendados
           </h2>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <span className="retro-label neutral-chip">
+            {pendingSubmissionCount === 1
+              ? "1 envio pendente"
+              : `${pendingSubmissionCount} envios pendentes`}
+          </span>
         </div>
         {feedback ? <div className="retro-label neutral-chip">{feedback}</div> : null}
       </div>
@@ -500,6 +565,12 @@ export function AdminRecommendationsPanel({
                           >
                             {item.isActive ? "Ativo" : "Inativo"}
                           </span>
+                          <span
+                            className="badge-brutal px-2 py-1 text-[10px] text-[var(--color-ink)]"
+                            style={{ backgroundColor: moderationStatusBgMap[item.moderationStatus] }}
+                          >
+                            {moderationStatusLabels[item.moderationStatus]}
+                          </span>
                         </div>
 
                         <p className="mt-2 text-sm text-[var(--color-ink-soft)]">{item.context}</p>
@@ -528,6 +599,28 @@ export function AdminRecommendationsPanel({
                       </div>
 
                       <div className="flex flex-col items-end gap-2">
+                        {item.moderationStatus !== "approved" ? (
+                          <button
+                            type="button"
+                            onClick={() => updateModerationStatus(item, "approved")}
+                            disabled={isPending}
+                            className="btn-brutal bg-[var(--color-mint)] px-3 py-2 text-xs disabled:opacity-60"
+                          >
+                            Aprovar
+                          </button>
+                        ) : null}
+
+                        {item.moderationStatus !== "rejected" ? (
+                          <button
+                            type="button"
+                            onClick={() => updateModerationStatus(item, "rejected")}
+                            disabled={isPending}
+                            className="btn-brutal bg-[var(--color-rose)] px-3 py-2 text-xs disabled:opacity-60"
+                          >
+                            Rejeitar
+                          </button>
+                        ) : null}
+
                         <button
                           type="button"
                           onClick={() => toggleStatus(item)}

@@ -4,6 +4,8 @@ import {
   flattenProductRecommendationSchemaErrors,
   formatProductRecommendationSchemaError,
   productRecommendationSchema,
+  productRecommendationStatusSchema,
+  productRecommendationSubmissionSchema,
 } from "@/lib/recommendation-schemas";
 
 describe("productRecommendationSchema", () => {
@@ -21,6 +23,34 @@ describe("productRecommendationSchema", () => {
     });
 
     expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.moderationStatus).toBe("approved");
+    }
+  });
+
+  it("accepts public recommendation submissions without admin-only fields", () => {
+    const parsed = productRecommendationSubmissionSchema.safeParse({
+      name: "Produto da comunidade",
+      category: "perifericos",
+      context: "Produto útil para organizar o setup da live.",
+      imageUrl: "https://example.com/produto.jpg",
+      href: "https://example.com/produto",
+      storeLabel: "Loja Teste",
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it("accepts moderation status updates", () => {
+    expect(productRecommendationStatusSchema.safeParse({ moderationStatus: "approved" }).success).toBe(
+      true,
+    );
+    expect(productRecommendationStatusSchema.safeParse({ moderationStatus: "rejected" }).success).toBe(
+      true,
+    );
+    expect(productRecommendationStatusSchema.safeParse({ moderationStatus: "published" }).success).toBe(
+      false,
+    );
   });
 
   it("returns friendly field errors for invalid form data", () => {

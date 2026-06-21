@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ProductRecommendationCard } from "@/components/product-recommendation-card";
+import { ProductRecommendationSubmitDialog } from "@/components/product-recommendation-submit-form";
 import { listProductRecommendations } from "@/lib/db/repository";
 import {
   getRecommendationCategoryLabel,
@@ -50,6 +51,9 @@ export default async function ProdutinhosPage({ searchParams }: ProdutinhosPageP
             virar afiliado, isso aparece marcado no próprio item antes do
             clique.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <ProductRecommendationSubmitDialog />
+          </div>
         </div>
       </section>
 

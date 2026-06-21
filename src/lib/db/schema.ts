@@ -417,6 +417,7 @@ export const productRecommendations = pgTable(
     href: text("href").notNull(),
     storeLabel: varchar("store_label", { length: 120 }).notNull(),
     linkKind: varchar("link_kind", { length: 32 }).notNull(),
+    moderationStatus: varchar("moderation_status", { length: 32 }).default("approved").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     sortOrder: integer("sort_order").default(0).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -424,6 +425,9 @@ export const productRecommendations = pgTable(
   },
   (table) => ({
     slugIdx: uniqueIndex("product_recommendations_slug_idx").on(table.slug),
+    moderationStatusIdx: index("product_recommendations_moderation_status_idx").on(
+      table.moderationStatus,
+    ),
   }),
 );
 

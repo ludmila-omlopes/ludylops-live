@@ -25,6 +25,7 @@ export async function PATCH(
       recommendationId: id,
       isActive: payload.isActive,
       category: payload.category,
+      moderationStatus: payload.moderationStatus,
     });
 
     return ok(updated);

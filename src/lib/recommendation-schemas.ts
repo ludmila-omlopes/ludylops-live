@@ -15,6 +15,12 @@ const productRecommendationCategorySchema = z
   .min(2, "Digite pelo menos 2 caracteres na categoria.")
   .max(32, "Use no máximo 32 caracteres na categoria.");
 
+export const productRecommendationModerationStatusSchema = z.enum([
+  "pending",
+  "approved",
+  "rejected",
+]);
+
 export const productRecommendationSchema = z.object({
   name: z
     .string()
@@ -54,6 +60,7 @@ export const productRecommendationSchema = z.object({
     .min(2, "Digite pelo menos 2 caracteres no nome da loja.")
     .max(120, "Use no máximo 120 caracteres no nome da loja."),
   linkKind: z.enum(["external", "affiliate"]).default("external"),
+  moderationStatus: productRecommendationModerationStatusSchema.default("approved"),
   isActive: z.boolean().default(true),
   sortOrder: z
     .number()
@@ -62,12 +69,30 @@ export const productRecommendationSchema = z.object({
     .default(0),
 });
 
-export const productRecommendationStatusSchema = z.object({
-  isActive: z.boolean().optional(),
-  category: productRecommendationCategorySchema.optional(),
-}).refine((value) => value.isActive !== undefined || value.category !== undefined, {
-  message: "Informe ao menos um campo para atualizar.",
+export const productRecommendationSubmissionSchema = productRecommendationSchema.pick({
+  name: true,
+  category: true,
+  context: true,
+  imageUrl: true,
+  href: true,
+  storeLabel: true,
 });
+
+export const productRecommendationStatusSchema = z
+  .object({
+    isActive: z.boolean().optional(),
+    category: productRecommendationCategorySchema.optional(),
+    moderationStatus: productRecommendationModerationStatusSchema.optional(),
+  })
+  .refine(
+    (value) =>
+      value.isActive !== undefined ||
+      value.category !== undefined ||
+      value.moderationStatus !== undefined,
+    {
+      message: "Informe ao menos um campo para atualizar.",
+    },
+  );
 
 export function formatProductRecommendationSchemaError(error: z.ZodError) {
   return error.issues[0]?.message ?? "Payload inválido.";
