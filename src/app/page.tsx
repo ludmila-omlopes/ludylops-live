@@ -196,6 +196,15 @@ function HeroActions({
   if (hasUsableSession) {
     return (
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <a
+          href={YOUTUBE_CHANNEL_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="btn-brutal bg-[var(--color-pink)] px-6 py-3 text-sm text-[var(--color-accent-ink)]"
+        >
+          <CirclePlay className="size-4" aria-hidden="true" />
+          Ir pro canal
+        </a>
         <Link href="/apostas" className="btn-brutal accent-button px-6 py-3 text-sm">
           <Ticket className="size-4" aria-hidden="true" />
           Abrir Apostas
@@ -265,7 +274,7 @@ function HomeHero({
   viewerName: string | null;
 }) {
   const title = hasUsableSession
-    ? "Você já está na live da Ludylops."
+    ? "Estou online, vem pra live!"
     : isLive
       ? "A live já começou."
       : "Oi, eu sou a Ludylops. Eu jogo, o chat palpita.";
