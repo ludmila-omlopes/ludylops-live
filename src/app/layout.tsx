@@ -33,8 +33,9 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pipetz",
-  description: "Ganhe pipetz na live, resgate recompensas, aposte em desafios e sugira jogos.",
+  title: "Ludylops Games: eu disseco jogos no YouTube",
+  description:
+    "Faço lives e vídeos de jogos no YouTube, com campanhas longas, sugestões do chat e muito bate-papo. Acompanhe o jogo atual, junte pipetz e participe do que acontece ao vivo.",
 };
 
 const themeScript = `

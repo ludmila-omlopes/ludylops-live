@@ -1,11 +1,15 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   CirclePlay,
+  Coins,
   Gamepad2,
   Sparkles,
   Ticket,
+  Trophy,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,19 +30,60 @@ import type { BetWithOptionsRecord, CurrentGameRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const LUDYLOPS_PROFILE_IMAGE = "/selfie2.png";
-
-type HomeAction = {
-  href: string;
-  title: string;
-  body: string;
-  cta: string;
-  icon: LucideIcon;
-  bg: string;
-};
+const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@ludylopsgames";
+const YOUTUBE_LIVE_URL = `${YOUTUBE_CHANNEL_URL}/live`;
+const YOUTUBE_STREAMS_URL = `${YOUTUBE_CHANNEL_URL}/streams`;
 
 type HomePageProps = {
   searchParams: Promise<{ googleAccountProtection?: string | string[] | undefined }>;
 };
+
+type PipetzStep = {
+  title: string;
+  body: string;
+  icon: LucideIcon;
+  bg: string;
+};
+
+type BetweenLivesLink = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  bg: string;
+};
+
+const PIPETZ_STEPS: PipetzStep[] = [
+  {
+    title: "Junte pipetz",
+    body: "Os pontos entram na sua conta enquanto você acompanha a transmissão.",
+    icon: Coins,
+    bg: "bg-[var(--color-mint)]",
+  },
+  {
+    title: "Dê seus palpites",
+    body: "Escolha um lado nos bolões que eu abrir durante o jogo.",
+    icon: Ticket,
+    bg: "bg-[var(--color-pink)]",
+  },
+  {
+    title: "Ative resgates",
+    body: "Troque pipetz por efeitos que aparecem ao vivo.",
+    icon: Sparkles,
+    bg: "bg-[var(--color-blue)]",
+  },
+  {
+    title: "Acompanhe o ranking",
+    body: "Veja sua posição e quem mais está participando da comunidade.",
+    icon: Trophy,
+    bg: "bg-[var(--color-purple)]",
+  },
+];
+
+const BETWEEN_LIVES_LINKS: BetweenLivesLink[] = [
+  { href: "/jogos", label: "Sugestões de jogos", icon: Gamepad2, bg: "bg-[var(--color-mint)]" },
+  { href: "/videos", label: "Vídeos e pautas", icon: CirclePlay, bg: "bg-[var(--color-blue)]" },
+  { href: "/indicacoes", label: "Canais que me inspiram", icon: Users, bg: "bg-[var(--color-purple)]" },
+];
 
 function getGameMetadataParts(game: CurrentGameRecord | null) {
   if (!game) {
@@ -91,13 +136,13 @@ function AccountProtectionNotice({ status }: { status: AccountProtectionStatus }
   );
 }
 
-function HeroGameLabel({ game }: { game: CurrentGameRecord | null }) {
+function HeroGameLabel({ game, isLive }: { game: CurrentGameRecord | null; isLive: boolean }) {
   const metadata = getGameMetadataParts(game);
 
   return (
     <div className="mt-8 w-full max-w-[calc(100vw-2rem)] border-l-[6px] border-[var(--color-pink)] bg-white/90 p-4 text-black shadow-[5px_5px_0_rgba(255,255,255,0.22)] backdrop-blur dark:bg-black/70 dark:text-white dark:shadow-[5px_5px_0_rgba(0,0,0,0.45)] sm:max-w-2xl">
       <p className="mono text-[10px] font-black uppercase tracking-[0.24em] text-black/65 dark:text-white/65">
-        {game ? "jogando agora" : "ao vivo"}
+        {game ? (isLive ? "jogando agora" : "campanha atual") : "ao vivo"}
       </p>
       <h2
         className="mt-2 break-words text-3xl uppercase leading-[0.9] sm:text-4xl"
@@ -121,7 +166,33 @@ function HeroGameLabel({ game }: { game: CurrentGameRecord | null }) {
   );
 }
 
-function HeroActions({ hasUsableSession }: { hasUsableSession: boolean }) {
+function HeroAvatar({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "relative aspect-square shrink-0 overflow-hidden rounded-full border-[3px] border-[var(--color-ink)] bg-[var(--color-pink)] shadow-[4px_4px_0_var(--shadow-color)]",
+        className,
+      )}
+    >
+      <Image
+        src={LUDYLOPS_PROFILE_IMAGE}
+        alt="Foto da Ludylops"
+        fill
+        sizes="16rem"
+        className="object-cover object-top contrast-110"
+        priority
+      />
+    </div>
+  );
+}
+
+function HeroActions({
+  hasUsableSession,
+  isLive,
+}: {
+  hasUsableSession: boolean;
+  isLive: boolean;
+}) {
   if (hasUsableSession) {
     return (
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -141,16 +212,40 @@ function HeroActions({ hasUsableSession }: { hasUsableSession: boolean }) {
     );
   }
 
+  if (isLive) {
+    return (
+      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <a
+          href={YOUTUBE_LIVE_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="btn-brutal accent-button px-6 py-3 text-sm"
+        >
+          <CirclePlay className="size-4" aria-hidden="true" />
+          Assistir no YouTube
+        </a>
+        <AuthButtons label="Participar da live" />
+      </div>
+    );
+  }
+
   return (
     <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-      <AuthButtons />
-      <Link href="/apostas" className="btn-brutal accent-button px-6 py-3 text-sm">
-        <Ticket className="size-4" aria-hidden="true" />
-        Ver Apostas
-      </Link>
-      <Link href="/jogos" className="btn-brutal bg-[var(--color-mint)] px-6 py-3 text-sm text-[var(--color-accent-ink)]">
-        <Gamepad2 className="size-4" aria-hidden="true" />
-        Ver Jogos
+      <a
+        href={YOUTUBE_CHANNEL_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="btn-brutal accent-button px-6 py-3 text-sm"
+      >
+        <CirclePlay className="size-4" aria-hidden="true" />
+        Ver próxima Live
+      </a>
+      <Link
+        href="#pipetz"
+        className="btn-brutal bg-[var(--color-mint)] px-6 py-3 text-sm text-[var(--color-accent-ink)]"
+      >
+        <Coins className="size-4" aria-hidden="true" />
+        Como funcionam os pipetz
       </Link>
     </div>
   );
@@ -171,14 +266,18 @@ function HomeHero({
 }) {
   const title = hasUsableSession
     ? "Você já está na live da Ludylops."
-    : "A live da Ludylops começa aqui.";
+    : isLive
+      ? "A live já começou."
+      : "Oi, eu sou a Ludylops. Eu jogo, o chat palpita.";
   const description = accountProtectionStatus
     ? accountProtectionStatus === "google_signin_blocked"
       ? "Seu acesso com Google foi colocado em espera por segurança. Você ainda pode acompanhar a live enquanto revisa a conta."
       : "Sua sessão local foi encerrada por segurança. Quando você entrar de novo, os caminhos da live voltam para a sua conta."
     : hasUsableSession
       ? "Entre nas apostas, acione resgates e leve suas sugestões para o que acontece ao vivo."
-      : "Faça login para participar das apostas, resgatar efeitos e sugerir os jogos que movem a stream.";
+      : isLive
+        ? "Entre no YouTube para assistir, e faça login aqui pra participar dos palpites e usar seus pipetz com resgates de interação comigo."
+        : "Faço lives e vídeos de jogos no YouTube, com campanhas longas, sugestões do chat e muito bate-papo! Aqui você acompanha o jogo atual, junta pipetz e participa do que acontece ao vivo.";
 
   return (
     <section className="landing-plane relative isolate overflow-hidden bg-black text-white">
@@ -200,7 +299,8 @@ function HomeHero({
 
       <div className="mx-auto flex min-h-[min(760px,calc(100svh-9rem))] w-full max-w-[1520px] items-center px-4 py-12 sm:px-6 sm:py-16 lg:px-10 lg:py-18">
         <div className="w-full min-w-0 max-w-[calc(100vw-2rem)] sm:max-w-4xl">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <HeroAvatar className="w-20 sm:w-24" />
             <LivestreamIndicator isLive={isLive} />
             {viewerName ? (
               <span className="mono border border-white/40 bg-black/45 px-3 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-white">
@@ -210,7 +310,7 @@ function HomeHero({
           </div>
 
           <h1
-            className="mt-6 max-w-4xl break-words text-5xl leading-[0.88] text-pretty [overflow-wrap:anywhere] sm:text-6xl lg:text-[5.8rem]"
+            className="mt-6 max-w-4xl break-words text-4xl leading-[0.92] text-pretty [overflow-wrap:anywhere] sm:text-5xl lg:text-[4.25rem]"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {title}
@@ -224,123 +324,58 @@ function HomeHero({
             <AccountProtectionNotice status={accountProtectionStatus} />
           ) : null}
 
-          <HeroActions hasUsableSession={hasUsableSession} />
-          <HeroGameLabel game={currentGame} />
+          <HeroActions hasUsableSession={hasUsableSession} isLive={isLive} />
+          <HeroGameLabel game={currentGame} isLive={isLive} />
         </div>
       </div>
     </section>
   );
 }
 
-function ActionTile({ action }: { action: HomeAction }) {
-  const Icon = action.icon;
-
+function PipetzSection() {
   return (
-    <article className={cn("flex h-full min-w-0 flex-col justify-between border-[3px] border-[var(--color-ink)] p-5", action.bg)}>
-      <div>
-        <div className="flex size-12 items-center justify-center border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] text-[var(--color-ink)]">
-          <Icon className="size-6" aria-hidden="true" />
-        </div>
-        <h3
-          className="mt-5 text-3xl uppercase leading-[0.9]"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          {action.title}
-        </h3>
-        <p className="mt-4 text-sm font-medium leading-7 text-[var(--color-accent-ink-soft)]">
-          {action.body}
-        </p>
-      </div>
-      <Link href={action.href} className="mt-6 inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.08em] underline decoration-[3px] underline-offset-4">
-        {action.cta}
-        <ArrowRight className="size-4" aria-hidden="true" />
-      </Link>
-    </article>
-  );
-}
-
-function LiveActionSection({
-  activeBet,
-  hasUsableSession,
-}: {
-  activeBet: BetWithOptionsRecord | undefined;
-  hasUsableSession: boolean;
-}) {
-  const actions: HomeAction[] = hasUsableSession
-    ? [
-        {
-          href: "/apostas",
-          title: activeBet ? "Aposta aberta" : "Apostas da live",
-          body: activeBet
-            ? activeBet.question
-            : "Quando a live abre um palpite, esse é o caminho direto para entrar na disputa.",
-          cta: "Abrir Apostas",
-          icon: Ticket,
-          bg: "bg-[var(--color-pink)] text-[var(--color-accent-ink)]",
-        },
-        {
-          href: "/me",
-          title: "Minha área",
-          body: "Resgates, vínculo com o YouTube e histórico ficam juntos para você agir rápido durante a stream.",
-          cta: "Abrir Minha Área",
-          icon: Sparkles,
-          bg: "bg-[var(--color-blue)] text-[var(--color-accent-ink)]",
-        },
-        {
-          href: "/jogos",
-          title: "Próximo jogo",
-          body: "Sugira jogos e fortaleça as ideias da comunidade para as próximas lives.",
-          cta: "Ver Jogos",
-          icon: Gamepad2,
-          bg: "bg-[var(--color-mint)] text-[var(--color-accent-ink)]",
-        },
-      ]
-    : [
-        {
-          href: "/apostas",
-          title: "Apostas ao vivo",
-          body: "Veja os palpites que aparecem quando a live vira desafio para o chat.",
-          cta: "Ver Apostas",
-          icon: Ticket,
-          bg: "bg-[var(--color-pink)] text-[var(--color-accent-ink)]",
-        },
-        {
-          href: "/jogos",
-          title: "Jogos do chat",
-          body: "Conheça a fila de sugestões que ajuda a puxar o próximo jogo da stream.",
-          cta: "Ver Jogos",
-          icon: Gamepad2,
-          bg: "bg-[var(--color-blue)] text-[var(--color-accent-ink)]",
-        },
-        {
-          href: "/videos",
-          title: "Pautas da live",
-          body: "Vídeos, indicações e ideias entram como combustível para conversas com a comunidade.",
-          cta: "Ver Vídeos",
-          icon: CirclePlay,
-          bg: "bg-[var(--color-purple)] text-[var(--color-accent-ink)]",
-        },
-      ];
-
-  return (
-    <section className="landing-plane bg-[var(--color-paper)] py-9 sm:py-12">
+    <section id="pipetz" className="landing-plane scroll-mt-24 bg-[var(--color-paper)] py-9 sm:py-12">
       <div className="mx-auto w-full max-w-[1520px] px-4 sm:px-6 lg:px-10">
         <div className="max-w-3xl">
-          <p className="mono text-[11px] font-black uppercase tracking-[0.28em] text-[var(--color-ink-soft)]">
-            caminhos principais
-          </p>
           <h2
-            className="mt-3 text-4xl uppercase leading-[0.9] text-pretty sm:text-5xl"
+            className="text-4xl uppercase leading-[0.9] text-pretty sm:text-5xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            {hasUsableSession ? "Seu próximo lance na live." : "O que move a live."}
+            O chat entra no jogo.
           </h2>
+          <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--color-ink-soft)]">
+            Você junta pipetz enquanto assiste e usa os pontos para participar do que acontece
+            durante a live.
+          </p>
         </div>
 
-        <div className="mt-7 grid gap-4 md:grid-cols-3">
-          {actions.map((action) => (
-            <ActionTile key={action.href} action={action} />
-          ))}
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {PIPETZ_STEPS.map((step) => {
+            const Icon = step.icon;
+
+            return (
+              <article
+                key={step.title}
+                className={cn(
+                  "flex h-full min-w-0 flex-col border-[3px] border-[var(--color-ink)] p-5 text-[var(--color-accent-ink)] shadow-[5px_5px_0_var(--shadow-color)]",
+                  step.bg,
+                )}
+              >
+                <div className="flex size-12 items-center justify-center border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] text-[var(--color-ink)]">
+                  <Icon className="size-6" aria-hidden="true" />
+                </div>
+                <h3
+                  className="mt-5 text-2xl uppercase leading-[0.95]"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {step.title}
+                </h3>
+                <p className="mt-3 text-sm font-medium leading-6 text-[var(--color-accent-ink-soft)]">
+                  {step.body}
+                </p>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -388,11 +423,8 @@ function LiveBetSpotlight({
     <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-9 sm:py-12">
       <div className="mx-auto grid w-full max-w-[1520px] gap-6 px-4 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-10">
         <div>
-          <p className="mono text-[11px] font-black uppercase tracking-[0.28em] text-[var(--color-ink-soft)]">
-            aposta aberta
-          </p>
           <h2
-            className="mt-4 max-w-3xl break-words text-4xl uppercase leading-[0.9] text-pretty sm:text-5xl"
+            className="max-w-3xl break-words text-4xl uppercase leading-[0.9] text-pretty sm:text-5xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {activeBet.question}
@@ -411,6 +443,105 @@ function LiveBetSpotlight({
           {activeBet.options.map((option, index) => (
             <BetOptionCard key={option.id} optionLabel={option.label} index={index} />
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CampaignSection({ game }: { game: CurrentGameRecord | null }) {
+  if (!game) {
+    return null;
+  }
+
+  const metadata = getGameMetadataParts(game);
+  const shortName = game.name.split(":")[0]?.trim() || game.name;
+
+  return (
+    <section className="landing-plane landing-divider bg-[var(--color-paper)] py-9 sm:py-12">
+      <div className="mx-auto grid w-full max-w-[1520px] gap-6 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:px-10">
+        {game.coverImageUrl ? (
+          <div className="overflow-hidden border-[3px] border-[var(--color-ink)] shadow-[6px_6px_0_var(--shadow-color)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={game.coverImageUrl}
+              alt={`Capa de ${game.name}`}
+              className="aspect-video w-full object-cover"
+            />
+          </div>
+        ) : null}
+
+        <div>
+          <h2
+            className="break-words text-4xl uppercase leading-[0.9] text-pretty sm:text-5xl"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {game.name}
+          </h2>
+          {metadata.length > 0 ? (
+            <p className="mono mt-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-soft)]">
+              {metadata.join(" / ")}
+            </p>
+          ) : null}
+          <p className="mt-5 max-w-2xl text-base font-medium leading-7 text-[var(--color-ink-soft)]">
+            Estou jogando a campanha nas lives. Veja os últimos episódios, acompanhe de onde
+            paramos e entre na próxima transmissão.
+          </p>
+          <a
+            href={YOUTUBE_STREAMS_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-brutal accent-button mt-7 px-5 py-3 text-sm"
+          >
+            <CirclePlay className="size-4" aria-hidden="true" />
+            Ver as lives de {shortName}
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BetweenLivesSection() {
+  return (
+    <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-9 sm:py-12">
+      <div className="mx-auto w-full max-w-[1520px] px-4 sm:px-6 lg:px-10">
+        <div className="max-w-3xl">
+          <h2
+            className="text-4xl uppercase leading-[0.9] text-pretty sm:text-5xl"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Entre uma live e outra.
+          </h2>
+          <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--color-ink-soft)]">
+            Veja os jogos sugeridos pelo chat, vídeos que podem virar assunto e canais que eu
+            acompanho.
+          </p>
+        </div>
+
+        <div className="mt-7 grid gap-4 sm:grid-cols-3">
+          {BETWEEN_LIVES_LINKS.map((link) => {
+            const Icon = link.icon;
+
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "group flex items-center justify-between gap-3 border-[3px] border-[var(--color-ink)] p-5 text-[var(--color-accent-ink)] shadow-[5px_5px_0_var(--shadow-color)] transition-transform hover:-translate-y-0.5",
+                  link.bg,
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <Icon className="size-6 shrink-0" aria-hidden="true" />
+                  <span className="break-words text-lg font-black uppercase leading-tight [overflow-wrap:anywhere]">
+                    {link.label}
+                  </span>
+                </span>
+                <ArrowRight className="size-5 shrink-0" aria-hidden="true" />
+              </Link>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -442,8 +573,10 @@ export default async function Home({ searchParams }: HomePageProps) {
         viewerName={viewerName}
       />
 
-      <LiveActionSection activeBet={activeBet} hasUsableSession={hasUsableSession} />
+      <PipetzSection />
       <LiveBetSpotlight activeBet={activeBet} loggedIn={hasUsableSession} />
+      <CampaignSection game={currentGame} />
+      <BetweenLivesSection />
     </div>
   );
 }
