@@ -104,13 +104,9 @@ export function AppChrome({
   ];
   const isActiveLink = (href: string) => pathname === href;
   const isActiveGroup = (links: NavLink[]) => links.some((link) => isActiveLink(link.href));
-  const showTicker = pathname === "/";
   if (isObsView) {
     return <>{children}</>;
   }
-
-  const tickerText =
-    "PIPETZ // GANHE ASSISTINDO // ENTRE NO POOL // RESGATE EFEITOS // SUBA NO RANKING // ";
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -282,12 +278,6 @@ export function AppChrome({
             </span>
           </span>
         </Link>
-      ) : null}
-
-      {showTicker ? (
-        <div className="marquee-strip" aria-hidden="true">
-          <div className="marquee-inner">{tickerText.repeat(4)}</div>
-        </div>
       ) : null}
 
       {mobileOpen ? (

@@ -7,7 +7,7 @@ import { hasUsableAppSession } from "@/lib/auth/session-state";
 import { GOOGLE_AUTHORIZATION_PARAMS } from "@/lib/auth/google";
 import { Button } from "@/components/ui/button";
 
-export function AuthButtons() {
+export function AuthButtons({ label = "Entrar com Google" }: { label?: string } = {}) {
   const { data: session } = useSession();
   const hasUsableSession = hasUsableAppSession(session);
   const protectionStatus = session?.user?.accountProtectionStatus ?? null;
@@ -52,7 +52,7 @@ export function AuthButtons() {
       <div className="flex flex-col gap-2 sm:flex-row">
         {hasGoogle ? (
           <Button type="button" onClick={handleGoogleSignIn}>
-            Entrar com Google
+            {label}
           </Button>
         ) : null}
         {hasCredentials ? (

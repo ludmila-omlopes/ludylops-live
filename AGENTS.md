@@ -23,6 +23,10 @@ The website must never refer to itself or describe its own interface, and it is 
 - Write user-facing copy about the viewer, the streamer, and what happens in the live — never about the site, its pages, panels, dashboards, navigation, or how it compares to other tools or interfaces.
 - Avoid self-referential or self-marketing phrasing such as `sem atravessar um painel cheio de números`, `a página inicial mostra...`, or `o que move a página`. Speak directly to the viewer and the live experience instead.
 
+# No Eyebrow / Kicker Labels
+
+Never add eyebrow (kicker) labels above headings — the small mono, uppercase, letter-spaced line that sits above a section title (for example `PIPETZ`, `CAMPANHA ATUAL`, `CAMINHOS PRINCIPAIS`, `APOSTA ABERTA`). Let headings stand on their own.
+
 # GitHub PR Linking
 
 When creating a GitHub PR, explicitly state which issue it closes in the PR description so GitHub links it automatically.
