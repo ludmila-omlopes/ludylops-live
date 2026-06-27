@@ -25,6 +25,7 @@ import {
 } from "@/lib/auth/session-state";
 import { getCurrentGame } from "@/lib/current-game";
 import { listBets } from "@/lib/db/repository";
+import { getHomeHeroCopy } from "@/lib/home-hero-copy";
 import { isStreamerbotLivestreamActive } from "@/lib/streamerbot/live-status";
 import type { BetWithOptionsRecord, CurrentGameRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -138,17 +139,19 @@ function AccountProtectionNotice({ status }: { status: AccountProtectionStatus }
 
 function HeroGameLabel({ game, isLive }: { game: CurrentGameRecord | null; isLive: boolean }) {
   const metadata = getGameMetadataParts(game);
+  const eyebrow = game ? (isLive ? "jogando agora" : "campanha atual") : isLive ? "ao vivo" : "próxima live";
+  const title = game?.name ?? (isLive ? "Live da Ludylops" : "Canal da Ludylops");
 
   return (
     <div className="mt-8 w-full max-w-[calc(100vw-2rem)] border-l-[6px] border-[var(--color-pink)] bg-white/90 p-4 text-black shadow-[5px_5px_0_rgba(255,255,255,0.22)] backdrop-blur dark:bg-black/70 dark:text-white dark:shadow-[5px_5px_0_rgba(0,0,0,0.45)] sm:max-w-2xl">
       <p className="mono text-[10px] font-black uppercase tracking-[0.24em] text-black/65 dark:text-white/65">
-        {game ? (isLive ? "jogando agora" : "campanha atual") : "ao vivo"}
+        {eyebrow}
       </p>
       <h2
         className="mt-2 break-words text-3xl uppercase leading-[0.9] sm:text-4xl"
         style={{ fontFamily: "var(--font-display)" }}
       >
-        {game?.name ?? "Live da Ludylops"}
+        {title}
       </h2>
       {metadata.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -273,20 +276,11 @@ function HomeHero({
   isLive: boolean;
   viewerName: string | null;
 }) {
-  const title = hasUsableSession
-    ? "Estou online, vem pra live!"
-    : isLive
-      ? "A live já começou."
-      : "Oi, eu sou a Ludylops. Eu jogo, o chat palpita.";
-  const description = accountProtectionStatus
-    ? accountProtectionStatus === "google_signin_blocked"
-      ? "Seu acesso com Google foi colocado em espera por segurança. Você ainda pode acompanhar a live enquanto revisa a conta."
-      : "Sua sessão local foi encerrada por segurança. Quando você entrar de novo, os caminhos da live voltam para a sua conta."
-    : hasUsableSession
-      ? "Entre nas apostas, acione resgates e leve suas sugestões para o que acontece ao vivo."
-      : isLive
-        ? "Entre no YouTube para assistir, e faça login aqui pra participar dos palpites e usar seus pipetz com resgates de interação comigo."
-        : "Faço lives e vídeos de jogos no YouTube, com campanhas longas, sugestões do chat e muito bate-papo! Aqui você acompanha o jogo atual, junta pipetz e participa do que acontece ao vivo.";
+  const { title, description } = getHomeHeroCopy({
+    accountProtectionStatus,
+    hasUsableSession,
+    isLive,
+  });
 
   return (
     <section className="landing-plane relative isolate overflow-hidden bg-black text-white">
