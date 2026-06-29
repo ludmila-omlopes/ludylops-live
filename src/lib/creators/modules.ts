@@ -155,8 +155,8 @@ export function getEnabledCreatorModules(modules: CreatorModuleRecord[]) {
 export function getEnabledModuleNav(modules: CreatorModuleRecord[]): CreatorModuleNavItem[] {
   const navItems: CreatorModuleNavItem[] = [];
 
-  for (const module of getEnabledCreatorModules(modules)) {
-    const manifest = getCreatorModuleManifest(module.moduleKey);
+  for (const creatorModule of getEnabledCreatorModules(modules)) {
+    const manifest = getCreatorModuleManifest(creatorModule.moduleKey);
     const href = manifest?.publicRoutes[0];
     if (!manifest || !href) {
       continue;
