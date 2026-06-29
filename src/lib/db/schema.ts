@@ -29,6 +29,79 @@ export const users = pgTable(
   }),
 );
 
+export const creators = pgTable(
+  "creators",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    slug: varchar("slug", { length: 64 }).notNull(),
+    displayName: varchar("display_name", { length: 255 }).notNull(),
+    ownerUserId: varchar("owner_user_id", { length: 64 }).references(() => users.id),
+    status: varchar("status", { length: 32 }).default("active").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    slugIdx: uniqueIndex("creators_slug_idx").on(table.slug),
+    ownerUserIdIdx: index("creators_owner_user_id_idx").on(table.ownerUserId),
+  }),
+);
+
+export const creatorDomains = pgTable(
+  "creator_domains",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull(),
+    hostname: varchar("hostname", { length: 255 }).notNull(),
+    isPrimary: boolean("is_primary").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    hostnameIdx: uniqueIndex("creator_domains_hostname_idx").on(table.hostname),
+    creatorIdIdx: index("creator_domains_creator_id_idx").on(table.creatorId),
+  }),
+);
+
+export const creatorBranding = pgTable("creator_branding", {
+  creatorId: varchar("creator_id", { length: 64 })
+    .primaryKey()
+    .references(() => creators.id),
+  logoUrl: text("logo_url"),
+  avatarUrl: text("avatar_url"),
+  primaryColor: varchar("primary_color", { length: 16 }).default("#c7a2e9").notNull(),
+  secondaryColor: varchar("secondary_color", { length: 16 }).default("#ff79c6").notNull(),
+  backgroundColor: varchar("background_color", { length: 16 }).default("#f9f9f9").notNull(),
+  accentColor: varchar("accent_color", { length: 16 }).default("#40a9ff").notNull(),
+  fontHeading: varchar("font_heading", { length: 120 }).default("app-display").notNull(),
+  fontBody: varchar("font_body", { length: 120 }).default("app-body").notNull(),
+  borderRadius: integer("border_radius").default(0).notNull(),
+  themeJson: jsonb("theme_json").default({}).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const creatorModules = pgTable(
+  "creator_modules",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull(),
+    moduleKey: varchar("module_key", { length: 64 }).notNull(),
+    status: varchar("status", { length: 32 }).default("installed").notNull(),
+    configJson: jsonb("config_json").default({}).notNull(),
+    installedAt: timestamp("installed_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    creatorModuleIdx: uniqueIndex("creator_modules_creator_module_idx").on(
+      table.creatorId,
+      table.moduleKey,
+    ),
+    creatorIdIdx: index("creator_modules_creator_id_idx").on(table.creatorId),
+  }),
+);
+
 export const googleAccounts = pgTable(
   "google_accounts",
   {

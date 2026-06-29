@@ -81,6 +81,66 @@ export type ProductRecommendationModerationStatus =
   | "approved"
   | "rejected";
 
+export type CreatorStatus =
+  | "active"
+  | "disabled"
+  | "archived";
+
+export type CreatorModuleStatus =
+  | "installed"
+  | "disabled"
+  | "archived";
+
+export interface CreatorRecord {
+  id: string;
+  slug: string;
+  displayName: string;
+  ownerUserId: string | null;
+  status: CreatorStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatorDomainRecord {
+  id: string;
+  creatorId: string;
+  hostname: string;
+  isPrimary: boolean;
+  createdAt: string;
+}
+
+export interface CreatorBrandingRecord {
+  creatorId: string;
+  logoUrl: string | null;
+  avatarUrl: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+  accentColor: string;
+  fontHeading: string;
+  fontBody: string;
+  borderRadius: number;
+  themeJson: Record<string, unknown>;
+  updatedAt: string;
+}
+
+export interface CreatorModuleRecord {
+  id: string;
+  creatorId: string;
+  moduleKey: string;
+  status: CreatorModuleStatus;
+  configJson: Record<string, unknown>;
+  installedAt: string;
+  updatedAt: string;
+}
+
+export interface CreatorTenantRecord {
+  creator: CreatorRecord;
+  branding: CreatorBrandingRecord;
+  modules: CreatorModuleRecord[];
+  domains: CreatorDomainRecord[];
+}
+
 export interface ViewerRecord {
   id: string;
   googleUserId: string | null;
