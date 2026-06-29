@@ -1,4 +1,4 @@
-import { FaBluesky, FaGithub, FaInstagram, FaThreads, FaXTwitter, FaYoutube } from "react-icons/fa6";
+import { FaBluesky, FaDiscord, FaGithub, FaInstagram, FaThreads, FaXTwitter, FaYoutube } from "react-icons/fa6";
 import { TbWorld } from "react-icons/tb";
 
 export const socialLinks = [
@@ -19,8 +19,13 @@ export const socialLinks = [
   },
   {
     label: "Instagram",
-    href: "https://www.instagram.com/ludylops",
+    href: "https://www.instagram.com/ludylopsGames",
     Icon: FaInstagram,
+  },
+  {
+    label: "Discord",
+    href: "https://discord.gg/qGHZxtXDAK",
+    Icon: FaDiscord,
   },
   {
     label: "Bluesky",
