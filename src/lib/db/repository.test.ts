@@ -658,15 +658,42 @@ function createStreamerbotCounterDb({
 } = {}) {
   const rows = counterRows ? [...counterRows] : [];
 
+  function getCounterKeyFromWhereClause(whereClause: unknown) {
+    if (!whereClause || typeof whereClause !== "object" || !("queryChunks" in whereClause)) {
+      return null;
+    }
+
+    const queryChunks = (whereClause as { queryChunks?: unknown[] }).queryChunks;
+    if (!Array.isArray(queryChunks)) {
+      return null;
+    }
+
+    for (const chunk of queryChunks) {
+      if (chunk && typeof chunk === "object" && "value" in chunk) {
+        const value = (chunk as { value?: unknown }).value;
+        if (typeof value === "string") {
+          return value;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function findRows(whereClause?: unknown) {
+    const key = getCounterKeyFromWhereClause(whereClause);
+    return key ? rows.filter((entry) => entry.key === key) : rows;
+  }
+
   const tx = {
     select() {
       return {
         from(table: unknown) {
           if (table === streamerbotCounters) {
             return Object.assign(rows, {
-              where() {
+              where(whereClause?: unknown) {
                 return {
-                  limit: async () => rows,
+                  limit: async () => findRows(whereClause),
                 };
               },
             });
@@ -706,12 +733,13 @@ function createStreamerbotCounterDb({
         return {
           set(values: Partial<(typeof rows)[number]>) {
             return {
-              where: async () => {
-                if (!rows[0]) {
+              where: async (whereClause?: unknown) => {
+                const [target] = findRows(whereClause);
+                if (!target) {
                   throw new Error("Expected a counter row before update.");
                 }
 
-                Object.assign(rows[0], values);
+                Object.assign(target, values);
               },
             };
           },
@@ -1663,6 +1691,10 @@ describe("runStreamerbotCounterCommand", () => {
   it("lists public counters with global and game scopes in demo mode", async () => {
     getDbMock.mockReturnValue(null);
 
+    await runDeathCounterCommand({
+      action: "increment",
+      amount: 2,
+    });
     await runStreamerbotCounterCommand({
       counterKey: "win_count",
       counterLabel: "vitorias",
@@ -1688,6 +1720,13 @@ describe("runStreamerbotCounterCommand", () => {
       scopeKey: counter.scopeKey,
       value: counter.value,
     }))).toEqual([
+      {
+        key: "death_count",
+        label: "mortes",
+        scopeType: "global",
+        scopeKey: "global",
+        value: 2,
+      },
       {
         key: "win_count",
         label: "vitorias",
@@ -1867,6 +1906,20 @@ describe("runStreamerbotCounterCommand", () => {
           },
         },
         {
+          key: "death_count_daily",
+          value: 18,
+          lastResetAt: null,
+          updatedAt: new Date("2026-04-07T11:04:00.000Z"),
+          metadata: {
+            counterKey: "death_count_daily",
+            counterLabel: "mortes do dia",
+            scopeType: "global",
+            scopeKey: "global",
+            trackingDate: "2026-04-07",
+            hiddenFromPublic: true,
+          },
+        },
+        {
           key: "death_count",
           value: 154,
           lastResetAt: null,
@@ -1970,6 +2023,7 @@ describe("runStreamerbotCounterCommand", () => {
       action: "increment",
       amount: 3,
       requestedBy: "Mod",
+      occurredAt: "2026-04-07T12:00:00.000Z",
     });
 
     expect(result).toMatchObject({
@@ -1978,17 +2032,99 @@ describe("runStreamerbotCounterCommand", () => {
       count: 3,
       replyMessage: "Mod, contador de mortes em Hollow Knight: Silksong: 3 (+3).",
     });
-    expect(rows[0]).toMatchObject({
-      key: "game::hollow-knight-silksong::death_count",
-      value: 3,
-      metadata: {
-        counterKey: "death_count",
-        counterLabel: "mortes",
-        scopeType: "game",
-        scopeKey: "hollow-knight-silksong",
-        scopeLabel: "Hollow Knight: Silksong",
-      },
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "game::hollow-knight-silksong::death_count",
+          value: 3,
+          metadata: expect.objectContaining({
+            counterKey: "death_count",
+            counterLabel: "mortes",
+            scopeType: "game",
+            scopeKey: "hollow-knight-silksong",
+            scopeLabel: "Hollow Knight: Silksong",
+          }),
+        }),
+        expect.objectContaining({
+          key: "death_count",
+          value: 3,
+          metadata: expect.objectContaining({
+            counterKey: "death_count",
+            counterLabel: "mortes",
+            scopeType: "global",
+            scopeKey: "global",
+          }),
+        }),
+        expect.objectContaining({
+          key: "death_count_daily",
+          value: 3,
+          metadata: expect.objectContaining({
+            counterKey: "death_count_daily",
+            counterLabel: "mortes do dia",
+            trackingDate: "2026-04-07",
+            hiddenFromPublic: true,
+          }),
+        }),
+      ]),
+    );
+  });
+
+  it("resets the hidden daily death counter when a new day starts", async () => {
+    getDbMock.mockReturnValue(null);
+
+    await runDeathCounterCommand({
+      action: "increment",
+      amount: 2,
+      occurredAt: "2026-04-07T23:30:00.000Z",
     });
+
+    await runDeathCounterCommand({
+      action: "increment",
+      amount: 1,
+      occurredAt: "2026-04-08T10:00:00.000Z",
+    });
+
+    const counters = await listStreamerbotCounters();
+    const globalDeaths = counters.find((counter) => counter.key === "death_count" && counter.scopeType === "global");
+    expect(globalDeaths?.value).toBe(3);
+
+    const dailyHidden = await runStreamerbotCounterCommand({
+      action: "get",
+      counterKey: "death_count_daily",
+      counterLabel: "mortes do dia",
+      scopeType: "global",
+    });
+
+    expect(dailyHidden.count).toBe(1);
+    expect(dailyHidden.counter.metadata).toMatchObject({
+      trackingDate: "2026-04-08",
+      hiddenFromPublic: true,
+    });
+  });
+
+  it("shows the global and daily death counters on get", async () => {
+    getDbMock.mockReturnValue(null);
+
+    await runDeathCounterCommand({
+      action: "increment",
+      amount: 2,
+      occurredAt: "2026-04-07T10:00:00.000Z",
+    });
+    await runDeathCounterCommand({
+      action: "increment",
+      amount: 1,
+      occurredAt: "2026-04-07T11:00:00.000Z",
+      requestedBy: "Ludy",
+    });
+
+    const result = await runDeathCounterCommand({
+      action: "get",
+      occurredAt: "2026-04-07T12:00:00.000Z",
+      requestedBy: "Ludy",
+    });
+
+    expect(result.count).toBe(3);
+    expect(result.replyMessage).toBe("Ludy, contador geral de mortes: 3. Contador de mortes do dia: 3.");
   });
 
   it("uses the current stream game even when an explicit game scope is provided", async () => {
@@ -2014,7 +2150,46 @@ describe("runStreamerbotCounterCommand", () => {
     });
 
     expect(result.replyMessage).toBe("contador de mortes em Silksong: 1.");
-    expect(rows[0]?.key).toBe("game::silksong::death_count");
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "game::silksong::death_count",
+          value: 1,
+        }),
+        expect.objectContaining({
+          key: "death_count",
+          value: 1,
+        }),
+      ]),
+    );
+  });
+
+  it("shows the global and daily death counters on get even with an active current game", async () => {
+    const { db } = createStreamerbotCounterDb();
+    getDbMock.mockReturnValue(db);
+    getCurrentGameMock.mockResolvedValue({
+      igdbId: 103837,
+      name: "Silksong",
+      releaseYear: 2025,
+      coverImageUrl: null,
+      platforms: [],
+      genres: [],
+      updatedAt: "2026-04-07T10:00:00.000Z",
+      updatedBy: "admin@example.com",
+    });
+
+    await runDeathCounterCommand({
+      action: "increment",
+      amount: 2,
+      occurredAt: "2026-04-07T10:00:00.000Z",
+    });
+
+    const result = await runDeathCounterCommand({
+      action: "get",
+      occurredAt: "2026-04-07T12:00:00.000Z",
+    });
+
+    expect(result.replyMessage).toBe("contador geral de mortes: 2. Contador de mortes do dia: 2.");
   });
 });
 

@@ -155,6 +155,7 @@ function shouldExcludeFromRanking(email: string | null) {
 }
 
 const DEFAULT_DEATH_COUNTER_KEY = "death_count";
+const DAILY_DEATH_COUNTER_KEY = "death_count_daily";
 const HOWLONGTOBEAT_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const HOWLONGTOBEAT_MISSING_CACHE_TTL_MS = 1000 * 60 * 15;
 const HOWLONGTOBEAT_REFRESH_BATCH_LIMIT = 8;
@@ -252,6 +253,7 @@ function buildSpendingHistory(input: {
   ].sort((a, b) => +new Date(b.occurredAt) - +new Date(a.occurredAt));
 }
 const DEFAULT_DEATH_COUNTER_LABEL = "mortes";
+const DAILY_DEATH_COUNTER_LABEL = "mortes do dia";
 const GLOBAL_COUNTER_SCOPE_TYPE = "global";
 const GLOBAL_COUNTER_SCOPE_KEY = "global";
 const STREAMERBOT_COUNTER_STORAGE_SEPARATOR = "::";
@@ -590,6 +592,23 @@ type StreamerbotCounterCommandResult = {
   counter: StreamerbotCounterRecord;
   replyMessage: string;
 };
+
+function buildCounterDateKey(occurredAt: Date) {
+  return occurredAt.toISOString().slice(0, 10);
+}
+
+function isGlobalCounterScope(scope: { scopeType?: string | null }) {
+  return scope.scopeType === GLOBAL_COUNTER_SCOPE_TYPE;
+}
+
+function buildDeathCountersReply(input: {
+  requestedBy?: string | null;
+  globalCount: number;
+  dailyCount: number;
+}) {
+  const prefix = input.requestedBy ? `${input.requestedBy}, ` : "";
+  return `${prefix}contador geral de mortes: ${input.globalCount}. Contador de mortes do dia: ${input.dailyCount}.`;
+}
 
 function buildStreamerbotCounterSummary(counter: StreamerbotCounterRecord): StreamerbotCounterSummaryRecord {
   const scope = normalizeStreamerbotCounterScope({
@@ -931,6 +950,7 @@ function sanitizePublicCounterSummaries(
   const hiddenCounterKeys = new Set([
     "livestream_override",
     "death_counter_active_game",
+    DAILY_DEATH_COUNTER_KEY,
     "current_stream_game",
   ]);
 
@@ -7845,6 +7865,7 @@ export async function runStreamerbotCounterCommand(input: {
   occurredAt?: string | null;
   confirmReset?: boolean;
   resetReason?: string | null;
+  metadata?: Record<string, unknown> | null;
 }): Promise<StreamerbotCounterCommandResult> {
   const counterKey = input.counterKey.trim().toLowerCase();
   const amount = input.amount ?? 1;
@@ -7889,6 +7910,7 @@ export async function runStreamerbotCounterCommand(input: {
         scopeType: scope.scopeType,
         scopeKey: scope.scopeKey,
         scopeLabel: scope.scopeLabel,
+        ...(input.metadata ?? {}),
       };
     } else if (input.action === "decrement") {
       appliedAmount = Math.min(amount, counter.value);
@@ -7903,6 +7925,7 @@ export async function runStreamerbotCounterCommand(input: {
         scopeType: scope.scopeType,
         scopeKey: scope.scopeKey,
         scopeLabel: scope.scopeLabel,
+        ...(input.metadata ?? {}),
       };
     } else if (input.action === "reset") {
       const previousValue = counter.value;
@@ -7919,6 +7942,7 @@ export async function runStreamerbotCounterCommand(input: {
         scopeKey: scope.scopeKey,
         scopeLabel: scope.scopeLabel,
         resetReason: input.resetReason ?? null,
+        ...(input.metadata ?? {}),
       };
     }
 
@@ -7962,6 +7986,7 @@ export async function runStreamerbotCounterCommand(input: {
           scopeType: scope.scopeType,
           scopeKey: scope.scopeKey,
           scopeLabel: scope.scopeLabel,
+          ...(input.metadata ?? {}),
         },
       },
       replyMessage: buildStreamerbotCounterReply({
@@ -8021,6 +8046,7 @@ export async function runStreamerbotCounterCommand(input: {
             scopeType: scope.scopeType,
             scopeKey: scope.scopeKey,
             scopeLabel: scope.scopeLabel,
+            ...(input.metadata ?? {}),
           }
         : input.action === "decrement"
           ? {
@@ -8033,6 +8059,7 @@ export async function runStreamerbotCounterCommand(input: {
               scopeType: scope.scopeType,
               scopeKey: scope.scopeKey,
               scopeLabel: scope.scopeLabel,
+              ...(input.metadata ?? {}),
             }
           : {
               lastAction: "reset",
@@ -8045,6 +8072,7 @@ export async function runStreamerbotCounterCommand(input: {
               scopeKey: scope.scopeKey,
               scopeLabel: scope.scopeLabel,
               resetReason: input.resetReason ?? null,
+              ...(input.metadata ?? {}),
             };
 
     await tx
@@ -8121,22 +8149,111 @@ export async function runDeathCounterCommand(input: {
   resetReason?: string | null;
 }) {
   const currentGame = await getCurrentGame();
-  const currentGameScope = currentGame
+  const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
+  const counterDateKey = buildCounterDateKey(occurredAt);
+  const dailyMetadata = {
+    hiddenFromPublic: true,
+    trackingDate: counterDateKey,
+  };
+  const resolvedScope = currentGame
     ? {
         scopeType: "game" as const,
         scopeKey: slugify(currentGame.name) || String(currentGame.igdbId),
         scopeLabel: currentGame.name,
       }
-    : null;
+    : normalizeStreamerbotCounterScope({
+        scopeType: input.scopeType,
+        scopeKey: input.scopeKey,
+        scopeLabel: input.scopeLabel,
+      });
 
-  return runStreamerbotCounterCommand({
+  const primaryResult = await runStreamerbotCounterCommand({
     ...input,
-    scopeType: currentGameScope?.scopeType ?? input.scopeType,
-    scopeKey: currentGameScope?.scopeKey ?? input.scopeKey,
-    scopeLabel: currentGameScope?.scopeLabel ?? input.scopeLabel,
+    scopeType: resolvedScope.scopeType,
+    scopeKey: resolvedScope.scopeKey,
+    scopeLabel: resolvedScope.scopeLabel,
     counterKey: DEFAULT_DEATH_COUNTER_KEY,
     counterLabel: DEFAULT_DEATH_COUNTER_LABEL,
   });
+
+  if (input.action === "get") {
+    const globalCounter = isGlobalCounterScope(resolvedScope)
+      ? primaryResult
+      : await runStreamerbotCounterCommand({
+          action: "get",
+          requestedBy: input.requestedBy,
+          source: input.source,
+          occurredAt: input.occurredAt,
+          counterKey: DEFAULT_DEATH_COUNTER_KEY,
+          counterLabel: DEFAULT_DEATH_COUNTER_LABEL,
+          scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
+        });
+    const dailyCounter = await runStreamerbotCounterCommand({
+      action: "get",
+      requestedBy: input.requestedBy,
+      source: input.source,
+      occurredAt: input.occurredAt,
+      counterKey: DAILY_DEATH_COUNTER_KEY,
+      counterLabel: DAILY_DEATH_COUNTER_LABEL,
+      scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
+      metadata: dailyMetadata,
+    });
+
+    return {
+      ...primaryResult,
+      replyMessage: buildDeathCountersReply({
+        requestedBy: input.requestedBy,
+        globalCount: globalCounter.count,
+        dailyCount: dailyCounter.count,
+      }),
+    };
+  }
+
+  if (input.action === "increment" || input.action === "decrement") {
+    if (!isGlobalCounterScope(resolvedScope)) {
+      await runStreamerbotCounterCommand({
+        ...input,
+        scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
+        counterKey: DEFAULT_DEATH_COUNTER_KEY,
+        counterLabel: DEFAULT_DEATH_COUNTER_LABEL,
+      });
+    }
+    const dailyCounter = await runStreamerbotCounterCommand({
+      action: "get",
+      counterKey: DAILY_DEATH_COUNTER_KEY,
+      counterLabel: DAILY_DEATH_COUNTER_LABEL,
+      scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
+      occurredAt: input.occurredAt,
+      metadata: dailyMetadata,
+    });
+    const trackedDate =
+      typeof dailyCounter.counter.metadata.trackingDate === "string"
+        ? dailyCounter.counter.metadata.trackingDate
+        : null;
+
+    if (trackedDate && trackedDate !== counterDateKey) {
+      await runStreamerbotCounterCommand({
+        action: "reset",
+        counterKey: DAILY_DEATH_COUNTER_KEY,
+        counterLabel: DAILY_DEATH_COUNTER_LABEL,
+        scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
+        occurredAt: input.occurredAt,
+        confirmReset: true,
+        resetReason: "new_day",
+        metadata: dailyMetadata,
+      });
+    }
+
+    await runStreamerbotCounterCommand({
+      ...input,
+      scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
+      counterKey: DAILY_DEATH_COUNTER_KEY,
+      counterLabel: DAILY_DEATH_COUNTER_LABEL,
+      metadata: dailyMetadata,
+    });
+  }
+
+  return primaryResult;
 }
 
 export async function lockBet(betId: string) {
