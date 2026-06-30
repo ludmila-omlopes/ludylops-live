@@ -148,6 +148,13 @@
       "when": 1782019200000,
       "tag": "0020_product_recommendation_moderation",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1782737747335,
+      "tag": "0021_hard_riptide",
+      "breakpoints": true
     }
   ]
 }
