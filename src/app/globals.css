@@ -977,6 +977,42 @@ a:focus-visible {
   transform-origin: bottom center;
 }
 
+@keyframes obscurOverlayPop {
+  0% {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(22px);
+  }
+
+  14% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+
+  84% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(-10px);
+  }
+}
+
+.obscur-overlay-pop {
+  animation: obscurOverlayPop 12s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: bottom left;
+}
+
+.obscur-subscriber-pop {
+  animation: obscurOverlayPop 7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: bottom left;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

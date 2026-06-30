@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { getObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-style";
 import type { BetWithOptionsRecord } from "@/lib/types";
 import { formatPipetz } from "@/lib/utils";
 
@@ -34,9 +35,10 @@ function formatRemaining(closesAt: string, now: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function ObsBetOverlay() {
+export function ObsBetOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
+  const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
   const [liveBet, setLiveBet] = useState<BetWithOptionsRecord | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -91,6 +93,57 @@ export function ObsBetOverlay() {
   const bet = isDemo ? DEMO_BET : liveBet;
   const totalPool = bet?.totalPool ?? 0;
   const remaining = bet ? formatRemaining(bet.closesAt, now) : "00:00";
+
+  if (isObscurStyle) {
+    return (
+      <div className="pointer-events-none flex min-h-screen items-end justify-start p-5 text-[#f8ecd4] sm:p-8 lg:p-10">
+        {bet ? (
+          <section
+            key={bet.id}
+            className="relative w-[min(680px,92vw)] overflow-hidden border-l border-[#d8b46a]/80 bg-[linear-gradient(90deg,rgba(7,7,10,0.74),rgba(7,7,10,0.40)_72%,rgba(7,7,10,0.02))] px-5 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.42)] backdrop-blur-[2px]"
+            aria-live="polite"
+          >
+            <div className="absolute inset-y-3 left-2 w-px bg-[#f3d58b]/60" />
+            <div className="relative flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold text-[#d8b46a] [text-shadow:0_2px_14px_rgba(0,0,0,0.9)]">
+              <span>fecha em {remaining}</span>
+              <span>{formatPipetz(totalPool)} pipetz</span>
+            </div>
+
+            <h1
+              className="relative mt-2 max-w-[24ch] break-words text-[1.45rem] font-semibold leading-tight [text-shadow:0_2px_18px_rgba(0,0,0,0.88)] sm:text-[2rem] lg:text-[2.35rem]"
+              style={{ fontFamily: "var(--font-body)" }}
+            >
+              {bet.question}
+            </h1>
+
+            <div className="relative mt-4 grid gap-3">
+              {bet.options.map((option, index) => {
+                const percentage = totalPool > 0 ? Math.round((option.poolAmount / totalPool) * 100) : 0;
+                return (
+                  <div key={option.id}>
+                    <div className="flex items-center justify-between gap-3 text-sm font-semibold [text-shadow:0_2px_14px_rgba(0,0,0,0.9)] sm:text-base">
+                      <span className="min-w-0 break-words">
+                        {index + 1}. {option.label}
+                      </span>
+                      <span className="shrink-0 text-[#d8b46a]">
+                        {percentage}% - {formatPipetz(option.poolAmount)}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-[3px] overflow-hidden bg-[#f8ecd4]/18">
+                      <div
+                        className="h-full bg-[#d8b46a] transition-[width] duration-500"
+                        style={{ width: `${Math.max(percentage, totalPool > 0 ? 4 : 0)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="pointer-events-none flex min-h-screen items-end justify-center p-6 sm:p-10 lg:p-14">

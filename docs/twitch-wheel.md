@@ -5,6 +5,7 @@
 - Admin: `/admin`, aba `Operação`, painel `Roleta da live`.
 - Overlay para OBS: `/obs/wheel`.
 - Demo visual do overlay: `/obs/wheel?demo=1`.
+- O estilo ativo é escolhido no admin. Demo manual do visual minimalista: `/obs/wheel?demo=1&style=obscur`.
 - Feed JSON do overlay: `GET /api/obs/wheel/current`.
 - Giro assinado pelo Streamer.bot: `POST /api/internal/streamerbot/wheel`.
 
@@ -22,6 +23,7 @@ O app salva a configuração em `streamerbot_counters`, na chave `twitch_wheel_c
 ## OBS
 
 Adicione um `Browser Source` apontando para `/obs/wheel`.
+Para ocupar menos tela, escolha o estilo minimalista no admin sem trocar a URL no OBS.
 
 Sugestão de cena:
 

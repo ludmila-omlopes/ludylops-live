@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import type { ObsOverlayAdminStatusRecord } from "@/lib/types";
 import { formatDateTime, formatPipetz } from "@/lib/utils";
+import type { ObsOverlayStyle } from "@/lib/obs-overlay-style";
 
 const overlays = [
   {
@@ -23,6 +24,8 @@ const overlays = [
     description: "Overlay das quotes pagas em pipetz, com som embutido e visual pronto para browser source.",
     liveHref: "/obs/quotes",
     demoHref: "/obs/quotes?demo=1",
+    minimalHref: "/obs/quotes?style=obscur",
+    minimalDemoHref: "/obs/quotes?demo=1&style=obscur",
     apiHref: "/api/obs/quotes/current",
   },
   {
@@ -31,6 +34,8 @@ const overlays = [
     description: "Overlay da meta ativa de likes, com contador, progresso e recompensa exibidos ao vivo.",
     liveHref: "/obs/likes",
     demoHref: "/obs/likes?demo=1",
+    minimalHref: "/obs/likes?style=obscur",
+    minimalDemoHref: "/obs/likes?demo=1&style=obscur",
     apiHref: "/api/obs/likes/current",
   },
   {
@@ -39,6 +44,8 @@ const overlays = [
     description: "Overlay de nova inscrição, com imagem configurável, som de alerta e fila local para eventos consecutivos.",
     liveHref: "/obs/subscribers",
     demoHref: "/obs/subscribers?demo=1",
+    minimalHref: "/obs/subscribers?style=obscur",
+    minimalDemoHref: "/obs/subscribers?demo=1&style=obscur",
     apiHref: "/api/obs/subscribers/current",
   },
   {
@@ -47,6 +54,8 @@ const overlays = [
     description: "Overlay da aposta aberta, com pool, opções e distribuição dos votos atualizados automaticamente.",
     liveHref: "/obs/bets",
     demoHref: "/obs/bets?demo=1",
+    minimalHref: "/obs/bets?style=obscur",
+    minimalDemoHref: "/obs/bets?demo=1&style=obscur",
     apiHref: "/api/obs/bets/current",
   },
   {
@@ -55,6 +64,8 @@ const overlays = [
     description: "Overlay da roleta da live, com animação visual e resultado final mantido na tela.",
     liveHref: "/obs/wheel",
     demoHref: "/obs/wheel?demo=1",
+    minimalHref: "/obs/wheel?style=obscur",
+    minimalDemoHref: "/obs/wheel?demo=1&style=obscur",
     apiHref: "/api/obs/wheel/current",
   },
 ];
@@ -73,7 +84,7 @@ export function AdminObsOverlaysPanel({
   const isPaused = status.control.status === "paused";
   const hasConfigurationError = status.control.status === "error";
 
-  function submitAction(action: "pause" | "resume" | "cancel_queue") {
+  function submitAction(action: "pause" | "resume" | "cancel_queue" | "set_style", style?: ObsOverlayStyle) {
     setFeedback(null);
     startTransition(async () => {
       try {
@@ -82,7 +93,7 @@ export function AdminObsOverlaysPanel({
           headers: {
             "content-type": "application/json",
           },
-          body: JSON.stringify({ action }),
+          body: JSON.stringify({ action, style }),
         });
         const payload = (await response.json()) as {
           ok?: boolean;
@@ -97,7 +108,9 @@ export function AdminObsOverlaysPanel({
 
         setStatus(payload.data);
         setFeedback(
-          action === "pause"
+          action === "set_style"
+            ? "Estilo dos overlays atualizado."
+            : action === "pause"
             ? "Chamadas ao OBS pausadas."
             : action === "resume"
               ? "Chamadas ao OBS retomadas."
@@ -110,6 +123,10 @@ export function AdminObsOverlaysPanel({
     });
   }
 
+  function submitStyle(style: ObsOverlayStyle) {
+    submitAction("set_style", style);
+  }
+
   const content = (
     <div className="panel surface-section p-6">
           <h2
@@ -119,11 +136,11 @@ export function AdminObsOverlaysPanel({
             Seus browser sources
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--color-ink-soft)] sm:text-base">
-            Aqui ficam os overlays hospedados pelo app. Use o link real no OBS e o link de demo
-            quando quiser conferir o visual fora da live.
+            Aqui ficam os overlays hospedados pelo app. O OBS pode continuar usando os links sem
+            parâmetros; o estilo ativo é aplicado pelo app.
           </p>
 
-          <div className="mt-6 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+          <div className="mt-6 grid gap-4 xl:grid-cols-[0.8fr_1fr_1fr]">
             <div className="card-brutal-static surface-card-accent p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -186,6 +203,42 @@ export function AdminObsOverlaysPanel({
                 <p>Atualizado em {formatDateTime(status.control.updatedAt)}</p>
                 {status.control.updatedBy ? <p>Por {status.control.updatedBy}</p> : null}
                 {feedback ? <p className="font-bold text-[var(--color-ink)]">{feedback}</p> : null}
+              </div>
+            </div>
+
+            <div className="card-brutal-static surface-card p-4">
+              <p className="mono text-[10px] uppercase tracking-[0.24em] text-[var(--color-ink-soft)]">
+                estilo ativo
+              </p>
+              <p className="mt-2 text-2xl font-black uppercase">
+                {status.overlayStyle.style === "obscur" ? "Minimalista" : "Clássico"}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-[var(--color-ink-soft)]">
+                Altera todos os Browser Sources `/obs/*` sem precisar trocar URL no OBS.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() => submitStyle("classic")}
+                  disabled={isPending || status.overlayStyle.style === "classic"}
+                  variant="neutral"
+                  size="sm"
+                >
+                  Usar clássico
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => submitStyle("obscur")}
+                  disabled={isPending || status.overlayStyle.style === "obscur"}
+                  variant="success"
+                  size="sm"
+                >
+                  Usar minimalista
+                </Button>
+              </div>
+              <div className="mt-4 grid gap-2 text-sm text-[var(--color-ink-soft)]">
+                <p>Atualizado em {formatDateTime(status.overlayStyle.updatedAt)}</p>
+                {status.overlayStyle.updatedBy ? <p>Por {status.overlayStyle.updatedBy}</p> : null}
               </div>
             </div>
 
@@ -277,6 +330,9 @@ export function AdminObsOverlaysPanel({
                   </Link>
                   <Link href={overlay.demoHref} className="btn-brutal accent-button px-4 py-2 text-xs">
                     Abrir demo
+                  </Link>
+                  <Link href={overlay.minimalDemoHref} className="btn-brutal bg-[var(--color-paper)] px-4 py-2 text-xs">
+                    Abrir demo minimalista
                   </Link>
                 </CardFooter>
               </Card>

@@ -3,6 +3,8 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { getObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-style";
+
 type QuoteOverlayPayload = {
   slot: string;
   overlayId: string;
@@ -86,9 +88,10 @@ async function playQuoteOverlayChime() {
   });
 }
 
-export function ObsQuoteOverlay() {
+export function ObsQuoteOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
+  const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
   const [liveOverlay, setLiveOverlay] = useState<QuoteOverlayPayload | null>(null);
   const [isLive, setIsLive] = useState(false);
   const lastPlayedOverlayId = useRef<string | null>(null);
@@ -231,6 +234,33 @@ export function ObsQuoteOverlay() {
       // Autoplay can be blocked in regular browsers; OBS browser source is the main target.
     });
   }, [overlay?.overlayId]);
+
+  if (isObscurStyle) {
+    return (
+      <div className="pointer-events-none flex min-h-screen items-end justify-start p-5 text-[#f8ecd4] sm:p-8 lg:p-10">
+        {overlay ? (
+          <section
+            key={overlay.overlayId}
+            className={`${isDemo ? "" : "obscur-overlay-pop "}relative w-fit max-w-[min(760px,92vw)] overflow-hidden border-l border-[#d8b46a]/80 bg-[linear-gradient(90deg,rgba(7,7,10,0.78),rgba(7,7,10,0.42)_68%,rgba(7,7,10,0.02))] px-5 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur-[2px] sm:px-6 sm:py-5`}
+            aria-live="polite"
+          >
+            <div className="absolute inset-y-3 left-2 w-px bg-[#f3d58b]/60" />
+            <blockquote
+              className="relative max-w-[24ch] break-words text-[1.45rem] font-semibold leading-tight [text-shadow:0_2px_18px_rgba(0,0,0,0.88)] sm:text-[2.05rem] lg:text-[2.55rem]"
+              style={{ fontFamily: "var(--font-body)" }}
+            >
+              {overlay.quoteBody}
+            </blockquote>
+            <div className="relative mt-3 flex max-w-full flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold text-[#d8b46a] [text-shadow:0_2px_14px_rgba(0,0,0,0.9)]">
+              <span>Quote #{overlay.quoteNumber}</span>
+              <span>{overlay.createdByDisplayName}</span>
+              {overlay.requestedByYoutubeHandle ? <span>{overlay.requestedByYoutubeHandle}</span> : null}
+            </div>
+          </section>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="pointer-events-none flex min-h-screen items-end justify-center p-6 sm:p-10 lg:p-14">

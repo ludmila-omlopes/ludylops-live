@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { getObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-style";
 import type { SubscriberAlertRecord } from "@/lib/types";
 
 const DEFAULT_DURATION_MS = 7000;
@@ -99,9 +100,10 @@ async function playAlertSound(soundUrl: string | null, volume: number) {
   await playSubscriberChime();
 }
 
-export function ObsSubscriberOverlay() {
+export function ObsSubscriberOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
+  const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
   const durationMs = clampDuration(readParam(searchParams, ["durationMs", "duration"]));
   const imageUrl = readParam(searchParams, ["imageUrl", "image"]);
   const soundUrl = readParam(searchParams, ["soundUrl", "sound"]);
@@ -199,6 +201,47 @@ export function ObsSubscriberOverlay() {
 
     return () => window.clearTimeout(timeout);
   }, [currentAlert, durationMs, soundUrl, volume]);
+
+  if (isObscurStyle) {
+    return (
+      <div className="pointer-events-none flex min-h-screen items-end justify-start p-5 text-[#f8ecd4] sm:p-8 lg:p-10">
+        {currentAlert ? (
+          <section
+            key={currentAlert.eventId}
+            className="obscur-subscriber-pop relative flex w-fit max-w-[min(620px,92vw)] items-center gap-4 overflow-hidden border-l border-[#d8b46a]/80 bg-[linear-gradient(90deg,rgba(7,7,10,0.76),rgba(7,7,10,0.40)_72%,rgba(7,7,10,0.02))] px-5 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.42)] backdrop-blur-[2px]"
+            style={{ animationDuration: `${durationMs}ms` }}
+            aria-live="polite"
+          >
+            <div className="absolute inset-y-3 left-2 w-px bg-[#f3d58b]/60" />
+            {imageUrl ? (
+              <div className="relative shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl}
+                  alt=""
+                  className="aspect-square w-16 border border-[#d8b46a]/70 object-cover shadow-[0_12px_30px_rgba(0,0,0,0.4)] sm:w-20"
+                />
+              </div>
+            ) : null}
+            <div className="relative min-w-0">
+              <h1
+                className="max-w-[18ch] break-words text-[1.8rem] font-semibold leading-none [text-shadow:0_2px_18px_rgba(0,0,0,0.88)] sm:text-[2.5rem] lg:text-[3rem]"
+                style={{ fontFamily: "var(--font-body)" }}
+              >
+                {currentAlert.displayName}
+              </h1>
+              <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm font-semibold text-[#d8b46a] [text-shadow:0_2px_14px_rgba(0,0,0,0.9)] sm:text-base">
+                <span>
+                  {title} - {subtitle}
+                </span>
+                {currentAlert.youtubeHandle ? <span>{currentAlert.youtubeHandle}</span> : null}
+              </p>
+            </div>
+          </section>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="pointer-events-none flex min-h-screen items-end justify-center p-6 sm:p-10 lg:p-14">
