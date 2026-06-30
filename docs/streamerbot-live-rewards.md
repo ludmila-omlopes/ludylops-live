@@ -21,6 +21,7 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
 
 - Abra `/obs/subscribers` como Browser Source no OBS ou em ferramenta equivalente.
 - Use `/obs/subscribers?demo=1` para testar o visual e o som sem depender de eventos reais.
+- O estilo usado pelo OBS é escolhido no admin, sem alterar essa URL. Para testar manualmente o visual minimalista, use `/obs/subscribers?demo=1&style=obscur`.
 - O overlay consulta `GET /api/obs/subscribers/current` a cada segundo e enfileira localmente os eventos novos recebidos nos últimos 2 minutos.
 - Cada alerta toca o som uma vez, fica visível por 7 segundos por padrão e sai automaticamente. Eventos consecutivos são exibidos em sequência.
 - Parâmetros opcionais do Browser Source:
@@ -30,6 +31,7 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
   - `title`: texto do selo principal. Padrão: `Nova inscrição`.
   - `subtitle`: texto abaixo do nome. Padrão: `chegou no canal`.
   - `volume`: volume do `soundUrl`, de `0` a `1`.
+  - `style`: override manual opcional; use `obscur`, `minimal` ou `minimalista` para o visual mais leve.
 
 ## Metas de likes
 
@@ -43,12 +45,14 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
   - `occurredAt`: data em ISO
 - Critério de presença: viewers com ledger `presence_tick` na mesma `broadcastId` do evento de likes, desde o início da live até o momento em que a meta bateu.
 - Overlay do OBS: use `/obs/likes` como browser source. Para testar o visual sem live, use `/obs/likes?demo=1`.
+- O estilo ativo é escolhido no admin. Para demo manual do visual minimalista, use `/obs/likes?demo=1&style=obscur`.
 - Feed do overlay: `/api/obs/likes/current`, atualizado pelo último `like_count_update` recebido.
 
 ### Overlay da meta de likes
 
 - Abra `/obs/likes` como Browser Source no OBS ou em ferramenta equivalente.
 - Use `/obs/likes?demo=1` para testar o visual sem depender de eventos reais.
+- Escolha o estilo minimalista no admin para ocupar menos tela sem alterar a URL do OBS.
 - O overlay lê a meta ativa cadastrada no admin e o último `like_count_update` aceito pela API.
 - Para atualizar o progresso ao vivo, mantenha o script `streamerbot/like-count-update.cs` em uma action ligada ao trigger `YouTube > Broadcast > Statistics Updated`.
 

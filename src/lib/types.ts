@@ -1,3 +1,5 @@
+import type { ObsOverlayStyleConfigRecord } from "@/lib/obs-overlay-style";
+
 export type CatalogItemType =
   | "onscreen_text"
   | "play_sound"
@@ -377,6 +379,7 @@ export interface QuoteOverlayQueueRecord {
 
 export interface ObsOverlayAdminStatusRecord {
   control: ObsOverlayControlRecord;
+  overlayStyle: ObsOverlayStyleConfigRecord;
   activeOverlay: QuoteOverlayStateRecord | null;
   pending: QuoteOverlayQueueRecord[];
   pendingCount: number;

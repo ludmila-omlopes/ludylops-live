@@ -162,6 +162,7 @@ Mais detalhes ficam em `bridge/README.md`.
 - `/obs/quotes`: browser source para quotes no OBS.
 - `/obs/bets`: browser source para apostas abertas no OBS.
 - `/obs/subscribers`: browser source para alertas de novas inscrições no canal.
+- O estilo ativo dos overlays é escolhido no admin, sem trocar a URL usada no OBS. `?style=obscur` continua disponível como override manual para teste.
 
 ## Setup local
 

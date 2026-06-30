@@ -75,6 +75,7 @@ import {
 } from "@/lib/streamerbot/live-status";
 import { getCurrentGame } from "@/lib/current-game";
 import { normalizeYoutubeHandle } from "@/lib/youtube/identity";
+import { getObsOverlayStyleConfig } from "@/lib/obs-overlay-settings";
 import { evaluateRedeemability } from "@/lib/redemptions/service";
 import {
   resolveHowLongToBeatGame,
@@ -950,6 +951,7 @@ function sanitizePublicCounterSummaries(
   const hiddenCounterKeys = new Set([
     "livestream_override",
     "death_counter_active_game",
+    "obs_overlay_style",
     DAILY_DEATH_COUNTER_KEY,
     "current_stream_game",
   ]);
@@ -3151,9 +3153,10 @@ async function requestQuoteOverlay(input: {
 export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusRecord> {
   try {
     await expireQueuedQuoteOverlays();
-    const [control, activeOverlay] = await Promise.all([
+    const [control, activeOverlay, overlayStyle] = await Promise.all([
       getObsOverlayControlRecord(),
       getActiveQuoteOverlay(),
+      getObsOverlayStyleConfig(),
     ]);
     const db = getDb();
 
@@ -3165,6 +3168,7 @@ export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusR
 
       return {
         control,
+        overlayStyle,
         activeOverlay,
         pending,
         pendingCount: pending.length,
@@ -3182,6 +3186,7 @@ export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusR
 
     return {
       control,
+      overlayStyle,
       activeOverlay,
       pending,
       pendingCount: pending.length,
@@ -3199,6 +3204,7 @@ export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusR
         status: "error",
         lastError: "Migration pendente: crie as tabelas obs_overlay_control e quote_overlay_queue.",
       },
+      overlayStyle: await getObsOverlayStyleConfig(),
       activeOverlay: await getActiveQuoteOverlay(),
       pending: [],
       pendingCount: 0,

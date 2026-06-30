@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { getObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-style";
 import type { LiveLikeGoalOverlayStateRecord } from "@/lib/types";
 import { formatPipetz } from "@/lib/utils";
 
@@ -30,9 +31,10 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
 
-export function ObsLikeGoalOverlay() {
+export function ObsLikeGoalOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
+  const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
   const [liveState, setLiveState] = useState<LiveLikeGoalOverlayStateRecord | null>(null);
 
   useEffect(() => {
@@ -82,6 +84,48 @@ export function ObsLikeGoalOverlay() {
   const goal = state?.goal ?? null;
   const currentLikeCount = state?.currentLikeCount ?? 0;
   const progressPercent = state?.progressPercent ?? 0;
+
+  if (isObscurStyle) {
+    return (
+      <div className="pointer-events-none flex min-h-screen items-end justify-end p-5 text-[#f8ecd4] sm:p-8 lg:p-10">
+        <section
+          className="relative w-[min(560px,92vw)] overflow-hidden border-l border-[#d8b46a]/80 bg-[linear-gradient(90deg,rgba(7,7,10,0.72),rgba(7,7,10,0.38)_72%,rgba(7,7,10,0.02))] px-5 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.42)] backdrop-blur-[2px]"
+          aria-live="polite"
+        >
+          <div className="absolute inset-y-3 left-2 w-px bg-[#f3d58b]/60" />
+          {!state ? (
+            <p className="relative text-xl font-semibold [text-shadow:0_2px_16px_rgba(0,0,0,0.86)]">
+              Carregando meta de likes.
+            </p>
+          ) : goal ? (
+            <div className="relative">
+              <div className="flex items-end justify-between gap-4">
+                <p className="min-w-0 max-w-[18ch] break-words text-xl font-semibold leading-tight [text-shadow:0_2px_16px_rgba(0,0,0,0.86)] sm:text-2xl">
+                  {goal.label || `${formatNumber(goal.targetLikeCount)} likes`}
+                </p>
+                <p className="shrink-0 text-2xl font-semibold text-[#d8b46a] [text-shadow:0_2px_16px_rgba(0,0,0,0.9)] sm:text-3xl">
+                  {formatNumber(currentLikeCount)}/{formatNumber(goal.targetLikeCount)}
+                </p>
+              </div>
+              <div className="mt-3 h-[3px] overflow-hidden bg-[#f8ecd4]/20">
+                <div
+                  className="h-full bg-[#d8b46a] transition-[width] duration-500"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-[#cdbb91] [text-shadow:0_2px_14px_rgba(0,0,0,0.9)]">
+                {formatPipetz(goal.rewardAmount)} pipetz pra cada presente
+              </p>
+            </div>
+          ) : (
+            <p className="relative text-xl font-semibold [text-shadow:0_2px_16px_rgba(0,0,0,0.86)]">
+              Configure uma meta ativa no admin.
+            </p>
+          )}
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="pointer-events-none flex min-h-screen items-end justify-center p-6 sm:justify-end sm:p-10 lg:p-14">

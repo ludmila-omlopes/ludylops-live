@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { getObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-style";
 import type { WheelConfigRecord, WheelSpinRecord } from "@/lib/types";
 
 const DEMO_CONFIG: WheelConfigRecord = {
@@ -61,9 +62,10 @@ function isSpinVisible(spin: WheelSpinRecord | null) {
   return spin ? new Date(spin.resultVisibleUntil).getTime() > Date.now() : false;
 }
 
-export function ObsWheelOverlay() {
+export function ObsWheelOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
+  const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
   const [config, setConfig] = useState<WheelConfigRecord | null>(isDemo ? DEMO_CONFIG : null);
   const [rotation, setRotation] = useState(0);
   const [lastSpinId, setLastSpinId] = useState<string | null>(null);
@@ -123,6 +125,47 @@ export function ObsWheelOverlay() {
 
   if (!config || activeOptions.length < 2) {
     return null;
+  }
+
+  if (isObscurStyle) {
+    return (
+      <div className="pointer-events-none flex min-h-screen items-end justify-end p-5 text-[#f8ecd4] sm:p-8 lg:p-10">
+        <section
+          className="grid w-[min(700px,92vw)] items-end gap-5 sm:grid-cols-[230px_1fr]"
+          aria-live="polite"
+        >
+          <div className="relative mx-auto aspect-square w-[min(230px,48vw)] sm:w-full">
+            <div className="absolute left-1/2 top-[-10px] z-20 h-0 w-0 -translate-x-1/2 border-x-[13px] border-t-[26px] border-x-transparent border-t-[#d8b46a] drop-shadow-[0_5px_10px_rgba(0,0,0,0.65)]" />
+            <div
+              className="absolute inset-0 rounded-full border border-[#d8b46a]/85 shadow-[0_18px_45px_rgba(0,0,0,0.48)]"
+              style={{
+                background: `conic-gradient(${gradient})`,
+                filter: "saturate(0.72) brightness(0.82)",
+                transform: `rotate(${rotation}deg)`,
+                transition: `transform ${spin?.spinDurationMs ?? config.spinDurationMs}ms cubic-bezier(.12,.82,.16,1)`,
+              }}
+            >
+              <div className="absolute inset-[15%] rounded-full border border-[#d8b46a]/60 bg-[rgba(8,7,10,0.72)]" />
+              <div className="absolute inset-[41%] rounded-full bg-[#d8b46a]" />
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden border-l border-[#d8b46a]/80 bg-[linear-gradient(90deg,rgba(7,7,10,0.74),rgba(7,7,10,0.40)_72%,rgba(7,7,10,0.02))] px-5 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.42)] backdrop-blur-[2px]">
+            <div className="absolute inset-y-3 left-2 w-px bg-[#f3d58b]/60" />
+            <h1
+              className="relative max-w-[14ch] break-words text-[1.7rem] font-semibold leading-tight [text-shadow:0_2px_18px_rgba(0,0,0,0.88)] sm:text-[2.35rem] lg:text-[2.75rem]"
+              style={{ fontFamily: "var(--font-body)" }}
+            >
+              {visibleSpin ? visibleSpin.label : "Pronta para girar"}
+            </h1>
+            <p className="relative mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm font-semibold text-[#d8b46a] [text-shadow:0_2px_14px_rgba(0,0,0,0.9)]">
+              <span>{visibleSpin ? "Resultado final" : `${activeOptions.length} opções ativas`}</span>
+              <span>{config.title}</span>
+            </p>
+          </div>
+        </section>
+      </div>
+    );
   }
 
   return (
