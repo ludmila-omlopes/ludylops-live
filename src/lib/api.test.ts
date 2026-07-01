@@ -7,6 +7,7 @@ const envState = vi.hoisted(() => ({
   isDemoMode: false,
   isProduction: false,
   adminEmails: new Set<string>(),
+  platformOwnerEmails: new Set<string>(),
 }));
 
 vi.mock("@/auth", () => ({
@@ -23,9 +24,12 @@ vi.mock("@/lib/env", () => ({
   get adminEmails() {
     return envState.adminEmails;
   },
+  get platformOwnerEmails() {
+    return envState.platformOwnerEmails;
+  },
 }));
 
-import { requireAdminApiSession } from "@/lib/api";
+import { requireAdminApiSession, requirePlatformOwnerApiSession } from "@/lib/api";
 
 describe("isTrustedAppMutationRequest", () => {
   it("accepts matching origin headers", () => {
@@ -82,6 +86,7 @@ describe("requireAdminApiSession", () => {
     envState.isDemoMode = true;
     envState.isProduction = false;
     envState.adminEmails = new Set<string>();
+    envState.platformOwnerEmails = new Set<string>();
   });
 
   it("rejects a non-admin user in production demo mode", async () => {
@@ -94,5 +99,46 @@ describe("requireAdminApiSession", () => {
     envState.isProduction = false;
 
     await expect(requireAdminApiSession()).resolves.toBe(session);
+  });
+});
+
+describe("requirePlatformOwnerApiSession", () => {
+  const session = {
+    expires: "2099-01-01T00:00:00.000Z",
+    user: { email: "owner@example.com" },
+  };
+
+  beforeEach(() => {
+    authMock.mockReset();
+    authMock.mockResolvedValue(session);
+    envState.isDemoMode = false;
+    envState.isProduction = false;
+    envState.adminEmails = new Set<string>(["admin@example.com"]);
+    envState.platformOwnerEmails = new Set<string>(["owner@example.com"]);
+  });
+
+  it("allows configured platform owners", async () => {
+    await expect(requirePlatformOwnerApiSession()).resolves.toBe(session);
+  });
+
+  it("does not allow regular admins by default when platform owners are configured", async () => {
+    authMock.mockResolvedValue({
+      ...session,
+      user: { email: "admin@example.com" },
+    });
+
+    await expect(requirePlatformOwnerApiSession()).resolves.toBeNull();
+  });
+
+  it("keeps the owner bypass limited to non-production demo mode", async () => {
+    envState.isDemoMode = true;
+    envState.isProduction = true;
+    envState.platformOwnerEmails = new Set<string>();
+
+    await expect(requirePlatformOwnerApiSession()).resolves.toBeNull();
+
+    envState.isProduction = false;
+
+    await expect(requirePlatformOwnerApiSession()).resolves.toBe(session);
   });
 });
