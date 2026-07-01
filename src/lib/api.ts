@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { adminEmails, isDemoMode, isProduction } from "@/lib/env";
+import { adminEmails, isDemoMode, isProduction, platformOwnerEmails } from "@/lib/env";
 export { isTrustedAppMutationRequest } from "@/lib/request-origin";
 
 export function ok(data: unknown, init?: ResponseInit) {
@@ -38,6 +38,21 @@ export async function requireAdminApiSession() {
   }
 
   if (!adminEmails.has(session.user.email.toLowerCase())) {
+    return null;
+  }
+  return session;
+}
+
+export async function requirePlatformOwnerApiSession() {
+  const session = await requireApiSession();
+  if (!session?.user?.email) {
+    return null;
+  }
+  if (isDemoMode && !isProduction) {
+    return session;
+  }
+
+  if (!platformOwnerEmails.has(session.user.email.toLowerCase())) {
     return null;
   }
   return session;

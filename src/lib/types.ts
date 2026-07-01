@@ -143,6 +143,28 @@ export interface CreatorTenantRecord {
   domains: CreatorDomainRecord[];
 }
 
+export interface PlatformCreatorOwnerRecord {
+  id: string;
+  email: string | null;
+  youtubeDisplayName: string;
+  youtubeHandle?: string | null;
+  avatarUrl: string | null;
+}
+
+export interface PlatformCreatorModuleSummaryRecord {
+  available: number;
+  installed: number;
+  disabled: number;
+  archived: number;
+}
+
+export interface PlatformCreatorInstanceRecord extends CreatorTenantRecord {
+  owner: PlatformCreatorOwnerRecord | null;
+  primaryDomain: string | null;
+  publicUrl: string | null;
+  moduleSummary: PlatformCreatorModuleSummaryRecord;
+}
+
 export interface ViewerRecord {
   id: string;
   googleUserId: string | null;

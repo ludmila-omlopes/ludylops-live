@@ -35,3 +35,34 @@ describe("env authSecret", () => {
     expect(authSecret).toBe("dev-secret");
   });
 });
+
+describe("platformOwnerEmails", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("DATABASE_URL", "");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("falls back to admin emails when platform owners are not configured", async () => {
+    vi.stubEnv("ADMIN_EMAILS", "admin@example.com");
+    vi.stubEnv("PLATFORM_OWNER_EMAILS", undefined);
+
+    const { platformOwnerEmails } = await import("@/lib/env");
+
+    expect(platformOwnerEmails.has("admin@example.com")).toBe(true);
+  });
+
+  it("uses platform owner emails when configured", async () => {
+    vi.stubEnv("ADMIN_EMAILS", "admin@example.com");
+    vi.stubEnv("PLATFORM_OWNER_EMAILS", "owner@example.com");
+
+    const { platformOwnerEmails } = await import("@/lib/env");
+
+    expect(platformOwnerEmails.has("owner@example.com")).toBe(true);
+    expect(platformOwnerEmails.has("admin@example.com")).toBe(false);
+  });
+});
