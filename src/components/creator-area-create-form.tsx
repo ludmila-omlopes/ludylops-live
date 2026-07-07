@@ -9,7 +9,7 @@ import {
   createCreatorAreaSchema,
   flattenCreatorAreaSchemaErrors,
   formatCreateCreatorAreaError,
-} from "@/lib/creators/service";
+} from "@/lib/creators/area-form";
 
 type FieldErrors = Partial<Record<"displayName" | "slug" | "primaryColor" | "accentColor", string>>;
 
