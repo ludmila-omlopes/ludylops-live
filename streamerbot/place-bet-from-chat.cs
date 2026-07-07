@@ -56,15 +56,19 @@ public class CPHInline
             return false;
         }
 
-        if (!TryReadIntArg("optionIndex", out int optionIndex) || optionIndex <= 0)
+        bool hasOptionIndex = TryReadIntArg("optionIndex", out int optionIndex) && optionIndex > 0;
+        string optionLabel = hasOptionIndex
+            ? null
+            : GetFirstArgString("optionLabel", "option", "optionIndex");
+        if (!hasOptionIndex && string.IsNullOrWhiteSpace(optionLabel))
         {
-            Reply("Comando invalido. Use !bet <opcao> <valor>.", true);
+            Reply("Comando inválido. Use !bet <opção> <valor>.", true);
             return false;
         }
 
         if (!TryReadIntArg("amount", out int amount) || amount <= 0)
         {
-            Reply("Valor invalido. Use !bet <opcao> <valor>.", true);
+            Reply("Valor inválido. Use !bet <opção> <valor>.", true);
             return false;
         }
 
@@ -92,7 +96,8 @@ public class CPHInline
             displayName,
             youtubeHandle,
             string.IsNullOrWhiteSpace(activeBetId) ? null : activeBetId,
-            optionIndex,
+            hasOptionIndex ? (int?)optionIndex : null,
+            optionLabel,
             amount,
             "streamerbot_chat"
         );
@@ -310,7 +315,8 @@ public class CPHInline
         string displayName,
         string youtubeHandle,
         string betId,
-        int optionIndex,
+        int? optionIndex,
+        string optionLabel,
         int amount,
         string source
     )
@@ -334,7 +340,15 @@ public class CPHInline
             builder.AppendFormat(",\"betId\":\"{0}\"", JsonEscape(betId));
         }
 
-        builder.AppendFormat(",\"optionIndex\":{0}", optionIndex);
+        if (optionIndex.HasValue)
+        {
+            builder.AppendFormat(",\"optionIndex\":{0}", optionIndex.Value);
+        }
+        else if (!string.IsNullOrWhiteSpace(optionLabel))
+        {
+            builder.AppendFormat(",\"optionLabel\":\"{0}\"", JsonEscape(optionLabel));
+        }
+
         builder.AppendFormat(",\"amount\":{0}", amount);
         builder.AppendFormat(",\"source\":\"{0}\"", JsonEscape(source));
         builder.Append("}");

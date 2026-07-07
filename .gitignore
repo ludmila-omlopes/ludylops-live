@@ -43,4 +43,8 @@ devserver-*.log
 *.tsbuildinfo
 next-env.d.ts
 
+# local git worktrees
+/.worktrees/
+/.claude/worktrees/
+
 .vercel

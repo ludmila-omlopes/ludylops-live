@@ -94,7 +94,9 @@ export function AppChrome({
     },
   ];
 
-  const authedLinks: NavLink[] = [{ href: "/me", label: "Meus Pipetz" }];
+  const authedLinks: NavLink[] = [
+    { href: "/me", label: "Meus Pipetz" },
+  ];
   const adminLinks: NavLink[] = isAdmin ? [{ href: "/admin", label: "Admin" }] : [];
   const ownerLinks: NavLink[] = isPlatformOwner ? [{ href: "/owner", label: "Plataforma" }] : [];
   const hasUsableSession = hasUsableAppSession(session);

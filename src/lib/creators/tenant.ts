@@ -9,6 +9,8 @@ import {
   DEFAULT_CREATOR_MODULES,
   DEFAULT_CREATOR_SLUG,
 } from "@/lib/creators/defaults";
+import { findDemoCreatorTenantByHostname, findDemoCreatorTenantBySlug } from "@/lib/creators/demo-store";
+import { normalizeCreatorSlug, normalizeHostname } from "@/lib/creators/identity";
 import { getDb } from "@/lib/db/client";
 import { creatorBranding, creatorDomains, creatorModules, creators } from "@/lib/db/schema";
 import type {
@@ -39,29 +41,6 @@ export const defaultCreatorTenant: CreatorTenantRecord = {
 
 function toIsoDate(value: Date | string) {
   return value instanceof Date ? value.toISOString() : value;
-}
-
-function normalizeHostname(value?: string | null) {
-  const hostname = value?.split(",")[0]?.trim().toLowerCase() ?? "";
-  if (!hostname) {
-    return null;
-  }
-
-  const withoutProtocol = hostname.replace(/^https?:\/\//u, "");
-  const withoutPath = withoutProtocol.split("/")[0] ?? "";
-  const withoutPort =
-    withoutPath.startsWith("[") && withoutPath.includes("]")
-      ? withoutPath.slice(1, withoutPath.indexOf("]"))
-      : withoutPath.split(":")[0];
-
-  return withoutPort || null;
-}
-
-function normalizeCreatorSlug(value?: string | null) {
-  const slug = value?.trim().toLowerCase() ?? "";
-  return /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/u.test(slug) || /^[a-z0-9]$/u.test(slug)
-    ? slug
-    : null;
 }
 
 function getRequestHostname(request?: Request | null) {
@@ -288,7 +267,10 @@ export async function resolveCreatorFromRequest(
   const db = getDb();
 
   if (!db) {
-    return defaultCreatorTenant;
+    const demoTenant =
+      (explicitSlug ? findDemoCreatorTenantBySlug(explicitSlug) : null) ??
+      (hostname ? findDemoCreatorTenantByHostname(hostname) : null);
+    return demoTenant ?? defaultCreatorTenant;
   }
 
   try {

@@ -17,6 +17,7 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 004  | Bridge redemption claim/complete/fail idempotency | P1 | M | 003 | [#139](https://github.com/ludmila-omlopes/ludylops-live/issues/139) | DONE |
 | 005  | redeemItem balance overdraw + stock oversell guards | P1 | S | 001 | [#140](https://github.com/ludmila-omlopes/ludylops-live/issues/140) | DONE |
 | 006  | Hardening batch: timing-safe sync auth, dep vulns, FK indexes | P2 | M | 001 | [#141](https://github.com/ludmila-omlopes/ludylops-live/issues/141) | DONE (manual index migration generated; not applied) |
+| 007  | Public landing page for the creator platform beta at `/criar-area` | P1 | M | white-label foundation committed (see plan) | [#169](https://github.com/ludmila-omlopes/ludylops-live/issues/169) | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -26,6 +27,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - 004 requires 003 because the route tests characterize the HTTP contract that 004's repository changes must not break.
 - 005 and 006 only need 001 (gates in CI); they are independent of each other and of 003/004.
 - 006 generates a Drizzle migration but does NOT apply it — applying to the Neon database (`npm run db:push`) is an operator decision.
+- 007 (added 2026-07-07 at `aa9104c`) depends on the white-label foundation files (`src/lib/creators/access.ts`, `src/app/(viewer)/criar-area/**`, creator forms) being committed and merged — they were untracked working-tree files when the plan was written. Its drift check verifies this.
 
 ## Findings considered and rejected
 
@@ -40,6 +42,7 @@ So nobody re-audits these:
 - **OBS overlay polling → serverless/Neon cost**: real but architectural (SSE/WebSocket redesign); deferred — revisit if Neon/Vercel bills climb.
 - **`repository.ts` decomposition (10,033-line god module, duplicated demo/DB paths)**: real and HIGH-impact, but deliberately not planned this round — user selected the top-5 + hardening batch. Decompose only after 003/004/005 land (tests first). Re-raise next run.
 - **Unbounded admin queries / O(n×m) suggestion assembly**: real, MED impact; not selected this round. Re-raise next run.
+- **Beta email gating for creator-area creation** (requested 2026-07-07): already fully implemented — `canCreateCreatorArea` in `src/lib/creators/access.ts` (admin emails + admin-managed allowlist), enforced on the `/criar-area` page and on `GET/POST /api/me/creator-area`, with admin UI (`admin-creator-area-access-panel.tsx`) and tests (`access.test.ts`). No plan needed; only the landing page (007) was missing.
 
 ## Issues
 
