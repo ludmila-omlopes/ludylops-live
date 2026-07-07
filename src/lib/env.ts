@@ -67,7 +67,12 @@ export const platformOwnerEmails = parseEmailSet(env.PLATFORM_OWNER_EMAILS ?? en
 export const isDemoMode = !env.DATABASE_URL;
 export const isDemoAuthEnabled = isDemoMode;
 
-if (isProduction && !env.NEXTAUTH_SECRET) {
+// Guard against evaluating server-only env validation in the browser: this
+// module must never be part of a client bundle, but if it accidentally is
+// (e.g. a "use client" component transitively imports it), NEXTAUTH_SECRET is
+// absent client-side and this throw would crash the page during hydration.
+// The server-side check is the one that matters; keep it scoped to the server.
+if (typeof window === "undefined" && isProduction && !env.NEXTAUTH_SECRET) {
   throw new Error(
     "[env] NEXTAUTH_SECRET is required in production. " +
       "Set it in the deployment environment before starting the app.",
