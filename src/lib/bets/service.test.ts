@@ -12,6 +12,7 @@ import type { BetEntryRecord, BetWithOptionsRecord } from "@/lib/types";
 const baseBet: BetWithOptionsRecord = {
   id: "bet-1",
   question: "Boss no-hit?",
+  optionMode: "preset",
   status: "open",
   openedAt: new Date("2026-03-31T10:00:00.000Z").toISOString(),
   closesAt: new Date("2026-03-31T12:00:00.000Z").toISOString(),
@@ -192,6 +193,19 @@ describe("calculateHouseBetEntries", () => {
             createdAt: new Date("2026-03-31T10:00:00.000Z").toISOString(),
           },
         ],
+      }),
+    ).toEqual([]);
+  });
+
+  it("does not create house entries for freeform bets", () => {
+    expect(
+      calculateHouseBetEntries({
+        optionMode: "freeform",
+        options: [
+          { id: "a", betId: "bet-1", label: "A", sortOrder: 0, poolAmount: 100 },
+          { id: "b", betId: "bet-1", label: "B", sortOrder: 1, poolAmount: 0 },
+        ],
+        existingEntries: [],
       }),
     ).toEqual([]);
   });

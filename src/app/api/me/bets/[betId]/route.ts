@@ -22,7 +22,8 @@ export async function POST(
     const entry = await placeBet({
       viewerId: session.user.activeViewerId,
       betId,
-      optionId: payload.optionId,
+      optionId: payload.optionId ?? null,
+      optionLabel: payload.optionLabel ?? null,
       amount: payload.amount,
       source: payload.source,
     });

@@ -9,7 +9,7 @@ import type {
   GameSuggestionBoostSettingsRecord,
   GameSuggestionWithMeta,
 } from "@/lib/types";
-import { cn, formatDateTime, formatPipetz } from "@/lib/utils";
+import { formatDateTime, formatPipetz } from "@/lib/utils";
 
 type GameSuggestionStatus = GameSuggestionWithMeta["status"];
 
@@ -47,14 +47,33 @@ const statusLabels: Record<GameSuggestionWithMeta["status"], string> = {
   rejected: "Rejeitada",
 };
 
-const statusFilterOptions: Array<{ status: GameSuggestionStatus; label: string }> = [
-  { status: "open", label: "Abertas" },
-  { status: "accepted", label: "Aceitas" },
-  { status: "played", label: "Já jogadas" },
-  { status: "rejected", label: "Recusadas" },
-];
+type GameSuggestionTabId = "queue" | "played" | "rejected";
 
-const DEFAULT_VISIBLE_STATUSES: GameSuggestionStatus[] = ["open", "accepted"];
+const suggestionTabs: Array<{
+  id: GameSuggestionTabId;
+  label: string;
+  statuses: GameSuggestionStatus[];
+  emptyMessage: string;
+}> = [
+  {
+    id: "queue",
+    label: "Fila",
+    statuses: ["open", "accepted"],
+    emptyMessage: "Nenhuma sugestão aberta ou aceita.",
+  },
+  {
+    id: "played",
+    label: "Jogos jogados",
+    statuses: ["played"],
+    emptyMessage: "Nenhum jogo marcado como jogado.",
+  },
+  {
+    id: "rejected",
+    label: "Jogos rejeitados",
+    statuses: ["rejected"],
+    emptyMessage: "Nenhum jogo rejeitado.",
+  },
+];
 
 const statusBgMap: Record<GameSuggestionWithMeta["status"], string> = {
   open: "var(--color-sky)",
@@ -104,20 +123,20 @@ export function AdminGameSuggestionsPanel({
   const [boostForm, setBoostForm] = useState(toBoostFormState(initialBoostSettings));
   const [isPending, startTransition] = useTransition();
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
-  const [visibleStatuses, setVisibleStatuses] = useState<GameSuggestionStatus[]>(DEFAULT_VISIBLE_STATUSES);
-  const filteredSuggestions = suggestions.filter((suggestion) => visibleStatuses.includes(suggestion.status));
+  const [activeSuggestionTabId, setActiveSuggestionTabId] = useState<GameSuggestionTabId>("queue");
+  const activeSuggestionTab =
+    suggestionTabs.find((tab) => tab.id === activeSuggestionTabId) ?? suggestionTabs[0];
+  const filteredSuggestions = suggestions.filter((suggestion) =>
+    activeSuggestionTab.statuses.includes(suggestion.status)
+  );
   const visibleSuggestions = showAllSuggestions
     ? filteredSuggestions
     : filteredSuggestions.slice(0, INITIAL_VISIBLE_GAME_SUGGESTIONS);
   const hiddenSuggestionCount = Math.max(filteredSuggestions.length - visibleSuggestions.length, 0);
 
-  function toggleStatusFilter(status: GameSuggestionStatus) {
+  function selectSuggestionTab(tabId: GameSuggestionTabId) {
     setShowAllSuggestions(false);
-    setVisibleStatuses((currentStatuses) =>
-      currentStatuses.includes(status)
-        ? currentStatuses.filter((currentStatus) => currentStatus !== status)
-        : [...currentStatuses, status]
-    );
+    setActiveSuggestionTabId(tabId);
   }
 
   function updateBoostField(field: BoostSettingField, value: string) {
@@ -201,7 +220,7 @@ export function AdminGameSuggestionsPanel({
               className="text-3xl uppercase"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Fila de sugestões
+              Sugestões de jogos
             </h2>
           </div>
           {feedback ? (
@@ -276,42 +295,50 @@ export function AdminGameSuggestionsPanel({
                 Status das sugestões
               </h3>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {statusFilterOptions.map((option) => {
-                const isChecked = visibleStatuses.includes(option.status);
-                const statusCount = suggestions.filter((suggestion) => suggestion.status === option.status).length;
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Status das sugestões de jogos">
+              {suggestionTabs.map((tab) => {
+                const isActive = tab.id === activeSuggestionTab.id;
+                const tabCount = suggestions.filter((suggestion) =>
+                  tab.statuses.includes(suggestion.status)
+                ).length;
 
                 return (
-                  <label
-                    key={option.status}
-                    className={cn(
-                      "badge-brutal flex cursor-pointer items-center gap-2 px-3 py-2 text-xs text-[var(--color-ink)] transition hover:-translate-y-0.5",
-                      isChecked ? "bg-[var(--color-mint)]" : "bg-[var(--color-paper)] opacity-70"
-                    )}
+                  <Button
+                    key={tab.id}
+                    type="button"
+                    variant={isActive ? "accent" : "neutral"}
+                    size="sm"
+                    onClick={() => selectSuggestionTab(tab.id)}
+                    className="min-h-11 gap-3 whitespace-normal px-3 text-left"
+                    role="tab"
+                    id={`game-suggestions-tab-trigger-${tab.id}`}
+                    aria-controls={`game-suggestions-tab-panel-${tab.id}`}
+                    aria-selected={isActive}
                   >
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-[var(--color-mint)]"
-                      checked={isChecked}
-                      onChange={() => toggleStatusFilter(option.status)}
-                    />
-                    <span>{option.label}</span>
-                    <span className="mono text-[10px]">({statusCount})</span>
-                  </label>
+                    <span>{tab.label}</span>
+                    <span className="badge-brutal bg-[var(--color-paper)] px-2 py-0.5 text-[10px] text-[var(--color-ink)]">
+                      {tabCount}
+                    </span>
+                  </Button>
                 );
               })}
             </div>
           </div>
         </div>
 
-        <div className="mt-6 grid gap-3">
+        <div
+          className="mt-6 grid gap-3"
+          id={`game-suggestions-tab-panel-${activeSuggestionTab.id}`}
+          role="tabpanel"
+          aria-labelledby={`game-suggestions-tab-trigger-${activeSuggestionTab.id}`}
+        >
           {suggestions.length === 0 ? (
             <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
               Nenhuma sugestão cadastrada.
             </div>
           ) : filteredSuggestions.length === 0 ? (
             <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
-              Nenhuma sugestão corresponde aos filtros selecionados.
+              {activeSuggestionTab.emptyMessage}
             </div>
           ) : null}
 

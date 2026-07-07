@@ -1,0 +1,1 @@
+ALTER TABLE "bets" ADD COLUMN "option_mode" varchar(32) DEFAULT 'preset' NOT NULL;

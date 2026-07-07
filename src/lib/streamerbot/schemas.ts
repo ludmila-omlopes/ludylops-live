@@ -32,11 +32,17 @@ export const showQuoteOverlaySchema = z.object({
   source: z.string().default("web"),
 });
 
-export const placeBetSchema = z.object({
-  optionId: z.string().min(1),
-  amount: z.number().int().min(1),
-  source: z.string().default("web"),
-});
+export const placeBetSchema = z
+  .object({
+    optionId: z.string().min(1).optional(),
+    optionLabel: z.string().trim().min(1).max(255).optional(),
+    amount: z.number().int().min(1),
+    source: z.string().default("web"),
+  })
+  .refine((value) => value.optionId || value.optionLabel, {
+    message: "Option selector is required.",
+    path: ["optionId"],
+  });
 
 export const streamerbotChatBetSchema = z
   .object({
@@ -46,7 +52,7 @@ export const streamerbotChatBetSchema = z
     betId: z.string().min(1).optional(),
     optionId: z.string().min(1).optional(),
     optionIndex: z.number().int().min(1).optional(),
-    optionLabel: z.string().min(1).optional(),
+    optionLabel: z.string().trim().min(1).max(255).optional(),
     amount: z.number().int().min(1),
     source: z.string().default("streamerbot_chat"),
   })
@@ -172,12 +178,31 @@ export const setActiveViewerSchema = z.object({
   viewerId: z.string().min(1),
 });
 
-export const createBetSchema = z.object({
-  question: z.string().min(6).max(255),
-  closesAt: z.string().datetime(),
-  options: z.array(z.string().min(1).max(255)).min(2).max(6),
-  startOpen: z.boolean().default(true),
-});
+export const createBetSchema = z
+  .object({
+    question: z.string().min(6).max(255),
+    closesAt: z.string().datetime(),
+    optionMode: z.enum(["preset", "freeform"]).default("preset"),
+    options: z.array(z.string().min(1).max(255)).max(6).default([]),
+    startOpen: z.boolean().default(true),
+  })
+  .superRefine((value, ctx) => {
+    if (value.optionMode === "preset" && value.options.length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["options"],
+        message: "A aposta precisa ter ao menos 2 opções.",
+      });
+    }
+
+    if (value.optionMode === "freeform" && value.options.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["options"],
+        message: "Apostas livres não usam opções pré-cadastradas.",
+      });
+    }
+  });
 
 export const resolveBetSchema = z.object({
   winningOptionId: z.string().min(1),

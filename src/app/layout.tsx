@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { Archivo_Black, IBM_Plex_Mono, DM_Sans, Geist } from "next/font/google";
-import Script from "next/script";
 
 import { auth } from "@/auth";
 import { AppChrome } from "@/components/app-chrome";
 import { Providers } from "@/components/providers";
 import "./globals.css";
-import { adminEmails, isDemoMode } from "@/lib/env";
+import { adminEmails, isDemoMode, platformOwnerEmails } from "@/lib/env";
 import { isStreamerbotLivestreamActive } from "@/lib/streamerbot/live-status";
-import { isThemeMode, themeCookieKey, themeStorageKey } from "@/lib/theme";
+import { isThemeMode, themeCookieKey } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -38,28 +37,6 @@ export const metadata: Metadata = {
     "Faço lives e vídeos de jogos no YouTube, com campanhas longas, sugestões do chat e muito bate-papo. Acompanhe o jogo atual, junte pipetz e participe do que acontece ao vivo.",
 };
 
-const themeScript = `
-(() => {
-  const storageKey = "${themeStorageKey}";
-  const cookieKey = "${themeCookieKey}";
-  const root = document.documentElement;
-  const cookieMatch = document.cookie
-    .split("; ")
-    .find((entry) => entry.startsWith(cookieKey + "="));
-  const cookieTheme = cookieMatch ? decodeURIComponent(cookieMatch.split("=").slice(1).join("=")) : null;
-  const storedTheme = window.localStorage.getItem(storageKey) ?? cookieTheme;
-  const theme =
-    storedTheme === "dark" || storedTheme === "light"
-      ? storedTheme
-      : window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
-
-  root.dataset.theme = theme;
-  root.style.colorScheme = theme;
-})();
-`;
-
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -75,6 +52,10 @@ export default async function RootLayout({
   const isAdmin = Boolean(
     session?.user?.email && (isDemoMode || adminEmails.has(session.user.email.toLowerCase())),
   );
+  const isPlatformOwner = Boolean(
+    session?.user?.email &&
+      (isDemoMode || platformOwnerEmails.has(session.user.email.toLowerCase())),
+  );
 
   return (
     <html
@@ -86,13 +67,11 @@ export default async function RootLayout({
       style={initialTheme ? { colorScheme: initialTheme } : undefined}
     >
       <body className="min-h-full text-[var(--color-ink)]" style={{ fontFamily: "var(--font-body), var(--font-display), sans-serif" }}>
-        <Script id="pipetz-theme" strategy="beforeInteractive">
-          {themeScript}
-        </Script>
         <Providers>
           <AppChrome
             session={session}
             isAdmin={isAdmin}
+            isPlatformOwner={isPlatformOwner}
             isLive={isLive}
             initialTheme={initialTheme}
             showViewerLinkingAlert={Boolean(session?.user?.email && session.user.isLinked === false)}

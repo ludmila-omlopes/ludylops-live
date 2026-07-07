@@ -1,10 +1,11 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
+  applyTheme,
   getPreferredTheme,
   persistTheme,
   themeStorageKey,
@@ -40,6 +41,10 @@ export function ThemeToggle({ initialTheme = null }: { initialTheme?: ThemeMode 
     getPreferredTheme,
     () => initialTheme ?? "light",
   );
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   function handleToggle() {
     const nextTheme = theme === "dark" ? "light" : "dark";

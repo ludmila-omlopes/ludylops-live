@@ -252,6 +252,7 @@ function createPlaceBetDb(options?: {
   const betRow = {
     id: "bet-db-1",
     question: "Vai passar sem hit?",
+    optionMode: "preset",
     status: "open",
     openedAt: new Date(now - 5 * 60 * 1000),
     closesAt: new Date(now + 60 * 60 * 1000),
@@ -299,9 +300,9 @@ function createPlaceBetDb(options?: {
           if (table === betOptions) {
             return {
               where() {
-                return {
+                return Object.assign(Promise.resolve(optionRows), {
                   limit: async () => [optionRows[0]],
-                };
+                });
               },
             };
           }
@@ -977,6 +978,44 @@ describe("placeBet demo top-ups", () => {
       }),
     ).rejects.toThrow("aposta_ja_registrada");
   });
+
+  it("creates and reuses freeform options in demo mode", async () => {
+    const bet = await createBet({
+      question: "Qual será o tempo final?",
+      closesAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      optionMode: "freeform",
+      options: [],
+    });
+
+    expect(bet.options).toEqual([]);
+
+    const firstEntry = await placeBet({
+      viewerId: "viewer_ana",
+      betId: bet.id,
+      optionLabel: "07:42",
+      amount: 100,
+      source: "web",
+    });
+    const secondEntry = await placeBet({
+      viewerId: "viewer_caio",
+      betId: bet.id,
+      optionLabel: " 07:42 ",
+      amount: 50,
+      source: "web",
+    });
+
+    expect(secondEntry.optionId).toBe(firstEntry.optionId);
+
+    const listed = (await listBets("viewer_ana")).find((entry) => entry.id === bet.id);
+    expect(listed?.optionMode).toBe("freeform");
+    expect(listed?.options).toEqual([
+      expect.objectContaining({
+        id: firstEntry.optionId,
+        label: "07:42",
+        poolAmount: 150,
+      }),
+    ]);
+  });
 });
 
 describe("placeBet database guards", () => {
@@ -1125,6 +1164,35 @@ describe("placeBetFromChatCommand", () => {
         source: "streamerbot_chat",
       }),
     ).rejects.toThrow("multiple_open_bets");
+  });
+
+  it("creates a freeform option from chat text", async () => {
+    const bet = await createBet({
+      question: "Qual será o tempo final?",
+      closesAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      optionMode: "freeform",
+      options: [],
+    });
+
+    const result = await placeBetFromChatCommand({
+      viewerExternalId: "yt_lia",
+      youtubeDisplayName: "Lia Pixel",
+      betId: bet.id,
+      optionLabel: "07:42",
+      amount: 75,
+      source: "streamerbot_chat",
+    });
+
+    expect(result.option).toMatchObject({
+      betId: bet.id,
+      label: "07:42",
+    });
+    expect(result.entry).toMatchObject({
+      betId: bet.id,
+      optionId: result.option.id,
+      viewerId: "viewer_lia",
+      amount: 75,
+    });
   });
 });
 

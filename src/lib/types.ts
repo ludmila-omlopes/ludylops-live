@@ -34,6 +34,8 @@ export type BetStatus =
   | "resolved"
   | "cancelled";
 
+export type BetOptionMode = "preset" | "freeform";
+
 export type RedemptionStatus =
   | "queued"
   | "executing"
@@ -141,6 +143,34 @@ export interface CreatorTenantRecord {
   branding: CreatorBrandingRecord;
   modules: CreatorModuleRecord[];
   domains: CreatorDomainRecord[];
+}
+
+export interface PlatformCreatorOwnerRecord {
+  id: string;
+  email: string | null;
+  youtubeDisplayName: string;
+  youtubeHandle?: string | null;
+  avatarUrl: string | null;
+}
+
+export interface PlatformCreatorModuleSummaryRecord {
+  available: number;
+  installed: number;
+  disabled: number;
+  archived: number;
+}
+
+export interface PlatformCreatorInstanceRecord extends CreatorTenantRecord {
+  owner: PlatformCreatorOwnerRecord | null;
+  primaryDomain: string | null;
+  publicUrl: string | null;
+  moduleSummary: PlatformCreatorModuleSummaryRecord;
+}
+
+export interface CreatorAreaAccessSettingsRecord {
+  allowedEmails: string[];
+  updatedAt: string | null;
+  updatedBy: string | null;
 }
 
 export interface ViewerRecord {
@@ -492,6 +522,7 @@ export interface LivestreamStatusRecord {
 export interface BetRecord {
   id: string;
   question: string;
+  optionMode: BetOptionMode;
   status: BetStatus;
   openedAt: string | null;
   closesAt: string;

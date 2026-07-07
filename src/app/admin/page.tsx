@@ -11,10 +11,12 @@ import { AdminLiveLikeGoalsPanel } from "@/components/admin-live-like-goals-pane
 import { AdminWheelPanel } from "@/components/admin-wheel-panel";
 import { AdminRecommendationsPanel } from "@/components/admin-recommendations-panel";
 import { AdminViewerLinksPanel } from "@/components/admin-viewer-links-panel";
+import { AdminCreatorAreaAccessPanel } from "@/components/admin-creator-area-access-panel";
 import { RedemptionGrid } from "@/components/redemption-grid";
 import { LeaderboardTable } from "@/components/leaderboard-table";
 import { LiveStatusPanel } from "@/components/live-status-panel";
 import { requireAdminSession } from "@/lib/auth/session";
+import { getCreatorAreaAccessSettings } from "@/lib/creators/access";
 import {
   getBridgeStatus,
   getCatalog,
@@ -64,6 +66,7 @@ export default async function AdminPage() {
     pricing,
     wheelConfig,
     streamerbotScripts,
+    creatorAreaAccessSettings,
   ] = await Promise.all([
     getCatalog(),
     getLeaderboard(),
@@ -82,6 +85,7 @@ export default async function AdminPage() {
     getPipetzPricing(),
     getWheelConfig(),
     Promise.resolve(listStreamerbotScripts()),
+    getCreatorAreaAccessSettings(),
   ]);
   const openBetCount = bets.filter((bet) => bet.status === "open").length;
   const queuedRedemptionCount = redemptions.filter((entry) => entry.status === "queued").length;
@@ -175,6 +179,13 @@ export default async function AdminPage() {
                 description: "Contas Google e canais do YouTube.",
                 badge: `${viewers.length}`,
                 content: <AdminViewerLinksPanel entries={viewers} embedded />,
+              },
+              {
+                id: "areas-criadores",
+                label: "Beta áreas",
+                description: "Emails liberados para criar área.",
+                badge: `${creatorAreaAccessSettings.allowedEmails.length}`,
+                content: <AdminCreatorAreaAccessPanel initialSettings={creatorAreaAccessSettings} />,
               },
               {
                 id: "sugestoes-jogos",

@@ -10,6 +10,7 @@ import { formatPipetz } from "@/lib/utils";
 const DEMO_BET: BetWithOptionsRecord = {
   id: "demo-bet",
   question: "Ela passa o boss sem morrer?",
+  optionMode: "preset",
   status: "open",
   openedAt: "2026-05-20T18:00:00.000Z",
   closesAt: "2026-05-20T19:00:00.000Z",

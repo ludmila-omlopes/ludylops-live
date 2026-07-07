@@ -223,6 +223,7 @@ export const pointLedger = pgTable(
 export const bets = pgTable("bets", {
   id: varchar("id", { length: 64 }).primaryKey(),
   question: text("question").notNull(),
+  optionMode: varchar("option_mode", { length: 32 }).default("preset").notNull(),
   status: varchar("status", { length: 32 }).notNull(),
   openedAt: timestamp("opened_at", { withTimezone: true }),
   closesAt: timestamp("closes_at", { withTimezone: true }).notNull(),

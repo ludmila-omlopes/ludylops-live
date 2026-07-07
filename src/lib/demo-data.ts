@@ -1,6 +1,7 @@
 import {
   BetEntryRecord,
   BetOptionRecord,
+  BetOptionMode,
   BetRecord,
   BridgeClientRecord,
   CatalogItemRecord,
@@ -297,6 +298,7 @@ export interface DemoBetOption {
 export interface DemoBet {
   id: string;
   question: string;
+  optionMode?: BetOptionMode;
   status: "open" | "locked" | "resolved" | "cancelled";
   deadline: Date;
   totalPool: number;
@@ -346,6 +348,7 @@ export const demoBets: DemoBet[] = [
 export const demoBetRecords: BetRecord[] = demoBets.map((bet) => ({
   id: bet.id,
   question: bet.question,
+  optionMode: bet.optionMode ?? "preset",
   status: bet.status,
   openedAt: new Date(now.getTime() - 15 * 60 * 1000).toISOString(),
   closesAt: bet.deadline.toISOString(),

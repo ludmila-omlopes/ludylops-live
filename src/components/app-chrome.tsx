@@ -29,6 +29,7 @@ export function AppChrome({
   children,
   initialTheme = null,
   isAdmin = false,
+  isPlatformOwner = false,
   isLive = false,
   session,
   showViewerLinkingAlert = false,
@@ -36,6 +37,7 @@ export function AppChrome({
   children: React.ReactNode;
   initialTheme?: ThemeMode | null;
   isAdmin?: boolean;
+  isPlatformOwner?: boolean;
   isLive?: boolean;
   session: Session | null;
   showViewerLinkingAlert?: boolean;
@@ -92,11 +94,14 @@ export function AppChrome({
     },
   ];
 
-  const authedLinks: NavLink[] = [{ href: "/me", label: "Meus Pipetz" }];
+  const authedLinks: NavLink[] = [
+    { href: "/me", label: "Meus Pipetz" },
+  ];
   const adminLinks: NavLink[] = isAdmin ? [{ href: "/admin", label: "Admin" }] : [];
+  const ownerLinks: NavLink[] = isPlatformOwner ? [{ href: "/owner", label: "Plataforma" }] : [];
   const hasUsableSession = hasUsableAppSession(session);
 
-  const accountLinks = [...(hasUsableSession ? authedLinks : []), ...adminLinks];
+  const accountLinks = [...(hasUsableSession ? authedLinks : []), ...adminLinks, ...ownerLinks];
   const mobileNavSections: NavGroup[] = [
     { label: "Principais", links: primaryLinks },
     ...navGroups,
@@ -193,7 +198,7 @@ export function AppChrome({
                   key={link.href}
                   href={link.href}
                   className={`rounded-[var(--radius)] border px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-[0.1em] transition-colors duration-[var(--snap)] ${
-                    link.href === "/admin"
+                    link.href === "/admin" || link.href === "/owner"
                       ? "admin-action border-[2px] border-[var(--color-ink)] text-[var(--color-admin-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
                       : isActiveLink(link.href)
                       ? "pastel-action border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
@@ -245,7 +250,7 @@ export function AppChrome({
                       href={link.href}
                       onClick={() => setMobileOpen(false)}
                       className={`rounded-[var(--radius)] border px-4 py-3 text-sm font-extrabold uppercase tracking-[0.1em] transition-colors duration-[var(--snap)] ${
-                        link.href === "/admin"
+                        link.href === "/admin" || link.href === "/owner"
                           ? "admin-action border-[2px] border-[var(--color-ink)] text-[var(--color-admin-ink)] shadow-[4px_4px_0_var(--shadow-color)]"
                           : isActiveLink(link.href)
                           ? "pastel-action border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)] shadow-[4px_4px_0_var(--shadow-color)]"

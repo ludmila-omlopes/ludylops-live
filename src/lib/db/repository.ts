@@ -100,6 +100,7 @@ import {
   AdminViewerDirectoryRecord,
   AdminViewerLinkResult,
   BetEntryRecord,
+  BetOptionMode,
   BetOptionRecord,
   BetRecord,
   BetWithOptionsRecord,
@@ -1721,6 +1722,63 @@ function buildHouseViewerForOption(option: BetOptionRecord): ViewerRecord {
   };
 }
 
+function compactBetOptionLabel(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function normalizedBetOptionLabel(value: string) {
+  const compacted = compactBetOptionLabel(value);
+  return slugify(compacted) || compacted.toLocaleLowerCase("pt-BR");
+}
+
+function findBetOptionByLabel(options: BetOptionRecord[], label: string) {
+  const normalized = normalizedBetOptionLabel(label);
+  if (!normalized) {
+    return null;
+  }
+
+  return (
+    options.find((option) => normalizedBetOptionLabel(option.label) === normalized) ?? null
+  );
+}
+
+function resolveBetOptionForPlacement(input: {
+  bet: Pick<BetRecord, "id" | "optionMode">;
+  options: BetOptionRecord[];
+  optionId?: string | null;
+  optionLabel?: string | null;
+}):
+  | { kind: "existing"; option: BetOptionRecord }
+  | { kind: "create"; label: string; sortOrder: number } {
+  if (input.optionId) {
+    const option = input.options.find(
+      (entry) => entry.id === input.optionId && entry.betId === input.bet.id,
+    );
+    if (option) {
+      return { kind: "existing", option };
+    }
+  }
+
+  const label = input.optionLabel ? compactBetOptionLabel(input.optionLabel) : "";
+
+  if (input.bet.optionMode === "preset") {
+    throw new Error("invalid_option");
+  }
+
+  if (!label || label.length > 255) {
+    throw new Error("invalid_option");
+  }
+
+  const existingOption = findBetOptionByLabel(input.options, label);
+  if (existingOption) {
+    return { kind: "existing", option: existingOption };
+  }
+
+  const sortOrder =
+    input.options.reduce((max, option) => Math.max(max, option.sortOrder), -1) + 1;
+  return { kind: "create", label, sortOrder };
+}
+
 function getDemoGoogleAccountViewerLinks(store: DemoStore, googleAccountId: string) {
   return store.googleAccountViewers.filter((entry) => entry.googleAccountId === googleAccountId);
 }
@@ -1746,6 +1804,7 @@ function serializeBet(row: typeof bets.$inferSelect): BetRecord {
   return {
     id: row.id,
     question: row.question,
+    optionMode: (row.optionMode as BetOptionMode | undefined) ?? "preset",
     status: row.status as BetRecord["status"],
     openedAt: row.openedAt?.toISOString() ?? null,
     closesAt: row.closesAt.toISOString(),
@@ -3970,6 +4029,9 @@ function resolveChatBetOption(input: {
     if (option) {
       return option;
     }
+    if (input.bet.optionMode === "freeform") {
+      return null;
+    }
   }
 
   throw new Error("invalid_option");
@@ -4010,7 +4072,16 @@ function listDemoBets(viewer: ViewerRecord | null) {
 }
 
 function isMissingBetSchemaError(error: unknown) {
-  const tableNames = ['"bets"', '"bet_options"', '"bet_entries"', "bets", "bet_options", "bet_entries"];
+  const tableNames = [
+    '"bets"',
+    '"bet_options"',
+    '"bet_entries"',
+    '"option_mode"',
+    "bets",
+    "bet_options",
+    "bet_entries",
+    "option_mode",
+  ];
   const queue: unknown[] = [error];
   const visited = new Set<unknown>();
 
@@ -4028,6 +4099,7 @@ function isMissingBetSchemaError(error: unknown) {
     if (
       mentionsBetTables &&
       (normalized.includes("does not exist") ||
+        normalized.includes("column") ||
         normalized.includes("relation") ||
         normalized.includes("table") ||
         normalized.includes("failed query"))
@@ -7256,12 +7328,15 @@ export async function createBet(input: {
   question: string;
   closesAt: string;
   options: string[];
+  optionMode?: BetOptionMode;
   startOpen?: boolean;
 }) {
   const createdAt = new Date().toISOString();
+  const optionMode = input.optionMode ?? "preset";
   const bet: BetRecord = {
     id: randomUUID(),
     question: input.question,
+    optionMode,
     status: input.startOpen === false ? "draft" : "open",
     openedAt: input.startOpen === false ? null : createdAt,
     closesAt: input.closesAt,
@@ -7271,7 +7346,8 @@ export async function createBet(input: {
     winningOptionId: null,
     createdAt,
   };
-  const options = input.options.map((label, index) => ({
+  const optionLabels = optionMode === "freeform" ? [] : input.options;
+  const options = optionLabels.map((label, index) => ({
     id: randomUUID(),
     betId: bet.id,
     label,
@@ -7291,6 +7367,7 @@ export async function createBet(input: {
     await tx.insert(bets).values({
       id: bet.id,
       question: bet.question,
+      optionMode: bet.optionMode,
       status: bet.status,
       openedAt: bet.openedAt ? new Date(bet.openedAt) : null,
       closesAt: new Date(bet.closesAt),
@@ -7301,15 +7378,17 @@ export async function createBet(input: {
       createdAt: new Date(bet.createdAt),
     });
 
-    await tx.insert(betOptions).values(
-      options.map((option) => ({
-        id: option.id,
-        betId: option.betId,
-        label: option.label,
-        sortOrder: option.sortOrder,
-        poolAmount: option.poolAmount,
-      })),
-    );
+    if (options.length > 0) {
+      await tx.insert(betOptions).values(
+        options.map((option) => ({
+          id: option.id,
+          betId: option.betId,
+          label: option.label,
+          sortOrder: option.sortOrder,
+          poolAmount: option.poolAmount,
+        })),
+      );
+    }
   });
 
   return buildBetWithOptions({ bet, options, viewerEntry: null });
@@ -7417,11 +7496,12 @@ async function ensureViewerFromStreamerbotIdentity(input: {
 async function placeBetForViewer(input: {
   viewer: ViewerRecord;
   betId: string;
-  optionId: string;
+  optionId?: string | null;
+  optionLabel?: string | null;
   amount: number;
   source: string;
   requireLinkedViewer: boolean;
-}) {
+}): Promise<{ entry: BetEntryRecord; option: BetOptionRecord }> {
   const dashboard = await getViewerDashboard(input.viewer.id);
   if (!dashboard) {
     throw new Error("Viewer not found.");
@@ -7454,6 +7534,7 @@ async function placeBetForViewer(input: {
     bet: existingBet,
     amount: input.amount,
     optionId: input.optionId,
+    optionLabel: input.optionLabel,
     balance: dashboard.balance.currentBalance,
     existingEntry,
   });
@@ -7461,34 +7542,42 @@ async function placeBetForViewer(input: {
     throw new Error(validation.reason);
   }
 
-  const createdEntry: BetEntryRecord = {
-    id: randomUUID(),
-    betId: input.betId,
-    optionId: input.optionId,
-    viewerId: dashboard.viewer.id,
-    amount: input.amount,
-    isHouseEntry: false,
-    payoutAmount: null,
-    settledAt: null,
-    refundedAt: null,
-    createdAt: new Date().toISOString(),
-  };
-
   const db = getDb();
   if (isDemoMode || !db) {
     const store = getDemoStore();
     const bet = store.bets.find((entry) => entry.id === input.betId);
-    const option = store.betOptions.find(
-      (entry) => entry.id === input.optionId && entry.betId === input.betId,
-    );
-    if (!bet || !option) {
+    if (!bet) {
       throw new Error("Aposta nao encontrada.");
     }
 
+    const options = store.betOptions.filter((entry) => entry.betId === input.betId);
     const existingStoredEntry = store.betEntries.find(
       (entry) => entry.betId === input.betId && entry.viewerId === dashboard.viewer.id,
     );
-    if (existingStoredEntry && existingStoredEntry.optionId !== input.optionId) {
+    const optionResolution = resolveBetOptionForPlacement({
+      bet,
+      options,
+      optionId: input.optionId,
+      optionLabel: input.optionLabel,
+    });
+    let option: BetOptionRecord;
+    if (optionResolution.kind === "existing") {
+      option = optionResolution.option;
+    } else {
+      if (existingStoredEntry) {
+        throw new Error("aposta_ja_registrada");
+      }
+      option = {
+        id: randomUUID(),
+        betId: bet.id,
+        label: optionResolution.label,
+        sortOrder: optionResolution.sortOrder,
+        poolAmount: 0,
+      };
+      store.betOptions.push(option);
+    }
+
+    if (existingStoredEntry && existingStoredEntry.optionId !== option.id) {
       throw new Error("aposta_ja_registrada");
     }
 
@@ -7501,6 +7590,18 @@ async function placeBetForViewer(input: {
     balance.lifetimeSpent += input.amount;
     balance.lastSyncedAt = new Date().toISOString();
     option.poolAmount += input.amount;
+    const createdEntry: BetEntryRecord = {
+      id: randomUUID(),
+      betId: input.betId,
+      optionId: option.id,
+      viewerId: dashboard.viewer.id,
+      amount: input.amount,
+      isHouseEntry: false,
+      payoutAmount: null,
+      settledAt: null,
+      refundedAt: null,
+      createdAt: new Date().toISOString(),
+    };
     const persistedEntry = existingStoredEntry
       ? { ...existingStoredEntry, amount: existingStoredEntry.amount + input.amount }
       : createdEntry;
@@ -7515,16 +7616,17 @@ async function placeBetForViewer(input: {
       amount: -input.amount,
       source: input.source,
       externalEventId: null,
-      metadata: { betId: input.betId, optionId: input.optionId },
+      metadata: { betId: input.betId, optionId: option.id },
     });
-    return { ...persistedEntry };
+    return { entry: { ...persistedEntry }, option: { ...option } };
   }
 
-  let persistedEntry = createdEntry;
+  let persistedEntry: BetEntryRecord | null = null;
+  let persistedOption: BetOptionRecord | null = null;
   await db.transaction(async (tx) => {
-    const [betRow, optionRow, storedEntry] = await Promise.all([
+    const [betRow, optionRows, storedEntry] = await Promise.all([
       tx.select().from(bets).where(eq(bets.id, input.betId)).limit(1).then((rows) => rows[0] ?? null),
-      tx.select().from(betOptions).where(eq(betOptions.id, input.optionId)).limit(1).then((rows) => rows[0] ?? null),
+      tx.select().from(betOptions).where(eq(betOptions.betId, input.betId)),
       tx
         .select()
         .from(betEntries)
@@ -7533,7 +7635,7 @@ async function placeBetForViewer(input: {
         .then((rows) => rows[0] ?? null),
     ]);
 
-    if (!betRow || !optionRow || optionRow.betId !== input.betId) {
+    if (!betRow) {
       throw new Error("Aposta nao encontrada.");
     }
     if (betRow.status !== "open") {
@@ -7543,8 +7645,49 @@ async function placeBetForViewer(input: {
       throw new Error("bet_closed");
     }
 
-    if (storedEntry && storedEntry.optionId !== input.optionId) {
+    const currentBet = serializeBet(betRow);
+    const serializedOptions = optionRows.map(serializeBetOption);
+    const optionResolution = resolveBetOptionForPlacement({
+      bet: currentBet,
+      options: serializedOptions,
+      optionId: input.optionId,
+      optionLabel: input.optionLabel,
+    });
+
+    if (storedEntry && optionResolution.kind === "create") {
       throw new Error("aposta_ja_registrada");
+    }
+    if (
+      storedEntry &&
+      optionResolution.kind === "existing" &&
+      storedEntry.optionId !== optionResolution.option.id
+    ) {
+      throw new Error("aposta_ja_registrada");
+    }
+
+    if (optionResolution.kind === "existing") {
+      persistedOption = optionResolution.option;
+    } else {
+      const [insertedOption] = await tx
+        .insert(betOptions)
+        .values({
+          id: randomUUID(),
+          betId: input.betId,
+          label: optionResolution.label,
+          sortOrder: optionResolution.sortOrder,
+          poolAmount: 0,
+        })
+        .returning();
+
+      if (!insertedOption) {
+        throw new Error("invalid_option");
+      }
+
+      persistedOption = serializeBetOption(insertedOption);
+    }
+    const resolvedOption = persistedOption;
+    if (!resolvedOption) {
+      throw new Error("invalid_option");
     }
 
     if (storedEntry) {
@@ -7562,12 +7705,24 @@ async function placeBetForViewer(input: {
 
       persistedEntry = serializeBetEntry(updatedEntry);
     } else {
+      const createdEntry: BetEntryRecord = {
+        id: randomUUID(),
+        betId: input.betId,
+        optionId: resolvedOption.id,
+        viewerId: dashboard.viewer.id,
+        amount: input.amount,
+        isHouseEntry: false,
+        payoutAmount: null,
+        settledAt: null,
+        refundedAt: null,
+        createdAt: new Date().toISOString(),
+      };
       const insertedEntries = await tx
         .insert(betEntries)
         .values({
           id: createdEntry.id,
           betId: input.betId,
-          optionId: input.optionId,
+          optionId: resolvedOption.id,
           viewerId: dashboard.viewer.id,
           amount: input.amount,
           isHouseEntry: false,
@@ -7588,7 +7743,7 @@ async function placeBetForViewer(input: {
           .where(and(eq(betEntries.betId, input.betId), eq(betEntries.viewerId, dashboard.viewer.id)))
           .limit(1);
 
-        if (!conflictingEntry || conflictingEntry.optionId !== input.optionId) {
+        if (!conflictingEntry || conflictingEntry.optionId !== resolvedOption.id) {
           throw new Error("aposta_ja_registrada");
         }
 
@@ -7605,6 +7760,8 @@ async function placeBetForViewer(input: {
         }
 
         persistedEntry = serializeBetEntry(updatedEntry);
+      } else {
+        persistedEntry = createdEntry;
       }
     }
 
@@ -7632,7 +7789,7 @@ async function placeBetForViewer(input: {
       .set({
         poolAmount: sql`${betOptions.poolAmount} + ${input.amount}`,
       })
-      .where(eq(betOptions.id, input.optionId));
+      .where(eq(betOptions.id, resolvedOption.id));
 
     await tx.insert(pointLedger).values({
       id: randomUUID(),
@@ -7641,23 +7798,29 @@ async function placeBetForViewer(input: {
       amount: -input.amount,
       source: input.source,
       externalEventId: null,
-      metadata: { betId: input.betId, optionId: input.optionId },
+      metadata: { betId: input.betId, optionId: resolvedOption.id },
     });
   });
 
-  return persistedEntry;
+  if (!persistedEntry || !persistedOption) {
+    throw new Error("Falha ao registrar aposta.");
+  }
+
+  return { entry: persistedEntry, option: persistedOption };
 }
 
 export async function placeBet({
   viewerId,
   betId,
   optionId,
+  optionLabel,
   amount,
   source,
 }: {
   viewerId: string;
   betId: string;
-  optionId: string;
+  optionId?: string | null;
+  optionLabel?: string | null;
   amount: number;
   source: string;
 }) {
@@ -7666,14 +7829,16 @@ export async function placeBet({
     throw new Error("Viewer not found.");
   }
 
-  return placeBetForViewer({
+  const result = await placeBetForViewer({
     viewer,
     betId,
     optionId,
+    optionLabel,
     amount,
     source,
     requireLinkedViewer: true,
   });
+  return result.entry;
 }
 
 export async function placeBetFromChatCommand(input: {
@@ -7704,20 +7869,21 @@ export async function placeBetFromChatCommand(input: {
     optionLabel: input.optionLabel,
   });
   const unifiedViewer = await resolveUnifiedViewerForLinkedChannel(viewer);
-  const entry = await placeBetForViewer({
+  const result = await placeBetForViewer({
     viewer: unifiedViewer,
     betId: bet.id,
-    optionId: option.id,
+    optionId: option?.id ?? input.optionId ?? null,
+    optionLabel: input.optionLabel ?? null,
     amount: input.amount,
     source: input.source,
     requireLinkedViewer: false,
   });
 
   return {
-    entry,
+    entry: result.entry,
     viewer: unifiedViewer,
     bet,
-    option,
+    option: result.option,
   };
 }
 
@@ -8277,7 +8443,11 @@ export async function lockBet(betId: string) {
     }
     const options = store.betOptions.filter((option) => option.betId === betId);
     const existingEntries = store.betEntries.filter((entry) => entry.betId === betId);
-    const houseEntries = calculateHouseBetEntries({ options, existingEntries });
+    const houseEntries = calculateHouseBetEntries({
+      options,
+      existingEntries,
+      optionMode: bet.optionMode,
+    });
     for (const houseEntry of houseEntries) {
       const option = options.find((entry) => entry.id === houseEntry.optionId);
       if (!option) {
@@ -8332,6 +8502,7 @@ export async function lockBet(betId: string) {
     const houseEntries = calculateHouseBetEntries({
       options: serializedOptions,
       existingEntries: entryRows.map(serializeBetEntry),
+      optionMode: currentBet.optionMode,
     });
 
     for (const houseEntry of houseEntries) {

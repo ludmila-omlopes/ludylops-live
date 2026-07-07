@@ -31,6 +31,24 @@ Painel de operação e participação da live da Ludylops no YouTube. Ele conect
 8. O app une conta Google, viewer do chat, saldo, histórico, apostas, sugestões e resgates.
 9. Quando um resgate precisa executar algo local, a bridge busca a fila no app hospedado e chama o Streamer.bot no PC da live.
 
+## Áreas de criadores
+
+Criadores logados e aprovados no beta fechado podem reservar uma área em `/owner`.
+
+O fluxo atual cria:
+
+- registro em `creators`, com dono em `owner_user_id`;
+- subdomínio padrão em `creator_domains`, no formato `{slug}.ludylops.live`;
+- identidade visual básica em `creator_branding`;
+- módulos instalados em `creator_modules`;
+- rota pública em `/c/{slug}`.
+
+Em modo demo, sem `DATABASE_URL`, as áreas ficam em memória até reiniciar o servidor. Em banco real, os registros são persistidos.
+
+O acesso ao beta é configurado no admin, em `Comunidade > Beta áreas`. Admins gerais continuam liberados para testar mesmo sem aparecer na lista.
+
+Observação: a criação da área já separa creator, domínio, branding e módulos. O isolamento completo de pipetz, apostas, catálogo, sugestões e overlays por criador ainda depende de adicionar `creator_id` nas tabelas operacionais e escopar as consultas do repositório.
+
 ## Streamer.bot
 
 As chamadas do Streamer.bot para o app usam HMAC SHA-256. Todas devem enviar:
@@ -149,6 +167,9 @@ Mais detalhes ficam em `bridge/README.md`.
 
 - `/`: home da live, com estado da comunidade e atalhos.
 - `/me`: área do viewer logado.
+- `/owner`: área do criador aprovado no beta fechado.
+- `/criar-area`: redireciona para `/owner`.
+- `/c/:slug`: entrada pública da área de um criador.
 - `/ranking`: ranking público de pipetz.
 - `/apostas`: apostas abertas e histórico.
 - `/jogos`: sugestões de jogos com boost.

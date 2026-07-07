@@ -39,6 +39,7 @@ const envSchema = z.object({
   IGDB_CLIENT_ID: z.string().optional(),
   IGDB_CLIENT_SECRET: z.string().optional(),
   ADMIN_EMAILS: z.string().optional(),
+  PLATFORM_OWNER_EMAILS: z.string().optional(),
   APP_URL: z.string().url().optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   NEXT_PUBLIC_GITHUB_ISSUES_URL: z.string().url().optional(),
@@ -51,12 +52,17 @@ const envSchema = z.object({
 export const env = envSchema.parse(process.env);
 export const isProduction = process.env.NODE_ENV === "production";
 
-export const adminEmails = new Set(
-  (env.ADMIN_EMAILS ?? "")
+function parseEmailSet(value?: string) {
+  return new Set(
+    (value ?? "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean),
-);
+  );
+}
+
+export const adminEmails = parseEmailSet(env.ADMIN_EMAILS);
+export const platformOwnerEmails = parseEmailSet(env.PLATFORM_OWNER_EMAILS ?? env.ADMIN_EMAILS);
 
 export const isDemoMode = !env.DATABASE_URL;
 export const isDemoAuthEnabled = isDemoMode;

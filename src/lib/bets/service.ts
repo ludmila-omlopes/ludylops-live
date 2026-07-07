@@ -1,9 +1,16 @@
-import type { BetEntryRecord, BetOptionRecord, BetStatus, BetWithOptionsRecord } from "@/lib/types";
+import type {
+  BetEntryRecord,
+  BetOptionMode,
+  BetOptionRecord,
+  BetStatus,
+  BetWithOptionsRecord,
+} from "@/lib/types";
 
 type PlacementInput = {
   bet: BetWithOptionsRecord;
   amount: number;
-  optionId: string;
+  optionId?: string | null;
+  optionLabel?: string | null;
   balance: number;
   existingEntry: BetEntryRecord | null;
   now?: Date;
@@ -51,11 +58,21 @@ export function evaluateBetPlacement(input: PlacementInput): PlacementResult {
     return { canPlace: false, reason: "bet_closed" };
   }
 
-  if (!input.bet.options.some((option) => option.id === input.optionId)) {
+  const optionId = input.optionId ?? null;
+  const hasExistingOption = optionId
+    ? input.bet.options.some((option) => option.id === optionId)
+    : false;
+  const hasFreeformLabel = Boolean(input.optionLabel?.trim());
+
+  if (input.bet.optionMode === "preset" && !hasExistingOption) {
     return { canPlace: false, reason: "invalid_option" };
   }
 
-  if (input.existingEntry && input.existingEntry.optionId !== input.optionId) {
+  if (input.bet.optionMode === "freeform" && !hasExistingOption && !hasFreeformLabel) {
+    return { canPlace: false, reason: "invalid_option" };
+  }
+
+  if (input.existingEntry && optionId && input.existingEntry.optionId !== optionId) {
     return { canPlace: false, reason: "aposta_ja_registrada" };
   }
 
@@ -181,7 +198,12 @@ export function shouldRefundBetOnResolve(input: {
 export function calculateHouseBetEntries(input: {
   options: BetOptionRecord[];
   existingEntries: BetEntryRecord[];
+  optionMode?: BetOptionMode;
 }) {
+  if (input.optionMode === "freeform") {
+    return [];
+  }
+
   return input.options
     .filter((option) => option.poolAmount === 0)
     .filter(

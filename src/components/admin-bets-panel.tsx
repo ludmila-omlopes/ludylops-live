@@ -16,7 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { validateCreateBetDraft } from "@/lib/bets/admin";
 import { evaluateBetLifecycleAction } from "@/lib/bets/service";
-import type { BetStatus, BetWithOptionsRecord } from "@/lib/types";
+import type { BetOptionMode, BetStatus, BetWithOptionsRecord } from "@/lib/types";
 import { cn, formatDateTime, formatPipetz } from "@/lib/utils";
 
 function toLocalDateTimeInput(value: string) {
@@ -104,6 +104,7 @@ export function AdminBetsPanel({
   const router = useRouter();
   const [question, setQuestion] = useState("");
   const [closesAt, setClosesAt] = useState("");
+  const [optionMode, setOptionMode] = useState<BetOptionMode>("preset");
   const [optionsText, setOptionsText] = useState("Sim\nNão");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [resolveSelections, setResolveSelections] = useState<Record<string, string>>({});
@@ -145,16 +146,20 @@ export function AdminBetsPanel({
   }
 
   function handleCreate() {
-    const options = optionsText
-      .split(/\r?\n|,/)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
+    const options =
+      optionMode === "freeform"
+        ? []
+        : optionsText
+            .split(/\r?\n|,/)
+            .map((entry) => entry.trim())
+            .filter(Boolean);
 
     const closesAtDate = new Date(closesAt);
     const closesAtIso = Number.isFinite(closesAtDate.getTime()) ? closesAtDate.toISOString() : "";
     const validationError = validateCreateBetDraft({
       question: question.trim(),
       closesAt: closesAtIso,
+      optionMode,
       options,
     });
 
@@ -169,11 +174,13 @@ export function AdminBetsPanel({
         await runAction("/api/admin/bets", {
           question: question.trim(),
           closesAt: closesAtIso,
+          optionMode,
           options,
           startOpen: true,
         });
         setQuestion("");
         setClosesAt("");
+        setOptionMode("preset");
         setOptionsText("Sim\nNão");
         setFeedback("Aposta criada.");
         router.refresh();
@@ -255,6 +262,32 @@ export function AdminBetsPanel({
 
             <label className="grid gap-2">
               <span className="text-sm font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">
+                Tipo de aposta
+              </span>
+              <Select
+                value={optionMode}
+                onValueChange={(value) => setOptionMode(value as BetOptionMode)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de aposta">
+                    {(value) =>
+                      value === "freeform" ? "Resposta livre" : "Opções fixas"
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="preset">Opções fixas</SelectItem>
+                  <SelectItem value="freeform">Resposta livre</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs font-bold text-[var(--color-ink-soft)]">
+                Na resposta livre, cada pessoa escreve a própria opção ao apostar.
+              </span>
+            </label>
+
+            {optionMode === "preset" ? (
+            <label className="grid gap-2">
+              <span className="text-sm font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">
                 Opções
               </span>
               <Textarea
@@ -269,6 +302,7 @@ export function AdminBetsPanel({
                 Use uma opção por linha. Mínimo de 2 e máximo de 6 opções.
               </span>
             </label>
+            ) : null}
 
             <Button
               type="button"
@@ -314,6 +348,11 @@ export function AdminBetsPanel({
                     >
                       {statusLabels[bet.status]}
                     </span>
+                    {bet.optionMode === "freeform" ? (
+                      <span className="badge-brutal bg-[var(--color-yellow)] px-2 py-1 text-[10px] text-[var(--color-ink)]">
+                        Resposta livre
+                      </span>
+                    ) : null}
                     <span className="mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-ink-soft)]">
                       fecha {toLocalDateTimeInput(bet.closesAt).replace("T", " ")}
                     </span>

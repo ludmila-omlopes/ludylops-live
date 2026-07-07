@@ -156,7 +156,7 @@ export const streamerbotScriptDefinitions: StreamerbotScriptDefinition[] = [
     category: "apostas",
     trigger: "Comando de chat !bet",
     setupInstructions:
-      "Configure !bet com dois argumentos. Opcionalmente defina lojaneon.activeBetId para fixar a aposta aberta. Abra /obs/bets como Browser Source para mostrar o placar ao vivo.",
+      "Configure !bet com dois argumentos: opção ou resposta, e valor. Opcionalmente defina lojaneon.activeBetId para fixar a aposta aberta. Abra /obs/bets como Browser Source para mostrar o placar ao vivo.",
     sortOrder: 60,
   },
   {

@@ -1,8 +1,11 @@
 import type { ZodError } from "zod";
 
+import type { BetOptionMode } from "@/lib/types";
+
 type CreateBetDraft = {
   question: string;
   closesAt: string;
+  optionMode?: BetOptionMode;
   options: string[];
 };
 
@@ -21,6 +24,14 @@ export function validateCreateBetDraft(input: CreateBetDraft) {
   }
   if (closesAtMs <= Date.now()) {
     return "Escolha um horário futuro para encerrar a aposta.";
+  }
+
+  const optionMode = input.optionMode ?? "preset";
+  if (optionMode === "freeform") {
+    if (input.options.length > 0) {
+      return "Apostas livres não usam opções pré-cadastradas.";
+    }
+    return null;
   }
 
   if (input.options.length < 2) {
@@ -64,6 +75,10 @@ export function formatCreateBetSchemaError(error: ZodError) {
   }
 
   if (field === "options") {
+    if (issue.code === "custom" && typeof issue.message === "string") {
+      return issue.message;
+    }
+
     if (issue.path.length > 1) {
       if (issue.code === "too_big") {
         return "Cada opção deve ter no máximo 255 caracteres.";
@@ -78,6 +93,10 @@ export function formatCreateBetSchemaError(error: ZodError) {
       return "A aposta pode ter no máximo 6 opções.";
     }
     return "Opções inválidas.";
+  }
+
+  if (field === "optionMode") {
+    return "Tipo de aposta inválido.";
   }
 
   return "Payload inválido.";

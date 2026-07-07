@@ -126,8 +126,10 @@ export function BetCard({
 }) {
   const router = useRouter();
   const amountId = useId();
+  const freeformOptionId = `${amountId}-option`;
   const feedbackId = `${amountId}-feedback`;
   const [draftSelectedOption, setDraftSelectedOption] = useState<string | null>(null);
+  const [freeformOption, setFreeformOption] = useState("");
   const [amount, setAmount] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState<number | null>(null);
@@ -154,6 +156,7 @@ export function BetCard({
   const isOpen = bet.status === "open" && (nowMs === null || closesAtMs > nowMs);
   const isResolved = bet.status === "resolved";
   const isCancelled = bet.status === "cancelled";
+  const isFreeformBet = bet.optionMode === "freeform";
   const hasViewerBet = Boolean(bet.viewerPosition);
   const selectedOption = bet.viewerPosition?.optionId ?? draftSelectedOption;
   const selectedOptionLabel =
@@ -163,9 +166,9 @@ export function BetCard({
   const totalPool = bet.totalPool || bet.options.reduce((sum, option) => sum + option.poolAmount, 0);
   const displayStatus = bet.status === "open" && !isOpen ? closedStatusMeta : statusMeta[bet.status];
   const StatusIcon = displayStatus.Icon;
-  const canSelectOption = isOpen && canBet && !hasViewerBet;
+  const canSelectOption = isOpen && canBet && !hasViewerBet && !isFreeformBet;
   const canAddToExistingBet = isOpen && canBet && hasViewerBet;
-  const showAmountForm = isOpen && canBet && Boolean(selectedOption);
+  const showAmountForm = isOpen && canBet && (isFreeformBet || Boolean(selectedOption));
   const cardBackground = isCancelled
     ? "var(--color-rose)"
     : isResolved
@@ -177,8 +180,13 @@ export function BetCard({
 
     const normalizedAmount = amount.trim();
     const parsed = Number.parseInt(normalizedAmount, 10);
-    if (!selectedOption) {
+    const normalizedFreeformOption = freeformOption.trim().replace(/\s+/g, " ");
+    if (!isFreeformBet && !selectedOption) {
       setFeedback("Escolha uma opção antes de apostar.");
+      return;
+    }
+    if (isFreeformBet && !hasViewerBet && normalizedFreeformOption.length === 0) {
+      setFeedback("Preencha sua opção antes de apostar.");
       return;
     }
     if (!/^\d+$/.test(normalizedAmount) || !Number.isInteger(parsed) || parsed <= 0) {
@@ -199,7 +207,8 @@ export function BetCard({
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            optionId: selectedOption,
+            optionId: selectedOption ?? undefined,
+            optionLabel: isFreeformBet && !hasViewerBet ? normalizedFreeformOption : undefined,
             amount: parsed,
             source: "web",
           }),
@@ -212,6 +221,7 @@ export function BetCard({
         }
 
         setAmount("");
+        setFreeformOption("");
         setFeedback(hasViewerBet ? "Valor adicionado à sua aposta." : "Aposta registrada.");
         router.refresh();
       } catch {
@@ -382,7 +392,7 @@ export function BetCard({
             className="border border-[var(--color-ink)] bg-[var(--color-paper)] px-2 py-1 text-xs font-black text-[var(--color-ink)]"
             translate="no"
           >
-            !bet 1 100
+            {isFreeformBet ? "!bet palpite 100" : "!bet 1 100"}
           </code>
         </div>
       ) : null}
@@ -415,6 +425,25 @@ export function BetCard({
           className="mt-5 border-t border-dashed border-[var(--color-ink)] pt-4"
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            {isFreeformBet && !hasViewerBet ? (
+              <label htmlFor={freeformOptionId} className="flex min-w-0 flex-[2] flex-col gap-2">
+                <span className="text-xs font-black uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
+                  Sua opção
+                </span>
+                <Input
+                  id={freeformOptionId}
+                  name={`bet-${bet.id}-option`}
+                  type="text"
+                  maxLength={255}
+                  autoComplete="off"
+                  placeholder="Ex.: 07:42"
+                  value={freeformOption}
+                  onChange={(event) => setFreeformOption(event.target.value)}
+                  aria-describedby={feedback ? feedbackId : undefined}
+                  className="px-3 py-2"
+                />
+              </label>
+            ) : null}
             <label htmlFor={amountId} className="flex min-w-0 flex-1 flex-col gap-2">
               <span className="text-xs font-black uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
                 {hasViewerBet ? `Adicionar em ${selectedOptionLabel}` : "Valor em pipetz"}
