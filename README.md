@@ -168,7 +168,7 @@ Mais detalhes ficam em `bridge/README.md`.
 - `/`: home da live, com estado da comunidade e atalhos.
 - `/me`: área do viewer logado.
 - `/owner`: área do criador aprovado no beta fechado.
-- `/criar-area`: redireciona para `/owner`.
+- `/criar-area`: landing pública da plataforma white label, com criação de área para emails aprovados no beta.
 - `/c/:slug`: entrada pública da área de um criador.
 - `/ranking`: ranking público de pipetz.
 - `/apostas`: apostas abertas e histórico.
