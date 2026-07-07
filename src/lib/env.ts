@@ -55,9 +55,9 @@ export const isProduction = process.env.NODE_ENV === "production";
 function parseEmailSet(value?: string) {
   return new Set(
     (value ?? "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean),
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
   );
 }
 

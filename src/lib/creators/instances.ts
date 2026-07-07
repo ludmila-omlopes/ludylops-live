@@ -39,7 +39,7 @@ function toIsoDate(value: Date | string) {
 }
 
 function isMissingCreatorSchemaError(error: unknown) {
-  const schemaTerms = [
+  const tableNames = [
     '"creators"',
     '"creator_domains"',
     '"creator_branding"',
@@ -48,8 +48,6 @@ function isMissingCreatorSchemaError(error: unknown) {
     "creator_domains",
     "creator_branding",
     "creator_modules",
-    "owner_user_id",
-    "display_name",
   ];
   const queue: unknown[] = [error];
   const visited = new Set<unknown>();
@@ -63,14 +61,13 @@ function isMissingCreatorSchemaError(error: unknown) {
 
     const message = current instanceof Error ? current.message : typeof current === "string" ? current : "";
     const normalized = message.toLowerCase();
-    const mentionsCreatorSchema = schemaTerms.some((term) => normalized.includes(term));
+    const mentionsTable = tableNames.some((tableName) => normalized.includes(tableName));
 
     if (
-      mentionsCreatorSchema &&
+      mentionsTable &&
       (normalized.includes("does not exist") ||
         normalized.includes("relation") ||
         normalized.includes("table") ||
-        normalized.includes("column") ||
         normalized.includes("failed query"))
     ) {
       return true;
@@ -345,7 +342,7 @@ export async function updatePlatformCreatorModuleStatus(input: {
   const [updated] = await db
     .insert(creatorModules)
     .values({
-      id: `creator_module_${randomUUID()}`.slice(0, 64),
+      id: randomUUID(),
       creatorId: input.creatorId,
       moduleKey: manifest.key,
       status: input.status,
