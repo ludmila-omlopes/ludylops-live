@@ -256,6 +256,7 @@ function buildSpendingHistory(input: {
 }
 const DEFAULT_DEATH_COUNTER_LABEL = "mortes";
 const DAILY_DEATH_COUNTER_LABEL = "mortes do dia";
+const DAILY_DEATH_COUNTER_TIME_ZONE = "America/Sao_Paulo";
 const GLOBAL_COUNTER_SCOPE_TYPE = "global";
 const GLOBAL_COUNTER_SCOPE_KEY = "global";
 const STREAMERBOT_COUNTER_STORAGE_SEPARATOR = "::";
@@ -596,7 +597,22 @@ type StreamerbotCounterCommandResult = {
 };
 
 function buildCounterDateKey(occurredAt: Date) {
-  return occurredAt.toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: DAILY_DEATH_COUNTER_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(occurredAt);
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+  const year = values.get("year");
+  const month = values.get("month");
+  const day = values.get("day");
+
+  if (!year || !month || !day) {
+    throw new Error("daily_death_counter_date_unavailable");
+  }
+
+  return `${year}-${month}-${day}`;
 }
 
 function isGlobalCounterScope(scope: { scopeType?: string | null }) {
@@ -610,6 +626,40 @@ function buildDeathCountersReply(input: {
 }) {
   const prefix = input.requestedBy ? `${input.requestedBy}, ` : "";
   return `${prefix}contador geral de mortes: ${input.globalCount}. Contador de mortes do dia: ${input.dailyCount}.`;
+}
+
+async function ensureDailyDeathCounterForDate(input: { occurredAt: Date; trackingDate: string }) {
+  const occurredAt = input.occurredAt.toISOString();
+  const dailyMetadata = {
+    hiddenFromPublic: true,
+    trackingDate: input.trackingDate,
+  };
+  const dailyCounter = await runStreamerbotCounterCommand({
+    action: "get",
+    counterKey: DAILY_DEATH_COUNTER_KEY,
+    counterLabel: DAILY_DEATH_COUNTER_LABEL,
+    scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
+    occurredAt,
+  });
+  const trackedDate =
+    typeof dailyCounter.counter.metadata.trackingDate === "string"
+      ? dailyCounter.counter.metadata.trackingDate
+      : null;
+
+  if (trackedDate === input.trackingDate) {
+    return dailyCounter;
+  }
+
+  return runStreamerbotCounterCommand({
+    action: "reset",
+    counterKey: DAILY_DEATH_COUNTER_KEY,
+    counterLabel: DAILY_DEATH_COUNTER_LABEL,
+    scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
+    occurredAt,
+    confirmReset: true,
+    resetReason: "new_day",
+    metadata: dailyMetadata,
+  });
 }
 
 function buildStreamerbotCounterSummary(counter: StreamerbotCounterRecord): StreamerbotCounterSummaryRecord {
@@ -955,6 +1005,7 @@ function sanitizePublicCounterSummaries(
     "obs_overlay_style",
     DAILY_DEATH_COUNTER_KEY,
     "current_stream_game",
+    "creator_area_beta_access",
   ]);
 
   return counters
@@ -8323,10 +8374,7 @@ export async function runDeathCounterCommand(input: {
   const currentGame = await getCurrentGame();
   const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
   const counterDateKey = buildCounterDateKey(occurredAt);
-  const dailyMetadata = {
-    hiddenFromPublic: true,
-    trackingDate: counterDateKey,
-  };
+  const dailyMetadata = { hiddenFromPublic: true, trackingDate: counterDateKey };
   const resolvedScope = currentGame
     ? {
         scopeType: "game" as const,
@@ -8360,15 +8408,9 @@ export async function runDeathCounterCommand(input: {
           counterLabel: DEFAULT_DEATH_COUNTER_LABEL,
           scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
         });
-    const dailyCounter = await runStreamerbotCounterCommand({
-      action: "get",
-      requestedBy: input.requestedBy,
-      source: input.source,
-      occurredAt: input.occurredAt,
-      counterKey: DAILY_DEATH_COUNTER_KEY,
-      counterLabel: DAILY_DEATH_COUNTER_LABEL,
-      scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
-      metadata: dailyMetadata,
+    const dailyCounter = await ensureDailyDeathCounterForDate({
+      occurredAt,
+      trackingDate: counterDateKey,
     });
 
     return {
@@ -8390,37 +8432,14 @@ export async function runDeathCounterCommand(input: {
         counterLabel: DEFAULT_DEATH_COUNTER_LABEL,
       });
     }
-    const dailyCounter = await runStreamerbotCounterCommand({
-      action: "get",
-      counterKey: DAILY_DEATH_COUNTER_KEY,
-      counterLabel: DAILY_DEATH_COUNTER_LABEL,
-      scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
-      occurredAt: input.occurredAt,
-      metadata: dailyMetadata,
-    });
-    const trackedDate =
-      typeof dailyCounter.counter.metadata.trackingDate === "string"
-        ? dailyCounter.counter.metadata.trackingDate
-        : null;
-
-    if (trackedDate && trackedDate !== counterDateKey) {
-      await runStreamerbotCounterCommand({
-        action: "reset",
-        counterKey: DAILY_DEATH_COUNTER_KEY,
-        counterLabel: DAILY_DEATH_COUNTER_LABEL,
-        scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
-        occurredAt: input.occurredAt,
-        confirmReset: true,
-        resetReason: "new_day",
-        metadata: dailyMetadata,
-      });
-    }
+    await ensureDailyDeathCounterForDate({ occurredAt, trackingDate: counterDateKey });
 
     await runStreamerbotCounterCommand({
       ...input,
       scopeType: GLOBAL_COUNTER_SCOPE_TYPE,
       counterKey: DAILY_DEATH_COUNTER_KEY,
       counterLabel: DAILY_DEATH_COUNTER_LABEL,
+      occurredAt: occurredAt.toISOString(),
       metadata: dailyMetadata,
     });
   }

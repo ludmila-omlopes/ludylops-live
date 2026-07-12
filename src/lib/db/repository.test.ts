@@ -1974,6 +1974,16 @@ describe("runStreamerbotCounterCommand", () => {
           },
         },
         {
+          key: "creator_area_beta_access",
+          value: 1,
+          lastResetAt: null,
+          updatedAt: new Date("2026-04-07T11:03:30.000Z"),
+          metadata: {
+            allowedEmails: ["creator@example.com"],
+            updatedBy: "admin@example.com",
+          },
+        },
+        {
           key: "death_count_daily",
           value: 18,
           lastResetAt: null,
@@ -2193,6 +2203,42 @@ describe("runStreamerbotCounterCommand", () => {
 
     expect(result.count).toBe(3);
     expect(result.replyMessage).toBe("Ludy, contador geral de mortes: 3. Contador de mortes do dia: 3.");
+  });
+
+  it("resets daily deaths in database mode at midnight in Sao Paulo", async () => {
+    const { db, rows } = createStreamerbotCounterDb();
+    getDbMock.mockReturnValue(db);
+
+    await runDeathCounterCommand({
+      action: "increment",
+      amount: 2,
+      occurredAt: "2026-04-08T02:30:00.000Z",
+    });
+
+    const afterMidnight = await runDeathCounterCommand({
+      action: "get",
+      occurredAt: "2026-04-08T03:01:00.000Z",
+    });
+
+    expect(afterMidnight.replyMessage).toBe("contador geral de mortes: 2. Contador de mortes do dia: 0.");
+    expect(rows.find((row) => row.key === "death_count_daily")).toMatchObject({
+      value: 0,
+      metadata: expect.objectContaining({
+        hiddenFromPublic: true,
+        trackingDate: "2026-04-08",
+      }),
+    });
+
+    await runDeathCounterCommand({
+      action: "increment",
+      amount: 1,
+      occurredAt: "2026-04-08T03:02:00.000Z",
+    });
+
+    expect(rows.find((row) => row.key === "death_count_daily")).toMatchObject({
+      value: 1,
+      metadata: expect.objectContaining({ trackingDate: "2026-04-08" }),
+    });
   });
 
   it("uses the current stream game even when an explicit game scope is provided", async () => {

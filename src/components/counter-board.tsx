@@ -2,6 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { StreamerbotCounterSummaryRecord } from "@/lib/types";
 import { formatPipetz } from "@/lib/utils";
 
+const DEATH_COUNTER_KEY = "death_count";
+
 function scopeHeading(scopeKey: string, scopeLabel: string | null) {
   return scopeLabel ?? scopeKey.replace(/[_-]+/g, " ");
 }
@@ -73,7 +75,6 @@ export function CounterBoard({
   counters: StreamerbotCounterSummaryRecord[];
   currentScopeKey?: string | null;
 }) {
-  const globalCounters = counters.filter((counter) => counter.scopeType === "global");
   const gameGroups = counters
     .filter((counter) => counter.scopeType === "game")
     .reduce<Map<string, StreamerbotCounterSummaryRecord[]>>((groups, counter) => {
@@ -86,6 +87,14 @@ export function CounterBoard({
   const currentGameGroup = currentScopeKey
     ? gameGroupEntries.find(([scopeKey]) => scopeKey === currentScopeKey)
     : undefined;
+  const currentGameHasDeathCounter = currentGameGroup?.[1].some(
+    (counter) => counter.key === DEATH_COUNTER_KEY,
+  );
+  const globalCounters = counters.filter(
+    (counter) =>
+      counter.scopeType === "global" &&
+      !(currentGameHasDeathCounter && counter.key === DEATH_COUNTER_KEY),
+  );
   const otherGameGroups = currentScopeKey
     ? gameGroupEntries.filter(([scopeKey]) => scopeKey !== currentScopeKey)
     : gameGroupEntries;
