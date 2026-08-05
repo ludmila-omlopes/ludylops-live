@@ -12,6 +12,7 @@ import { AdminWheelPanel } from "@/components/admin-wheel-panel";
 import { AdminRecommendationsPanel } from "@/components/admin-recommendations-panel";
 import { AdminViewerLinksPanel } from "@/components/admin-viewer-links-panel";
 import { AdminCreatorAreaAccessPanel } from "@/components/admin-creator-area-access-panel";
+import { AdminDeathCountersPanel } from "@/components/admin-death-counters-panel";
 import { RedemptionGrid } from "@/components/redemption-grid";
 import { LeaderboardTable } from "@/components/leaderboard-table";
 import { LiveStatusPanel } from "@/components/live-status-panel";
@@ -31,6 +32,7 @@ import {
   listAdminBets,
   listAdminLiveLikeGoals,
   listAdminRedemptions,
+  listAdminStreamerbotCounters,
 } from "@/lib/db/repository";
 import { getStreamerbotLivestreamStatus } from "@/lib/streamerbot/live-status";
 import { listStreamerbotScripts } from "@/lib/streamerbot/scripts.server";
@@ -67,6 +69,7 @@ export default async function AdminPage() {
     wheelConfig,
     streamerbotScripts,
     creatorAreaAccessSettings,
+    deathCounters,
   ] = await Promise.all([
     getCatalog(),
     getLeaderboard(),
@@ -86,6 +89,7 @@ export default async function AdminPage() {
     getWheelConfig(),
     Promise.resolve(listStreamerbotScripts()),
     getCreatorAreaAccessSettings(),
+    listAdminStreamerbotCounters(),
   ]);
   const openBetCount = bets.filter((bet) => bet.status === "open").length;
   const queuedRedemptionCount = redemptions.filter((entry) => entry.status === "queued").length;
@@ -146,6 +150,12 @@ export default async function AdminPage() {
                 description: "Capa e metadados da landing page.",
                 badge: currentGame ? "ativo" : undefined,
                 content: <AdminCurrentGamePanel initialGame={currentGame} />,
+              },
+              {
+                id: "contadores-mortes",
+                label: "Contadores de mortes",
+                description: "Totais e mortes do dia por campanha.",
+                content: <AdminDeathCountersPanel counters={deathCounters} />,
               },
               {
                 id: "metas-likes",
