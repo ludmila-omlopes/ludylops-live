@@ -2278,7 +2278,7 @@ describe("runStreamerbotCounterCommand", () => {
     );
   });
 
-  it("shows the global and daily death counters on get even with an active current game", async () => {
+  it("shows the active game and its daily deaths on get", async () => {
     const { db } = createStreamerbotCounterDb();
     getDbMock.mockReturnValue(db);
     getCurrentGameMock.mockResolvedValue({
@@ -2303,7 +2303,7 @@ describe("runStreamerbotCounterCommand", () => {
       occurredAt: "2026-04-07T12:00:00.000Z",
     });
 
-    expect(result.replyMessage).toBe("contador geral de mortes: 2. Contador de mortes do dia: 2.");
+    expect(result.replyMessage).toBe("contador de mortes em Silksong: 2. Contador de mortes do dia: 2.");
   });
 });
 
