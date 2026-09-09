@@ -1,0 +1,75 @@
+/* One visual contract for every admin tab, including embedded public components. */
+.content {
+  min-width: 0;
+  align-self: start;
+  padding: 1.5rem;
+  border: var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-card);
+  color: var(--color-ink);
+}
+
+/* The tab owns its frame; individual modules only supply their content. */
+.content > :is(div, section) {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.content h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 2rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.content :is(h3, [data-slot="card-title"]) {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.5rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.content h2 + p {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  color: var(--color-ink-soft);
+}
+
+.content :is(div, header):has(> div > h2) {
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+/* Neutral structural surfaces. Badges, feedback and action buttons keep their states. */
+.content :is(
+  :global(.panel),
+  :global(.card-brutal),
+  :global(.card-brutal-static),
+  :global(.card-poster),
+  :global(.card-flat)
+):not(button):not(a) {
+  background: var(--surface-card);
+  color: var(--color-ink);
+  border-radius: var(--radius);
+  box-shadow: none;
+  filter: none;
+}
+
+.content > :is(div, section):global(.panel) {
+  background: transparent;
+}
+
+@media (max-width: 639px) {
+  .content {
+    padding: 1rem;
+  }
+}

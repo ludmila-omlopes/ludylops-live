@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -273,16 +272,13 @@ export function AdminObsOverlaysPanel({
           </div>
 
           <div className="mt-6 grid gap-4">
-            {overlays.map((overlay, index) => (
+            {overlays.map((overlay) => (
               <Card
                 key={overlay.id}
                 variant="poster"
-                className={`gap-4 p-5 text-[var(--color-accent-ink)] ${index % 2 === 0 ? "bg-[var(--color-blue)]" : "bg-[var(--color-mint)]"}`}
+                className="surface-card gap-4 p-4"
               >
                 <CardHeader className="gap-2">
-                  <CardDescription className="mono text-[10px] uppercase tracking-[0.28em] text-[var(--color-accent-ink-soft)]">
-                    browser source
-                  </CardDescription>
                   <CardTitle
                     className="text-3xl uppercase leading-none"
                     style={{ fontFamily: "var(--font-display)" }}
@@ -292,7 +288,7 @@ export function AdminObsOverlaysPanel({
                 </CardHeader>
 
                 <CardContent className="grid gap-4">
-                  <p className="text-sm leading-7 text-[var(--color-accent-ink-soft)] sm:text-base">
+                  <p className="text-sm leading-6 text-[var(--color-ink-soft)]">
                     {overlay.description}
                   </p>
 
