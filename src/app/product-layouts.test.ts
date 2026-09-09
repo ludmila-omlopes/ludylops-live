@@ -39,6 +39,10 @@ import BuilderLayout, { metadata as builderMetadata } from "@/app/(builder)/layo
 import CommunityLayout, { metadata as communityMetadata } from "@/app/(community)/layout";
 import CreatorPublicLayout, { metadata as creatorMetadata } from "@/app/(creator-public)/layout";
 import ObsLayout from "@/app/obs/layout";
+import { AppChrome } from "@/components/app-chrome";
+import { BuilderChrome } from "@/components/builder-chrome";
+import { ObsShell } from "@/components/obs-shell";
+import { Providers } from "@/components/providers";
 
 function elementChildren(element: React.ReactElement) {
   const props = element.props as { children?: React.ReactNode };
@@ -78,10 +82,8 @@ describe("product layouts", () => {
     const providers = result as React.ReactElement;
     const chrome = elementChildren(providers)[0];
 
-    expect(providers.type).toBeTypeOf("function");
-    expect((providers.type as Function).name).toBe("Providers");
-    expect(chrome.type).toBeTypeOf("function");
-    expect((chrome.type as Function).name).toBe("AppChrome");
+    expect(providers.type).toBe(Providers);
+    expect(chrome.type).toBe(AppChrome);
     expect(propsOf(chrome)).toMatchObject({
       session: expect.objectContaining({ user: expect.objectContaining({ email: "owner@example.com" }) }),
       isAdmin: true,
@@ -102,10 +104,8 @@ describe("product layouts", () => {
     const providers = result as React.ReactElement;
     const chrome = elementChildren(providers)[0];
 
-    expect(providers.type).toBeTypeOf("function");
-    expect((providers.type as Function).name).toBe("Providers");
-    expect(chrome.type).toBeTypeOf("function");
-    expect((chrome.type as Function).name).toBe("BuilderChrome");
+    expect(providers.type).toBe(Providers);
+    expect(chrome.type).toBe(BuilderChrome);
     expect(propsOf(chrome)).toMatchObject({ initialTheme: "dark", isPlatformOwner: true });
     expect(propsOf(chrome).children).toBe(children);
     expect(mocks.auth).toHaveBeenCalledOnce();
@@ -121,8 +121,7 @@ describe("product layouts", () => {
     expect(propsOf(creatorResult).children).toBe(children);
     expect(obsResult.type).toBe(React.Suspense);
     const obsShell = elementChildren(obsResult)[0];
-    expect(obsShell.type).toBeTypeOf("function");
-    expect((obsShell.type as Function).name).toBe("ObsShell");
+    expect(obsShell.type).toBe(ObsShell);
   });
 
   it("defines product-specific metadata", () => {

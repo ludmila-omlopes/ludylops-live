@@ -19,6 +19,11 @@ vi.mock("@/components/ui/button", () => ({
 
 import { BuilderChrome } from "@/components/builder-chrome";
 
+const BuilderChromeForTest = BuilderChrome as React.ComponentType<{
+  children?: React.ReactNode;
+  isPlatformOwner?: boolean;
+}>;
+
 describe("BuilderChrome", () => {
   beforeEach(() => {
     mocks.pathname = "/";
@@ -26,7 +31,7 @@ describe("BuilderChrome", () => {
 
   it("shows the public builder link to everyone", () => {
     const markup = renderToStaticMarkup(
-      React.createElement(BuilderChrome, { isPlatformOwner: false, children: "child" }),
+      React.createElement(BuilderChromeForTest, { isPlatformOwner: false }, "child"),
     );
 
     expect(markup).toContain('href="/criar-area"');
@@ -38,10 +43,10 @@ describe("BuilderChrome", () => {
 
   it("shows community administration only for platform owners", () => {
     const ownerMarkup = renderToStaticMarkup(
-      React.createElement(BuilderChrome, { isPlatformOwner: true, children: "child" }),
+      React.createElement(BuilderChromeForTest, { isPlatformOwner: true }, "child"),
     );
     const viewerMarkup = renderToStaticMarkup(
-      React.createElement(BuilderChrome, { isPlatformOwner: false, children: "child" }),
+      React.createElement(BuilderChromeForTest, { isPlatformOwner: false }, "child"),
     );
 
     expect(ownerMarkup).toContain('href="/owner"');
@@ -52,7 +57,7 @@ describe("BuilderChrome", () => {
 
   it("does not include community-only navigation or footer copy", () => {
     const markup = renderToStaticMarkup(
-      React.createElement(BuilderChrome, { isPlatformOwner: true, children: "child" }),
+      React.createElement(BuilderChromeForTest, { isPlatformOwner: true }, "child"),
     );
 
     expect(markup).not.toContain("Apostas");
