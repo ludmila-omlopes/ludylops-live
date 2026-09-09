@@ -44,7 +44,6 @@ export function AppChrome({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const isObsView = pathname.startsWith("/obs/");
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
@@ -57,18 +56,6 @@ export function AppChrome({
     onChange();
     return () => mq.removeEventListener("change", onChange);
   }, []);
-
-  useEffect(() => {
-    if (isObsView) {
-      document.body.dataset.obsOverlay = "true";
-      return () => {
-        delete document.body.dataset.obsOverlay;
-      };
-    }
-
-    delete document.body.dataset.obsOverlay;
-    return undefined;
-  }, [isObsView]);
 
   const primaryLinks: NavLink[] = [
     { href: "/apostas", label: "Apostas" },
@@ -109,10 +96,6 @@ export function AppChrome({
   ];
   const isActiveLink = (href: string) => pathname === href;
   const isActiveGroup = (links: NavLink[]) => links.some((link) => isActiveLink(link.href));
-  if (isObsView) {
-    return <>{children}</>;
-  }
-
   return (
     <div className="flex min-h-screen flex-col">
       <header
