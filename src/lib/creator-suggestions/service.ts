@@ -29,6 +29,10 @@ export const updateCreatorSuggestionStatusSchema = z.object({
   status: creatorSuggestionStatusSchema,
 });
 
+export const createAdminCreatorSuggestionSchema = z.object({
+  channelUrl: z.string().trim().min(1, "Cole o link do canal do YouTube.").max(500, "Link muito longo."),
+});
+
 export function validateCreatorSuggestionDraft(input: {
   name: string;
   channelUrl: string;

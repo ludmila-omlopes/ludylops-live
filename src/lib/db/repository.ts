@@ -3999,16 +3999,19 @@ function listDemoVideoSuggestions(viewerId?: string | null) {
 
 function listDemoCreatorSuggestions(
   viewerId?: string | null,
-  options?: { featured?: boolean },
+  options?: { featured?: boolean; includeFeatured?: boolean },
 ) {
   const store = getDemoStore();
   const viewerBoosts = viewerId
     ? store.creatorSuggestionBoosts.filter((entry) => entry.viewerId === viewerId)
     : [];
   const featured = options?.featured ?? false;
+  const includeFeatured = options?.includeFeatured ?? false;
 
   return [...store.creatorSuggestions]
-    .filter((entry) => (featured ? entry.status === "featured" : entry.status !== "featured"))
+    .filter((entry) =>
+      includeFeatured ? true : featured ? entry.status === "featured" : entry.status !== "featured",
+    )
     .sort((a, b) => {
       if (featured) {
         if (b.totalVotes !== a.totalVotes) {
@@ -6077,11 +6080,15 @@ export async function listAdminVideoSuggestions() {
   return listVideoSuggestions();
 }
 
-export async function listCreatorSuggestions(viewerId?: string | null) {
+export async function listCreatorSuggestions(
+  viewerId?: string | null,
+  options?: { includeFeatured?: boolean },
+) {
   const db = getDb();
+  const includeFeatured = options?.includeFeatured ?? false;
 
   if (isDemoMode || !db) {
-    return listDemoCreatorSuggestions(viewerId, { featured: false });
+    return listDemoCreatorSuggestions(viewerId, { includeFeatured });
   }
 
   let suggestionRows: Array<typeof creatorSuggestions.$inferSelect>;
@@ -6089,11 +6096,16 @@ export async function listCreatorSuggestions(viewerId?: string | null) {
 
   try {
     [suggestionRows, boostRows] = await Promise.all([
-      db
-        .select()
-        .from(creatorSuggestions)
-        .where(sql`${creatorSuggestions.status} <> 'featured'`)
-        .orderBy(desc(creatorSuggestions.totalVotes), desc(creatorSuggestions.createdAt)),
+      includeFeatured
+        ? db
+            .select()
+            .from(creatorSuggestions)
+            .orderBy(desc(creatorSuggestions.totalVotes), desc(creatorSuggestions.createdAt))
+        : db
+            .select()
+            .from(creatorSuggestions)
+            .where(sql`${creatorSuggestions.status} <> 'featured'`)
+            .orderBy(desc(creatorSuggestions.totalVotes), desc(creatorSuggestions.createdAt)),
       viewerId
         ? db.select().from(creatorSuggestionBoosts).where(eq(creatorSuggestionBoosts.viewerId, viewerId))
         : Promise.resolve([]),
@@ -6165,7 +6177,76 @@ export async function listFeaturedCreatorSuggestions() {
 }
 
 export async function listAdminCreatorSuggestions() {
-  return listCreatorSuggestions();
+  return listCreatorSuggestions(null, { includeFeatured: true });
+}
+
+export async function deleteCreatorSuggestion(suggestionId: string) {
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const suggestionIndex = store.creatorSuggestions.findIndex((entry) => entry.id === suggestionId);
+    if (suggestionIndex < 0) {
+      throw new Error("suggestion_not_found");
+    }
+
+    const [deleted] = store.creatorSuggestions.splice(suggestionIndex, 1);
+    store.creatorSuggestionBoosts = store.creatorSuggestionBoosts.filter(
+      (entry) => entry.suggestionId !== suggestionId,
+    );
+
+    if (!deleted) {
+      throw new Error("suggestion_not_found");
+    }
+
+    return deleted;
+  }
+
+  try {
+    let deleted: typeof creatorSuggestions.$inferSelect | undefined;
+
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(creatorSuggestionBoosts)
+        .where(eq(creatorSuggestionBoosts.suggestionId, suggestionId));
+
+      [deleted] = await tx
+        .delete(creatorSuggestions)
+        .where(eq(creatorSuggestions.id, suggestionId))
+        .returning();
+
+      if (!deleted) {
+        throw new Error("suggestion_not_found");
+      }
+    });
+
+    if (!deleted) {
+      throw new Error("suggestion_not_found");
+    }
+
+    return serializeCreatorSuggestion(deleted);
+  } catch (error) {
+    if (isMissingCreatorSuggestionSchemaError(error)) {
+      const store = getDemoStore();
+      const suggestionIndex = store.creatorSuggestions.findIndex((entry) => entry.id === suggestionId);
+      if (suggestionIndex < 0) {
+        throw new Error("suggestion_not_found");
+      }
+
+      const [deleted] = store.creatorSuggestions.splice(suggestionIndex, 1);
+      store.creatorSuggestionBoosts = store.creatorSuggestionBoosts.filter(
+        (entry) => entry.suggestionId !== suggestionId,
+      );
+
+      if (!deleted) {
+        throw new Error("suggestion_not_found");
+      }
+
+      return deleted;
+    }
+
+    throw error;
+  }
 }
 
 export async function listStreamerbotCounters() {
@@ -6938,6 +7019,229 @@ export async function createCreatorSuggestion(input: {
     throw new Error("Falha ao criar indicacao.");
   }
   return created;
+}
+
+export async function createAdminCreatorSuggestion(input: {
+  viewerId: string;
+  name: string;
+  channelUrl: string;
+  reason?: string | null;
+}) {
+  const viewer = await withViewerById(input.viewerId);
+  if (!viewer) {
+    throw new Error("viewer_not_found");
+  }
+
+  const name = input.name.trim();
+  const channelUrl = input.channelUrl.trim();
+  const reason = input.reason?.trim() || null;
+  const slug = slugify(name);
+  if (!slug || !channelUrl) {
+    throw new Error("invalid_creator");
+  }
+
+  const suggestionId = randomUUID();
+  const createdAt = new Date();
+  const db = getDb();
+
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const duplicate = store.creatorSuggestions.find(
+      (entry) => entry.slug === slug || entry.channelUrl.toLowerCase() === channelUrl.toLowerCase(),
+    );
+    if (duplicate) {
+      throw new Error("suggestion_already_exists");
+    }
+
+    const created: CreatorSuggestionRecord = {
+      id: suggestionId,
+      viewerId: input.viewerId,
+      slug,
+      name,
+      channelUrl,
+      platform: "youtube",
+      category: null,
+      reason,
+      status: "featured",
+      totalVotes: 0,
+      createdAt: createdAt.toISOString(),
+      updatedAt: createdAt.toISOString(),
+    };
+    store.creatorSuggestions.unshift(created);
+    return buildCreatorSuggestionWithMeta({ suggestion: created, viewer, boosts: [] });
+  }
+
+  try {
+    const [existing] = await db
+      .select()
+      .from(creatorSuggestions)
+      .where(
+        sql`(${creatorSuggestions.slug} = ${slug} or lower(${creatorSuggestions.channelUrl}) = ${channelUrl.toLowerCase()})`,
+      )
+      .limit(1);
+    if (existing) {
+      throw new Error("suggestion_already_exists");
+    }
+
+    const [created] = await db
+      .insert(creatorSuggestions)
+      .values({
+        id: suggestionId,
+        viewerId: input.viewerId,
+        slug,
+        name,
+        channelUrl,
+        platform: "youtube",
+        category: null,
+        reason,
+        status: "featured",
+        totalVotes: 0,
+        createdAt,
+        updatedAt: createdAt,
+      })
+      .returning();
+
+    if (!created) {
+      throw new Error("Falha ao incluir criador.");
+    }
+
+    return buildCreatorSuggestionWithMeta({
+      suggestion: serializeCreatorSuggestion(created),
+      viewer,
+      boosts: [],
+    });
+  } catch (error) {
+    if (isMissingCreatorSuggestionSchemaError(error)) {
+      const store = getDemoStore();
+      const duplicate = store.creatorSuggestions.find(
+        (entry) => entry.slug === slug || entry.channelUrl.toLowerCase() === channelUrl.toLowerCase(),
+      );
+      if (duplicate) {
+        throw new Error("suggestion_already_exists");
+      }
+
+      const created: CreatorSuggestionRecord = {
+        id: suggestionId,
+        viewerId: input.viewerId,
+        slug,
+        name,
+        channelUrl,
+        platform: "youtube",
+        category: null,
+        reason,
+        status: "featured",
+        totalVotes: 0,
+        createdAt: createdAt.toISOString(),
+        updatedAt: createdAt.toISOString(),
+      };
+      store.creatorSuggestions.unshift(created);
+      return buildCreatorSuggestionWithMeta({ suggestion: created, viewer, boosts: [] });
+    }
+
+    throw error;
+  }
+}
+
+export async function updateAdminCreatorSuggestion(input: {
+  suggestionId: string;
+  name: string;
+  channelUrl: string;
+  reason?: string | null;
+}) {
+  const name = input.name.trim();
+  const channelUrl = input.channelUrl.trim();
+  const reason = input.reason?.trim() || null;
+  const slug = slugify(name);
+  if (!slug || !channelUrl) {
+    throw new Error("invalid_creator");
+  }
+
+  const db = getDb();
+  if (isDemoMode || !db) {
+    const store = getDemoStore();
+    const suggestion = store.creatorSuggestions.find((entry) => entry.id === input.suggestionId);
+    if (!suggestion) {
+      throw new Error("suggestion_not_found");
+    }
+
+    const duplicate = store.creatorSuggestions.find(
+      (entry) =>
+        entry.id !== input.suggestionId &&
+        (entry.slug === slug || entry.channelUrl.toLowerCase() === channelUrl.toLowerCase()),
+    );
+    if (duplicate) {
+      throw new Error("suggestion_already_exists");
+    }
+
+    suggestion.name = name;
+    suggestion.slug = slug;
+    suggestion.channelUrl = channelUrl;
+    suggestion.reason = reason;
+    suggestion.updatedAt = new Date().toISOString();
+    return suggestion;
+  }
+
+  try {
+    const [existing] = await db
+      .select()
+      .from(creatorSuggestions)
+      .where(eq(creatorSuggestions.id, input.suggestionId))
+      .limit(1);
+    if (!existing) {
+      throw new Error("suggestion_not_found");
+    }
+
+    const [duplicate] = await db
+      .select({ id: creatorSuggestions.id })
+      .from(creatorSuggestions)
+      .where(
+        and(
+          sql`(${creatorSuggestions.slug} = ${slug} or lower(${creatorSuggestions.channelUrl}) = ${channelUrl.toLowerCase()})`,
+          sql`${creatorSuggestions.id} <> ${input.suggestionId}`,
+        ),
+      )
+      .limit(1);
+    if (duplicate) {
+      throw new Error("suggestion_already_exists");
+    }
+
+    const [updated] = await db
+      .update(creatorSuggestions)
+      .set({ name, slug, channelUrl, reason, updatedAt: new Date() })
+      .where(eq(creatorSuggestions.id, input.suggestionId))
+      .returning();
+    if (!updated) {
+      throw new Error("suggestion_not_found");
+    }
+
+    return serializeCreatorSuggestion(updated);
+  } catch (error) {
+    if (isMissingCreatorSuggestionSchemaError(error)) {
+      const store = getDemoStore();
+      const suggestion = store.creatorSuggestions.find((entry) => entry.id === input.suggestionId);
+      if (!suggestion) {
+        throw new Error("suggestion_not_found");
+      }
+
+      const duplicate = store.creatorSuggestions.find(
+        (entry) =>
+          entry.id !== input.suggestionId &&
+          (entry.slug === slug || entry.channelUrl.toLowerCase() === channelUrl.toLowerCase()),
+      );
+      if (duplicate) {
+        throw new Error("suggestion_already_exists");
+      }
+
+      suggestion.name = name;
+      suggestion.slug = slug;
+      suggestion.channelUrl = channelUrl;
+      suggestion.reason = reason;
+      suggestion.updatedAt = new Date().toISOString();
+      return suggestion;
+    }
+
+    throw error;
+  }
 }
 
 export async function boostCreatorSuggestion(input: {
