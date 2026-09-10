@@ -31,9 +31,10 @@ import type { BetWithOptionsRecord, CurrentGameRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const LUDYLOPS_PROFILE_IMAGE = "/selfie2.png";
-const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@ludylopsgames";
-const YOUTUBE_LIVE_URL = `${YOUTUBE_CHANNEL_URL}/live`;
-const YOUTUBE_STREAMS_URL = `${YOUTUBE_CHANNEL_URL}/streams`;
+const YOUTUBE_LIVE_CHANNEL_URL = "https://www.youtube.com/@ludylopsgames";
+const YOUTUBE_VIDEO_CHANNEL_URL = "https://www.youtube.com/@ludylops";
+const YOUTUBE_LIVE_URL = `${YOUTUBE_LIVE_CHANNEL_URL}/live`;
+const YOUTUBE_STREAMS_URL = `${YOUTUBE_LIVE_CHANNEL_URL}/streams`;
 
 type HomePageProps = {
   searchParams: Promise<{ googleAccountProtection?: string | string[] | undefined }>;
@@ -83,7 +84,7 @@ const PIPETZ_STEPS: PipetzStep[] = [
 const BETWEEN_LIVES_LINKS: BetweenLivesLink[] = [
   { href: "/jogos", label: "Sugestões de jogos", icon: Gamepad2, bg: "bg-[var(--color-mint)]" },
   { href: "/videos", label: "Vídeos e pautas", icon: CirclePlay, bg: "bg-[var(--color-blue)]" },
-  { href: "/indicacoes", label: "Canais que me inspiram", icon: Users, bg: "bg-[var(--color-purple)]" },
+  { href: "/indicacoes", label: "Canais que nos inspiram", icon: Users, bg: "bg-[var(--color-purple)]" },
 ];
 
 function getGameMetadataParts(game: CurrentGameRecord | null) {
@@ -196,18 +197,22 @@ function HeroActions({
   hasUsableSession: boolean;
   isLive: boolean;
 }) {
+  const actionSpacing = isLive ? "mt-8" : "mt-4";
+
   if (hasUsableSession) {
     return (
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <a
-          href={YOUTUBE_CHANNEL_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="btn-brutal bg-[var(--color-pink)] px-6 py-3 text-sm text-[var(--color-accent-ink)]"
-        >
-          <CirclePlay className="size-4" aria-hidden="true" />
-          Ir pro canal
-        </a>
+      <div className={cn(actionSpacing, "flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center")}>
+        {isLive ? (
+          <a
+            href={YOUTUBE_LIVE_CHANNEL_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-brutal bg-[var(--color-pink)] px-6 py-3 text-sm text-[var(--color-accent-ink)]"
+          >
+            <CirclePlay className="size-4" aria-hidden="true" />
+            Ir pro canal
+          </a>
+        ) : null}
         <Link href="/apostas" className="btn-brutal accent-button px-6 py-3 text-sm">
           <Ticket className="size-4" aria-hidden="true" />
           Abrir Apostas
@@ -226,7 +231,7 @@ function HeroActions({
 
   if (isLive) {
     return (
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className={cn(actionSpacing, "flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center")}>
         <a
           href={YOUTUBE_LIVE_URL}
           target="_blank"
@@ -242,16 +247,7 @@ function HeroActions({
   }
 
   return (
-    <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-      <a
-        href={YOUTUBE_CHANNEL_URL}
-        target="_blank"
-        rel="noreferrer"
-        className="btn-brutal accent-button px-6 py-3 text-sm"
-      >
-        <CirclePlay className="size-4" aria-hidden="true" />
-        Ver próxima Live
-      </a>
+    <div className={cn(actionSpacing, "flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center")}>
       <Link
         href="#pipetz"
         className="btn-brutal bg-[var(--color-mint)] px-6 py-3 text-sm text-[var(--color-accent-ink)]"
@@ -259,6 +255,60 @@ function HeroActions({
         <Coins className="size-4" aria-hidden="true" />
         Como funcionam os pipetz
       </Link>
+    </div>
+  );
+}
+
+function OfflineChannelCallout() {
+  return (
+    <div className="mt-8 max-w-3xl border-y-[3px] border-white/50 bg-black/70 p-4 text-white shadow-[6px_6px_0_rgba(255,255,255,0.18)] backdrop-blur sm:p-5">
+      <h2
+        className="max-w-2xl text-3xl uppercase leading-[0.92]"
+        style={{ fontFamily: "var(--font-display)" }}
+      >
+        Fora da live, tem dois caminhos.
+      </h2>
+      <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-white/80">
+        As transmissões ficam na LudylopsGames. Vídeos longos e análises ficam na Ludylops.
+      </p>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <a
+          href={YOUTUBE_LIVE_CHANNEL_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="group border-[3px] border-[var(--color-pink)] bg-[var(--color-pink)] p-4 text-[var(--color-accent-ink)] transition-transform hover:-translate-y-1 focus-visible:-translate-y-1"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-xl uppercase leading-none" style={{ fontFamily: "var(--font-display)" }}>
+              LudylopsGames
+            </h3>
+            <ArrowRight className="size-5 shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+          </div>
+          <p className="mt-3 text-sm font-bold leading-5">Lives, transmissões e episódios da campanha.</p>
+          <span className="mono mt-4 block text-[10px] font-black uppercase tracking-[0.16em]">
+            Canal de lives
+          </span>
+        </a>
+
+        <a
+          href={YOUTUBE_VIDEO_CHANNEL_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="group border border-white/30 bg-white/5 p-4 text-white transition-colors hover:border-white hover:bg-white/10 focus-visible:border-white focus-visible:bg-white/10"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-xl uppercase leading-none" style={{ fontFamily: "var(--font-display)" }}>
+              Ludylops
+            </h3>
+            <ArrowRight className="size-5 shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+          </div>
+          <p className="mt-3 text-sm font-bold leading-5 text-white/80">Vídeos longos e análises para assistir com calma.</p>
+          <span className="mono mt-4 block text-[10px] font-black uppercase tracking-[0.16em] text-white/70">
+            Vídeos e análises
+          </span>
+        </a>
+      </div>
     </div>
   );
 }
@@ -327,6 +377,7 @@ function HomeHero({
             <AccountProtectionNotice status={accountProtectionStatus} />
           ) : null}
 
+          {!isLive ? <OfflineChannelCallout /> : null}
           <HeroActions hasUsableSession={hasUsableSession} isLive={isLive} />
           <HeroGameLabel game={currentGame} isLive={isLive} />
         </div>

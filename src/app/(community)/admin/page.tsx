@@ -12,6 +12,7 @@ import { AdminWheelPanel } from "@/components/admin-wheel-panel";
 import { AdminRecommendationsPanel } from "@/components/admin-recommendations-panel";
 import { AdminViewerLinksPanel } from "@/components/admin-viewer-links-panel";
 import { AdminCreatorAreaAccessPanel } from "@/components/admin-creator-area-access-panel";
+import { AdminCreatorSuggestionsPanel } from "@/components/admin-creator-suggestions-panel";
 import { AdminDeathCountersPanel } from "@/components/admin-death-counters-panel";
 import { RedemptionGrid } from "@/components/redemption-grid";
 import { LeaderboardTable } from "@/components/leaderboard-table";
@@ -29,6 +30,7 @@ import {
   listAdminGameSuggestions,
   listAdminVideoSuggestions,
   listAdminProductRecommendations,
+  listAdminCreatorSuggestions,
   listAdminBets,
   listAdminLiveLikeGoals,
   listAdminRedemptions,
@@ -63,6 +65,7 @@ export default async function AdminPage() {
     gameBoostSettings,
     videoSuggestions,
     recommendations,
+    creatorSuggestions,
     viewers,
     obsOverlayStatus,
     pricing,
@@ -83,6 +86,7 @@ export default async function AdminPage() {
     getGameSuggestionBoostSettings(),
     listAdminVideoSuggestions(),
     listAdminProductRecommendations(),
+    listAdminCreatorSuggestions(),
     listAdminViewerDirectory(),
     getObsOverlayAdminStatus(),
     getPipetzPricing(),
@@ -196,6 +200,13 @@ export default async function AdminPage() {
                 description: "Emails liberados para criar área.",
                 badge: `${creatorAreaAccessSettings.allowedEmails.length}`,
                 content: <AdminCreatorAreaAccessPanel initialSettings={creatorAreaAccessSettings} />,
+              },
+              {
+                id: "indicacoes-criadores",
+                label: "Criadores indicados",
+                description: "Indicações da comunidade e exclusões.",
+                badge: `${creatorSuggestions.length}`,
+                content: <AdminCreatorSuggestionsPanel suggestions={creatorSuggestions} />,
               },
               {
                 id: "sugestoes-jogos",

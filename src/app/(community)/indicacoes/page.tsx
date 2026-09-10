@@ -119,7 +119,7 @@ export default async function IndicacoesPage() {
                 className="text-2xl font-bold uppercase"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                Canais que me inspiram
+                Canais que nos inspiram
               </h2>
               <p className="mt-2 text-sm leading-6 text-[var(--color-ink-soft)]">
                 Lista boa pra me conhecer. Esses canais me inspiram, seja pelo

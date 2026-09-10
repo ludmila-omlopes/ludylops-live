@@ -38,6 +38,8 @@ const expectedApiRoutes = new Set([
   "/api/admin/catalog",
   "/api/admin/catalog/[id]",
   "/api/admin/creator-area-access",
+  "/api/admin/creator-suggestions",
+  "/api/admin/creator-suggestions/[id]",
   "/api/admin/current-game",
   "/api/admin/death-counter-game",
   "/api/admin/death-counters",

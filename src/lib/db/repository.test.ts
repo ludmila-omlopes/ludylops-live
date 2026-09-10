@@ -68,11 +68,13 @@ import {
   cancelBet,
   createBet,
   createCreatorSuggestion,
+  createAdminCreatorSuggestion,
   createGameSuggestion,
   createLiveLikeGoal,
   createVideoSuggestion,
   createProductRecommendationFromInput,
   createProductRecommendationSubmission,
+  deleteCreatorSuggestion,
   deleteProductRecommendation,
   applyGoogleCrossAccountProtectionEvent,
   claimViewerLinkCodeFromStreamerbot,
@@ -88,6 +90,7 @@ import {
   ingestStreamerbotEvent,
   issueViewerLinkCode,
   listAdminProductRecommendations,
+  listAdminCreatorSuggestions,
   listProductRecommendations,
   listAdminViewerDirectory,
   listRecentSubscriberAlerts,
@@ -113,6 +116,7 @@ import {
   showQuoteOverlayForViewer,
   cancelQueuedQuoteOverlays,
   updateGameSuggestionStatus,
+  updateAdminCreatorSuggestion,
   updateGameSuggestionBoostSettings,
   updateProductRecommendationStatus,
   updateVideoSuggestionStatus,
@@ -3853,6 +3857,88 @@ describe("ingestStreamerbotEvent", () => {
     ]);
   });
 
+});
+
+describe("creator suggestions", () => {
+  beforeEach(() => {
+    getDbMock.mockReturnValue(null);
+    delete (globalThis as typeof globalThis & { __lojaDemoStore?: unknown }).__lojaDemoStore;
+  });
+
+  it("deletes a creator suggestion and its boosts in demo mode", async () => {
+    const created = await createCreatorSuggestion({
+      viewerId: "viewer_ana",
+      name: "Canal para excluir",
+      channelUrl: "https://www.youtube.com/@canalparaexcluir",
+      platform: "youtube",
+      source: "test",
+    });
+
+    await boostCreatorSuggestion({
+      suggestionId: created.id,
+      viewerId: "viewer_ana",
+      amount: 25,
+      source: "test",
+    });
+
+    await deleteCreatorSuggestion(created.id);
+
+    const suggestions = await listAdminCreatorSuggestions();
+    const store = (globalThis as typeof globalThis & {
+      __lojaDemoStore?: { creatorSuggestionBoosts: Array<{ suggestionId: string }> };
+    }).__lojaDemoStore;
+
+    expect(suggestions.some((entry) => entry.id === created.id)).toBe(false);
+    expect(store?.creatorSuggestionBoosts.some((entry) => entry.suggestionId === created.id)).toBe(false);
+  });
+
+  it("creates an admin creator as a featured suggestion without charging pipetz", async () => {
+    const before = await getViewerDashboard("viewer_ana");
+    const created = await createAdminCreatorSuggestion({
+      viewerId: "viewer_ana",
+      name: "Criador em destaque",
+      channelUrl: "https://www.youtube.com/@criadoremdestaque",
+    });
+    const after = await getViewerDashboard("viewer_ana");
+
+    expect(created).toMatchObject({
+      name: "Criador em destaque",
+      platform: "youtube",
+      status: "featured",
+      totalVotes: 0,
+    });
+    expect(after?.balance.currentBalance).toBe(before?.balance.currentBalance);
+    expect(await listAdminCreatorSuggestions()).toContainEqual(
+      expect.objectContaining({ id: created.id, status: "featured" }),
+    );
+  });
+
+  it("updates an admin creator description without changing its status", async () => {
+    const created = await createAdminCreatorSuggestion({
+      viewerId: "viewer_ana",
+      name: "Canal para atualizar",
+      channelUrl: "https://www.youtube.com/@canalparaatualizar",
+    });
+
+    const updated = await updateAdminCreatorSuggestion({
+      suggestionId: created.id,
+      name: "Canal para atualizar",
+      channelUrl: "https://www.youtube.com/@canalparaatualizar",
+      reason: "Descrição puxada do YouTube.",
+    });
+
+    expect(updated).toMatchObject({
+      id: created.id,
+      status: "featured",
+      reason: "Descrição puxada do YouTube.",
+    });
+  });
+
+  it("rejects deleting an unknown creator suggestion", async () => {
+    await expect(deleteCreatorSuggestion("missing-creator-suggestion")).rejects.toThrow(
+      "suggestion_not_found",
+    );
+  });
 });
 
 describe("product recommendations", () => {
