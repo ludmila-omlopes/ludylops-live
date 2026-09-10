@@ -133,7 +133,7 @@ export function LiveStatusPanel({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div
-              className="sticker px-4 py-2 text-sm text-[var(--color-ink)]"
+              className="retro-label px-4 py-2 text-[var(--color-ink)]"
               style={{
                 backgroundColor: online
                   ? "color-mix(in srgb, var(--color-mint) 22%, var(--surface-card) 78%)"
@@ -150,7 +150,7 @@ export function LiveStatusPanel({
               )}
             </div>
             <div
-              className="sticker px-4 py-2 text-sm text-[var(--color-ink)]"
+              className="retro-label px-4 py-2 text-[var(--color-ink)]"
               style={{
                 backgroundColor: status.isLive
                   ? "color-mix(in srgb, var(--color-mint) 30%, var(--color-paper) 70%)"
