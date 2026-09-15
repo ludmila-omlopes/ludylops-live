@@ -42,9 +42,9 @@ export function formatCreateCreatorAreaError(error: unknown) {
     case "missing_creator_owner":
       return "Entre novamente para criar a área.";
     case "creator_schema_missing":
-      return "A estrutura de criadores ainda não foi aplicada no banco. Rode as migrações antes de criar áreas.";
+      return "Não foi possível criar sua área agora. Tente novamente mais tarde.";
     default:
-      return message;
+      return "Não foi possível criar sua área agora. Tente novamente mais tarde.";
   }
 }
 

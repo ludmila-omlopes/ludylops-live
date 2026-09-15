@@ -110,7 +110,7 @@ describe("creator area service", () => {
   it("formats user-facing errors", () => {
     expect(formatCreateCreatorAreaError(new Error("creator_slug_exists"))).toBe("Esse endereço já está em uso.");
     expect(formatCreateCreatorAreaError(new Error("creator_slug_reserved"))).toBe("Esse endereço é reservado.");
-    expect(formatCreateCreatorAreaError(new Error("creator_schema_missing"))).toContain("migrações");
+    expect(formatCreateCreatorAreaError(new Error("creator_schema_missing"))).toBe("Não foi possível criar sua área agora. Tente novamente mais tarde.");
   });
 
   it("does not crash owner listing when the creator schema is outdated", async () => {
@@ -122,7 +122,7 @@ describe("creator area service", () => {
               where() {
                 return {
                   orderBy() {
-                    throw new Error('Failed query: column "creators"."owner_user_id" does not exist');
+                    throw Object.assign(new Error('column "creators"."owner_user_id" does not exist'), { code: "42703" });
                   },
                 };
               },
@@ -151,7 +151,7 @@ describe("creator area service", () => {
         };
       },
       transaction: async () => {
-        throw new Error('Failed query: column "owner_user_id" of relation "creators" does not exist');
+        throw Object.assign(new Error('column "owner_user_id" of relation "creators" does not exist'), { code: "42703" });
       },
     });
 

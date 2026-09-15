@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { desc, eq } from "drizzle-orm";
 
+import { classifyCreatorAreaError, CreatorAreaError, isMissingCreatorSchemaError } from "@/lib/creators/area-errors.server";
 import {
   createCreatorAreaSchema,
   flattenCreatorAreaSchemaErrors,
@@ -66,60 +67,14 @@ function toAreaSummary(creator: CreatorRecord): CreatorAreaSummary {
   };
 }
 
-function isMissingCreatorSchemaError(error: unknown) {
-  const schemaTerms = [
-    '"creators"',
-    '"creator_domains"',
-    '"creator_branding"',
-    '"creator_modules"',
-    "creators",
-    "creator_domains",
-    "creator_branding",
-    "creator_modules",
-    "owner_user_id",
-    "display_name",
-  ];
-  const queue: unknown[] = [error];
-  const visited = new Set<unknown>();
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current || visited.has(current)) {
-      continue;
-    }
-    visited.add(current);
-
-    const message = current instanceof Error ? current.message : typeof current === "string" ? current : "";
-    const normalized = message.toLowerCase();
-    const mentionsCreatorSchema = schemaTerms.some((term) => normalized.includes(term));
-
-    if (
-      mentionsCreatorSchema &&
-      (normalized.includes("does not exist") ||
-        normalized.includes("relation") ||
-        normalized.includes("column") ||
-        normalized.includes("failed query"))
-    ) {
-      return true;
-    }
-
-    if (typeof current === "object" && current && "cause" in current) {
-      queue.push((current as { cause?: unknown }).cause);
-    }
-  }
-
-  return false;
-}
-
-
 function parseCreatorAreaInput(input: unknown) {
   const parsed = createCreatorAreaSchema.parse(input);
   const slug = creatorSlugFromInput(parsed);
   if (!slug) {
-    throw new Error("invalid_creator_slug");
+    throw new CreatorAreaError("invalid_creator_slug");
   }
   if (isReservedCreatorSlug(slug)) {
-    throw new Error("creator_slug_reserved");
+    throw new CreatorAreaError("creator_slug_reserved");
   }
   return { ...parsed, slug };
 }
@@ -166,7 +121,7 @@ function buildDemoTenant(input: {
 
 export async function createCreatorArea(ownerUserId: string | null | undefined, input: unknown) {
   if (!ownerUserId) {
-    throw new Error("missing_creator_owner");
+    throw new CreatorAreaError("missing_creator_owner");
   }
 
   const parsed = parseCreatorAreaInput(input);
@@ -174,7 +129,7 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
 
   if (!db) {
     if (findDemoCreatorTenantBySlug(parsed.slug)) {
-      throw new Error("creator_slug_exists");
+      throw new CreatorAreaError("creator_slug_exists");
     }
     return insertDemoCreatorTenant(
       buildDemoTenant({
@@ -188,15 +143,6 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
   }
 
   try {
-    const [existing] = await db
-      .select({ id: creators.id })
-      .from(creators)
-      .where(eq(creators.slug, parsed.slug))
-      .limit(1);
-    if (existing) {
-      throw new Error("creator_slug_exists");
-    }
-
     const creatorId = `creator_${randomUUID()}`.slice(0, 64);
     const domainId = `creator_domain_${randomUUID()}`.slice(0, 64);
 
@@ -238,14 +184,15 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
         })),
       );
     });
-  } catch (error) {
-    if (isMissingCreatorSchemaError(error)) {
-      throw new Error("creator_schema_missing");
-    }
-    throw error;
-  }
 
-  return resolveCreatorFromRequest({ slug: parsed.slug });
+    const tenant = await resolveCreatorFromRequest({ slug: parsed.slug });
+    if (tenant.creator.id !== creatorId || tenant.creator.slug !== parsed.slug || tenant.creator.ownerUserId !== ownerUserId) {
+      throw new CreatorAreaError("creator_area_unexpected");
+    }
+    return tenant;
+  } catch (error) {
+    throw classifyCreatorAreaError(error);
+  }
 }
 
 export async function listCreatorAreasForOwner(ownerUserId: string | null | undefined): Promise<CreatorAreaSummary[]> {

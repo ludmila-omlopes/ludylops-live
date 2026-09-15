@@ -42,7 +42,7 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 012  | Bound hot queries + HLTB refresh off request path | P2 | M | — | [#177](https://github.com/ludmila-omlopes/ludylops-live/issues/177) | TODO |
 | 013  | Design spike: overlay delivery for multi-tenant scale | P2 | M | — | [#178](https://github.com/ludmila-omlopes/ludylops-live/issues/178) | TODO |
 | 014  | Establish a safe Drizzle migration and data-seed baseline | P1 | M | — | [#180](https://github.com/ludmila-omlopes/ludylops-live/issues/180) | BLOCKED (executor dispatches hit the account usage limit before implementation) |
-| 015  | Harden creator-area creation errors and concurrent slug conflicts | P1 | S | — | [#181](https://github.com/ludmila-omlopes/ludylops-live/issues/181) | TODO |
+| 015  | Harden creator-area creation errors and concurrent slug conflicts | P1 | S | — | [#181](https://github.com/ludmila-omlopes/ludylops-live/issues/181) | IN PROGRESS (implemented; 362 tests, typecheck, lint and build passed; awaiting integration) |
 | 016  | Route creator subdomains to their public Next.js surface | P1 | M | 017 | [#182](https://github.com/ludmila-omlopes/ludylops-live/issues/182) | TODO |
 | 017  | Make creator lifecycle status authoritative at public boundaries | P1 | M | — | [#183](https://github.com/ludmila-omlopes/ludylops-live/issues/183) | TODO |
 | 018  | Bind Streamer.bot requests to per-creator credentials | P1 | L | 014 | [#184](https://github.com/ludmila-omlopes/ludylops-live/issues/184) | TODO |
