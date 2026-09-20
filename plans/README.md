@@ -44,7 +44,7 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 014  | Establish a safe Drizzle migration and data-seed baseline | P1 | M | — | [#180](https://github.com/ludmila-omlopes/ludylops-live/issues/180) | IN PROGRESS (implemented and validated: 351 tests, types, lint, build; awaiting integration; no shared DB changes) |
 | 015  | Harden creator-area creation errors and concurrent slug conflicts | P1 | S | — | [#181](https://github.com/ludmila-omlopes/ludylops-live/issues/181) | TODO |
 | 016  | Route creator subdomains to their public Next.js surface | P1 | M | 017 | [#182](https://github.com/ludmila-omlopes/ludylops-live/issues/182) | TODO |
-| 017  | Make creator lifecycle status authoritative at public boundaries | P1 | M | — | [#183](https://github.com/ludmila-omlopes/ludylops-live/issues/183) | TODO |
+| 017  | Make creator lifecycle status authoritative at public boundaries | P1 | M | — | [#183](https://github.com/ludmila-omlopes/ludylops-live/issues/183) | IN PROGRESS (implemented and reviewed; 362 tests, typecheck, lint and build passed; awaiting integration) |
 | 018  | Bind Streamer.bot requests to per-creator credentials | P1 | L | 014 | [#184](https://github.com/ludmila-omlopes/ludylops-live/issues/184) | TODO |
 | 019  | Enforce module authorization and dependency-safe transitions | P1 | L | 009; coordinate 018 | [#185](https://github.com/ludmila-omlopes/ludylops-live/issues/185) | TODO |
 | 020  | Define builder, shared engine and Ludylops instance boundaries | P1 | M design / L migration | none for design; reconcile 008–019 before migration | — | DONE (architecture direction recorded; migration remains staged in follow-ups) |
