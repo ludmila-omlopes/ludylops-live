@@ -169,6 +169,13 @@
       "when": 1789920658752,
       "tag": "0023_familiar_echo",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789939967481,
+      "tag": "0024_lonely_lady_deathstrike",
+      "breakpoints": true
     }
   ]
 }
