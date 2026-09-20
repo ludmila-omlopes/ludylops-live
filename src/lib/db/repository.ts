@@ -2478,7 +2478,7 @@ function isQuoteOverlayActive(overlay: QuoteOverlayStateRecord | null, now = Dat
 
 type SerializableProductRecommendationRow = Omit<
   typeof productRecommendations.$inferSelect,
-  "moderationStatus"
+  "moderationStatus" | "creatorId"
 > & {
   moderationStatus?: string | null;
 };
