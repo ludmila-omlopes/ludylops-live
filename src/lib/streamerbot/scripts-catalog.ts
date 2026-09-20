@@ -58,8 +58,13 @@ export const streamerbotGlobalVariables = [
     required: true,
   },
   {
-    name: "lojaneon.streamerbotSharedSecret",
-    description: "Segredo compartilhado usado para assinar requisições HMAC enviadas ao app.",
+    name: "lojaneon.streamerbotCredentialId",
+    description: "ID público da credencial exclusiva deste streamer.",
+    required: true,
+  },
+  {
+    name: "lojaneon.streamerbotCredentialSecret",
+    description: "Segredo recebido na emissão da credencial. Não compartilhe em chat, capturas ou exportações.",
     required: true,
   },
   {
@@ -90,6 +95,16 @@ export const streamerbotGlobalVariables = [
 ];
 
 export const streamerbotScriptDefinitions: StreamerbotScriptDefinition[] = [
+  {
+    id: "check-credential",
+    filename: "check-credential.cs",
+    title: "Testar credencial",
+    description: "Confirma a autenticação sem alterar pontos, apostas ou conteúdo da live.",
+    category: "live",
+    trigger: "Execução manual",
+    setupInstructions: "Configure as variáveis persistidas de ID e segredo e execute esta action manualmente. O log informa o streamer autenticado e se os comandos estão disponíveis.",
+    sortOrder: 0,
+  },
   {
     id: "channel-subscription-reward",
     filename: "channel-subscription-reward.cs",

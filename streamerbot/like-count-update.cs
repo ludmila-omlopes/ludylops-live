@@ -10,12 +10,13 @@ public class CPHInline
     public bool Execute()
     {
         string appBaseUrl = ReadRequiredGlobal("lojaneon.appBaseUrl");
-        string sharedSecret = ReadRequiredGlobal("lojaneon.streamerbotSharedSecret");
+        string credentialId = ReadRequiredGlobal("lojaneon.streamerbotCredentialId");
+        string sharedSecret = ReadRequiredGlobal("lojaneon.streamerbotCredentialSecret");
         int likeCount = ReadIntArg("likeCount");
         string broadcastId = FirstArg("broadcastId");
         bool isLive = ReadBoolArg("isLive");
 
-        if (string.IsNullOrWhiteSpace(appBaseUrl) || string.IsNullOrWhiteSpace(sharedSecret) || likeCount <= 0)
+        if (string.IsNullOrWhiteSpace(appBaseUrl) || (string.IsNullOrWhiteSpace(sharedSecret) || string.IsNullOrWhiteSpace(credentialId)) || likeCount <= 0)
         {
             CPH.LogWarn("[Loja Pipetz] Statistics Updated sem app, segredo ou likeCount.");
             return false;
@@ -29,8 +30,9 @@ public class CPHInline
         using (var request = new HttpRequestMessage(HttpMethod.Post, string.Format("{0}/api/internal/streamerbot/events", appBaseUrl.TrimEnd('/'))))
         {
             request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            request.Headers.Add("x-streamerbot-credential-id", credentialId);
             request.Headers.Add("x-timestamp", timestamp);
-            request.Headers.Add("x-signature", BuildSignature(sharedSecret, timestamp, body));
+            request.Headers.Add("x-signature", BuildSignature(sharedSecret, timestamp, body, credentialId));
             HttpResponseMessage response = Http.SendAsync(request).GetAwaiter().GetResult();
             string responseBody = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             CPH.LogInfo(string.Format("[Loja Pipetz] like_count_update status={0} body={1}", (int)response.StatusCode, responseBody));
@@ -89,11 +91,11 @@ public class CPHInline
         return builder.ToString();
     }
 
-    private static string BuildSignature(string secret, string timestamp, string body)
+    private static string BuildSignature(string secret, string timestamp, string body, string credentialId)
     {
         using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret)))
         {
-            byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(string.Format("{0}.{1}", timestamp, body)));
+            byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(string.Format("v2\n{0}\n{1}\nPOST\n/api/internal/streamerbot/events\n{2}", timestamp, credentialId, body)));
             return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
     }

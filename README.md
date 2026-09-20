@@ -51,18 +51,26 @@ Observação: a criação da área já separa creator, domínio, branding e mód
 
 ## Streamer.bot
 
-As chamadas do Streamer.bot para o app usam HMAC SHA-256. Todas devem enviar:
+As chamadas novas do Streamer.bot usam uma credencial exclusiva por streamer e HMAC SHA-256. Envie:
 
 - `x-timestamp`
 - `x-signature`
+- `x-streamerbot-credential-id`
 
 A assinatura é calculada sobre:
 
 ```text
-<timestamp>.<body_json>
+v2
+<timestamp_em_milissegundos>
+<id_da_credencial>
+POST
+<pathname_do_endpoint>
+<body_json_exatamente_como_enviado>
 ```
 
-usando `STREAMERBOT_SHARED_SECRET`.
+Use o segredo da credencial, UTF-8 e uma quebra LF entre os campos, sem quebra adicional no final. O servidor deriva o streamer da credencial verificada. Host e `x-creator-slug` não autorizam outro streamer. Consulte [emissão, rotação, teste e revogação](docs/streamerbot-credentials.md).
+
+A assinatura antiga `<timestamp>.<body_json>` com `STREAMERBOT_SHARED_SECRET` continua temporariamente aceita somente para a Ludylops, sem o cabeçalho de credencial. `STREAMERBOT_LEGACY_AUTH_ENABLED=false` desativa essa compatibilidade. Scripts novos exigem ID e segredo próprios; não retornam automaticamente à chave global.
 
 Scripts prontos para colar em `Core > C# > Execute C# Code` ficam em `streamerbot/`:
 
@@ -79,7 +87,8 @@ Scripts prontos para colar em `Core > C# > Execute C# Code` ficam em `streamerbo
 Variáveis globais normalmente usadas no Streamer.bot:
 
 - `lojaneon.appBaseUrl`
-- `lojaneon.streamerbotSharedSecret`
+- `lojaneon.streamerbotCredentialId`
+- `lojaneon.streamerbotCredentialSecret`
 - `lojaneon.useBotAccount`
 - `lojaneon.activeBetId`
 - `lojaneon.counterGameKey`
@@ -96,6 +105,7 @@ Para comandos e C# actions, confira a documentação oficial do Streamer.bot ant
 
 ### Streamer.bot
 
+- `POST /api/internal/streamerbot/credentials/check`: testa autenticação e informa o streamer, sem executar comandos da live.
 - `POST /api/internal/streamerbot/events`: registra presença, bônus e eventos vindos da live.
 - `POST /api/internal/streamerbot/link`: vincula um código de `/me` ao canal do viewer no chat.
 - `POST /api/internal/streamerbot/points`: responde saldo do viewer para comandos como `!pontos`.
