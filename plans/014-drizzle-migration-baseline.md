@@ -5,9 +5,9 @@
 - Priority: P1; effort: M; risk: HIGH when applied to a shared database.
 - Depends on: none.
 - Issue: https://github.com/ludmila-omlopes/ludylops-live/issues/180
-- Planned at: `397701f`, reconciled 2026-09-09.
-- State: BLOCKED. Three isolated executor dispatches hit the account usage limit before implementation; resume when executor capacity is available. Shared-database mutations are not part of this delivery.
-- Drift check: `git diff --stat 397701f..HEAD -- package.json drizzle.config.ts src/lib/db/schema.ts drizzle README.md`.
+- Planned at: `ec19f8f`, reconciled 2026-09-15; same file tree as remote master `f353ce2`.
+- State: IN PROGRESS (2026-09-15): implementation and local validation complete in .worktrees/issue-180; awaiting PR/integration. Commands: db:baseline:check and db:baseline:ensure -- --apply. Validation: 351 tests (32 new), typecheck, lint and test-environment build. SQL/transaction behavior tested with an adapter fake; real database verification remains a deployment prerequisite. No shared database was changed.
+- Drift check: `git diff --stat ec19f8f..HEAD -- package.json drizzle.config.ts src/lib/db/schema.ts drizzle README.md`.
 
 ## Problem and decision
 
@@ -41,7 +41,7 @@ Out of scope: migrations, schema changes, application/UI/auth/Streamer.bot behav
 
 5. Document one production sequence: inventory/backup/review, baseline check, explicitly approved ensure if needed, successful check, separately approved schema push, verification. For an empty database, create foundation schema at the pre-008 revision before ensure, then apply dependent schema. Unknown migration history remains an operational STOP until an operator reconciles it; never replay generated DDL blindly. Document local/demo/production as yes/no/unknown based on evidence, plus rollback and exact CLI commands/exit semantics. No claim a migration-log table proves all historical DDL was applied.
 
-6. Amend plans 008/009: invoke this readiness check as prerequisite; remove hand-edited SQL seeds and any assumption db:push executes generated SQL. Generated SQL stays a reviewed schema artifact. Ensure scripts are applied separately only under operator approval. Copy the untracked plans from main into worktree before amending and commit these two documents; do not modify their main copies. Plan 009's 008/018 dependencies remain intact. Its public quotes path is now (community)/quotes/page.tsx.
+6. Amend plans 008/009: invoke this readiness check as prerequisite; remove hand-edited SQL seeds and any assumption db:push executes generated SQL. Generated SQL stays a reviewed schema artifact. Ensure scripts are applied separately only under operator approval. These plans are tracked; read the latest committed/reconciled versions in the worktree and reconcile any explicitly supplied uncommitted planning updates. Do not overwrite newer instructions with historical copies. Plan 009's 008/017/018 dependencies remain intact. Its public quotes path is src/app/(community)/quotes/page.tsx.
 
 7. Run focused new tests, then full npm test, npm run typecheck, npm run lint -- --ignore-pattern '.claude/**' --ignore-pattern '.worktrees/**'. Build in demo/test environment if validating app integration; never use real database for the build. Check CLI failure modes without DB and optionally read-only inventory of the existing configured database. No push/migrate/ensure apply against shared DB. Commit scoped implementation in worktree, do not merge/push/PR in this task.
 

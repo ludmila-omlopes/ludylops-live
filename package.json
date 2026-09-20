@@ -13,6 +13,8 @@
     "smoke:auth": "tsx scripts/auth-smoke.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
+    "db:baseline:check": "tsx scripts/creator-baseline.ts check",
+    "db:baseline:ensure": "tsx scripts/creator-baseline.ts ensure",
     "db:ensure-youtube-handle": "tsx scripts/ensure-youtube-handle-column.ts",
     "bridge:dev": "tsx bridge/src/index.ts",
     "backfill:hltb": "tsx scripts/backfill-howlongtobeat.ts",

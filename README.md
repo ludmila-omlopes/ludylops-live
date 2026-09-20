@@ -274,11 +274,18 @@ Gerar migração:
 npm run db:generate
 ```
 
-Aplicar schema no banco configurado:
+Verificar os dados de fundação, sem escrever no banco:
 
 ```bash
-npm run db:push
+npm run db:baseline:check
 ```
+
+O caminho de aplicação continua sendo `npm run db:push`, após inventário, backup,
+preparação dos dados e revisão da alteração. Push compara o schema e **não executa
+os seeds dos arquivos SQL gerados**. Registros faltantes são preparados separadamente
+com `npm run db:baseline:ensure -- --apply`, somente no alvo revisado e aprovado.
+Leia a sequência completa, incluindo banco vazio e limites do check, em
+[Banco: schema e preparação de dados](docs/database-migrations.md).
 
 Sem `DATABASE_URL`, o app usa dados em memória para desenvolvimento visual e testes simples.
 
@@ -291,7 +298,7 @@ npm run lint
 npm test
 npm run test:watch
 npm run db:generate
-npm run db:push
+npm run db:baseline:check
 npm run bridge:dev
 npm run smoke:auth
 npm run google:risc -- status

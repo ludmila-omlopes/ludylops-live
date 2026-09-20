@@ -1,199 +1,251 @@
-# Plan 009: Thread creator context through the data layer and scope the quotes vertical (pilot)
+# Plan 009: Thread creator context and isolate the quotes pilot
 
-> **Executor instructions**: This is a **design-and-pilot plan** — its purpose is
-> to establish a reusable pattern, not just ship one feature. Follow it step by
-> step, run every verification command, and honor the STOP conditions. The most
-> important deliverable is the pattern document in Step 6: later plans replicate
-> it per entity, so if the pattern is unclear, STOP and report rather than
-> shipping something inconsistent. Update this plan's row in `plans/README.md`
-> when done unless a reviewer told you they maintain the index.
+> **Executor instructions**: Establish an explicit, reusable creator context.
+> This is a technical isolation pilot, not authorization to open the product beta.
+> Preserve the existing Ludylops operation. Authentication, creator ownership,
+> module availability and data isolation are separate checks.
 >
-> **This plan is best run by a strong executor (or with close review).** It makes
-> genuine design decisions. If you are a lightweight executor and any step
-> requires judgment the plan doesn't spell out, STOP and report.
->
-> **Drift check (run first)**:
-> `git diff --stat 0b73c37..HEAD -- src/lib/db/schema.ts src/lib/db/repository.ts src/lib/creators/tenant.ts`
-> If these drifted materially, re-read the "Current state" excerpts before proceeding.
+> **Drift check**: `git diff --stat ec19f8f..HEAD -- src/lib/db src/lib/creators src/lib/streamerbot src/lib/obs-overlay-settings.ts src/lib/types.ts src/app src/components/obs-quote-overlay.tsx src/components/quote-overlay-trigger.tsx`
 
 ## Status
 
 - **Priority**: P1
 - **Effort**: L
-- **Risk**: HIGH (touches the core data-access layer and a live overlay/chat path; establishes a pattern many later plans copy)
-- **Depends on**: plans 008 and 018. Plan 008 establishes the backfilled `creator_id` pattern. Plan 018 ensures Streamer.bot requests derive creator identity from verified per-creator credentials before this pilot threads creator context through the quotes integration. This plan still owns the quote tables' constraint surgery.
+- **Risk**: HIGH: schema constraints, paid quote requests, queue refunds and OBS.
+- **Depends on**: plan 008 / #172, plan 017 / #183 and plan 018 / #184. Plan 014 / #180 is inherited through 008/018.
+- **Release dependencies**: plan 019 / #185 for module authorization; creator-owner administration and the economy/live-state follow-ups described below are not yet numbered. Do not mislabel these as plans 010–013, which are performance plans.
 - **Category**: tech-debt / migration
-- **Planned at**: commit `0b73c37`, 2026-07-07
+- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15; same file tree as remote master `f353ce2`.
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/173
+- **State**: TODO; this reconciliation executes no application changes.
 
 ## Why this matters
 
-Plan 008 gives operational tables a `creator_id` column, but at runtime the app is still single-tenant: **no repository function knows which creator a request belongs to** (`grep -c "resolveCreatorFromRequest\|creatorId" src/lib/db/repository.ts` → 0). Isolation only becomes real when queries filter by creator. Doing that across all 85 repository functions blindly is how you introduce a cross-tenant data leak. This plan de-risks the whole program by proving the end-to-end pattern on **one small vertical — quotes** — including the two hard parts every entity will hit: (1) how the resolved creator flows from an HTTP request down into a repository call (and its demo-store twin), and (2) how a global sequence/unique (`quote_number`) and a single-row key (`quote_overlay_state.slot`, `obs_overlay_control.key="quotes"`) become per-creator. The output is a working quotes vertical **plus** a written pattern (`docs/creator-scoping.md`) that plans 010+ follow mechanically.
+The operational repository has no creator context. Quotes, quote numbers,
+overlay state and queues are global. This pilot must prove that A's reads,
+writes and overlay operations cannot access B's records, while documenting a
+pattern for later per-module plans.
+
+Quotes are not independent of the economy: the public page reads dashboard and
+pricing, showing a quote charges points, and cancelling/expiring queued quotes
+can refund points. A quote-table filter alone cannot make that path safe.
+Never return another community's balance, pricing or live state to complete a
+demo of the pilot.
 
 ## Current state
 
-- Creator resolution already exists: `src/lib/creators/tenant.ts:251` `resolveCreatorFromRequest(input?: Request | ResolveCreatorOptions | null)` returns a `CreatorTenantRecord` (`.creator.id` is the creator id). It resolves from subdomain, `x-creator-slug` header, `/c/:slug` pathname, or hostname, and falls back to `DEFAULT_CREATOR` when nothing matches or the DB lacks the schema. **Reuse this — do not build a second resolver.**
-
-- No repository function accepts a creator. The demo/DB dual-path pattern (present in ~190 branches) for quotes, `src/lib/db/repository.ts:2545`:
-  ```ts
-  export async function listQuotes() {
-    const db = getDb();
-    if (isDemoMode || !db) {
-      return [...listDemoQuotes()].sort((a, b) => b.quoteNumber - a.quoteNumber);
-    }
-    const rows = await db.select().from(quotes).orderBy(desc(quotes.quoteNumber));
-    return rows.map(serializeQuote);
-  }
-  ```
-  and the write path uses a **global** next-number sequence (`repository.ts:2586-2612`): it reads `max(quote_number)` across the whole table. Per-creator, that max must be scoped to the creator.
-
-- Quotes schema (all in `src/lib/db/schema.ts`), with the global constraints that must become per-creator:
-  - `quotes` (`:564`): `quoteNumber` has `uniqueIndex("quotes_quote_number_idx")` — must become **composite unique `(creator_id, quote_number)`**.
-  - `quote_overlay_state` (`:593`): primary key is `slot` (one global slot) — must become per-creator (composite PK `(creator_id, slot)` or add `creator_id` to the key).
-  - `quote_overlay_queue` (`:621`): surrogate `id` PK — just needs a `creator_id` column + index.
-  - `obs_overlay_control` (`:611`): primary key is `key` (e.g. `"quotes"`) — must become composite `(creator_id, key)`.
-
-- Quote call graph (the callers that must resolve a creator and pass it down):
-  - `src/app/api/internal/streamerbot/quotes/route.ts:3` — imports `runQuoteCommandFromChat` (chat `!quote`/overlay command). Streamer.bot requests carry the creator via subdomain/header — resolve with `resolveCreatorFromRequest(request)`.
-  - `src/app/(public)/quotes/page.tsx` — the public quotes list (server component).
-  - `src/app/obs/quotes/page.tsx` — the OBS overlay browser source (server component).
-  - Confirm the full set yourself: `grep -rln "from \"@/lib/db/repository\"" src/app | xargs grep -l -i quote`.
-
-- Server components read the request via Next 16's `headers()`/`draftMode` APIs — **before writing any of this, read the Next.js guide** in `node_modules/next/dist/docs/` for how to access request headers in a server component in this version (per `AGENTS.md`, this Next may differ from training data). `resolveCreatorFromRequest` accepts a `{ hostname }` / `{ slug }` options object, so a server component can pass the host header without a full `Request`.
-
-- Repository test patterns to model new tests on: `src/lib/db/repository.test.ts`, `src/lib/db/repository-redeem.test.ts` (demo-mode-based unit tests).
+- `src/lib/db/repository.ts`, listQuotes at line 2610:
+  `db.select().from(quotes).orderBy(desc(quotes.quoteNumber))` has no creator filter.
+- Quote helpers include createQuoteRecord, getQuoteRecord, getActiveQuoteOverlay,
+  enqueueQuoteOverlay, activateQuoteOverlay, processNextQueuedQuoteOverlay,
+  refundQueuedQuoteOverlay, expireQueuedQuoteOverlays, setObsOverlayPaused,
+  cancelQueuedQuoteOverlays, runQuoteCommandFromChat and showQuoteOverlayForViewer.
+  Inventory their callers and side effects before changing signatures.
+- `src/lib/db/schema.ts`: quotes.quoteNumber is globally unique;
+  quote_overlay_state.slot and obs_overlay_control.key are global primary keys;
+  quote_overlay_queue has a surrogate id. Plan 008 intentionally excludes them.
+- `src/lib/creators/tenant.ts`: resolveCreatorFromRequest currently accepts
+  routing hints and can fall back to the default creator. Reuse the stricter
+  public policy delivered by plan 017, not its old permissive behavior.
+- `src/app/(community)/quotes/page.tsx` calls listQuotes, getViewerDashboard and
+  getPipetzPricing. Its viewer-triggered overlay operation is paid.
+- `src/app/obs/quotes/page.tsx` resolves style and renders ObsQuoteOverlay;
+  the component fetches /api/obs/live-status and /api/obs/quotes/current.
+  Both the requests and any style/live-state dependency need the right context.
+- `src/app/api/obs/quotes/current/route.ts` processes the queue on GET.
+  Preserve no-store; do not cache or deduplicate this operation.
+- `src/app/api/internal/streamerbot/quotes/route.ts` currently verifies a global
+  secret. After plan 018, use the authenticated creator returned by its verifier.
+  Never authorize the integration from x-creator-slug or a hostname.
+- `src/app/(creator-public)/c/[creatorSlug]/page.tsx` is the reservation page,
+  not a complete module UI. Route groups changed file locations, not URLs.
+- Existing /admin permissions are global. Selecting a creator in a URL is not
+  proof that the logged-in viewer owns it.
 
 ## Commands you will need
 
-| Purpose            | Command                | Expected on success              |
-|--------------------|------------------------|----------------------------------|
-| Install            | `npm install`          | exit 0                           |
-| Generate migration | `npm run db:generate`  | new `drizzle/NNNN_*.sql` created |
-| Lint               | `npm run lint`         | exit 0                           |
-| Typecheck          | `npx tsc --noEmit`     | exit 0, no errors                |
-| Tests              | `npm test`             | all pass + new quote-scoping tests |
-| Build              | `npm run build`        | exit 0 (`NEXTAUTH_SECRET` dummy env needed) |
+| Purpose | Command | Expected result |
+|---|---|---|
+| Inventory | `rg -n 'Quote|quote|ObsOverlay' src/lib/db/repository.ts src/app src/components` | all relevant callers found |
+| Generate schema | `npm run db:generate` | only planned schema changes |
+| Focused tests | `npm test -- quotes` | meaningful matching tests pass |
+| Typecheck | `npm run typecheck` | exit 0 |
+| Lint | `npm run lint` | exit 0 in isolated checkout |
+| Full suite | `npm test` | current suite and new tests pass |
+| Build | `npm run build` | exit 0 with test/demo environment and a dummy NEXTAUTH_SECRET |
 
-Do NOT run `npm run db:push`.
+Install from the lockfile in the isolated worktree if needed. Read installed
+Next.js headers, routing and server-component docs before writing application
+code. Use plan 014's documented ensure/readiness/schema-first sequence on a
+disposable database; never apply to a shared or production database in this delivery.
+
+Exact prerequisite gate: `npm run db:baseline:check` must exit 0 on that disposable
+database. If foundation rows are missing, run `npm run db:baseline:ensure -- --apply`
+there and repeat the check. If schema is missing, use the pre-008 foundation
+bootstrap in docs/database-migrations.md before preparing data. Never replay
+0021 or assume db:push executes generated SQL seeds. Production adoption remains
+a separate reviewed/approved operation; this does not weaken the 008/017/018 dependencies.
 
 ## Scope
 
 **In scope**:
-- `src/lib/db/schema.ts` — quotes-vertical tables' `creator_id` + composite constraints (see Current state).
-- `drizzle/NNNN_*.sql` + `drizzle/meta/*` — generated migration (add per-creator backfill default like plan 008; the composite-unique/PK changes will appear as index drops+creates — verify they're safe on backfilled data).
-- `src/lib/db/repository.ts` — every quote-related function: add a required `creatorId: string` parameter (or an options field), scope both the DB path (`.where(eq(quotes.creatorId, creatorId))`, per-creator max for the sequence) and the demo path (filter the demo store by creator; see demo-store note below).
-- `src/lib/creators/demo-store.ts` — if demo quotes need a creator dimension to test scoping, extend the demo store minimally (or key demo quotes by creator). Keep it small.
-- The quote callers listed above — resolve the creator via `resolveCreatorFromRequest` and pass `creator.id` down.
-- `src/lib/db/repository-quotes.test.ts` (create) — new tests proving per-creator isolation in demo mode.
-- `docs/creator-scoping.md` (create) — the pattern document (Step 6).
 
-**Out of scope** (do NOT touch):
-- Any non-quote repository function — bets, suggestions, redemptions, ledger, balances, catalog, counters. Those are plans 010+.
-- The 16 tables plan 008 already handled — leave their columns as-is.
-- `viewer_balances` composite PK — a later plan.
-- Auth/session code, the landing page, admin UI unrelated to quotes.
-- `streamerbot_counters` general handling — but note `obs_overlay_control` (key-based, in scope here) is a **different** table; do not confuse them.
+- Quote-related operations in src/lib/db/repository.ts and their existing demo
+  store implementation; locate it from getDemoStore imports, rather than assuming
+  src/lib/creators/demo-store.ts contains operational quotes.
+- The four quote/overlay tables in src/lib/db/schema.ts, generated drizzle
+  schema artifacts and directly required record types in src/lib/types.ts.
+- Quote public, viewer/API, integration and OBS callers found by the inventory;
+  src/components/obs-quote-overlay.tsx and quote-overlay-trigger.tsx.
+- Quote-related administrative handlers and shared overlay-control callers only
+  as needed to adapt the composite key and preserve default-creator behavior.
+- Creator-context plumbing using plans 017/018; focused unit, route and
+  disposable-database tests; docs/creator-scoping.md.
+- plans/README.md reporting unless the reviewer maintains it.
 
-## Git workflow
+**Out of scope**:
 
-- Depends on 008 being merged. Update local `master`, branch `codex/009-creator-scoping-quotes-pilot`.
-- Commit per logical unit (schema, migration, repository, callers, tests, docs). Do NOT push/PR or `db:push` unless instructed.
+- Migrating the entire economy, bets, suggestions, catalog, counters or bridge.
+- A general streamer management console, theme editor, publication workflow,
+  wildcard root routing (plan 016), cache (plan 011), or broad repository rewrite.
+- Trusting a caller-selected creator as admin authorization.
+- Making paid quote operations free or changing dependencies merely to pass tests.
 
-## Steps
+## Implementation steps
 
-### Step 1: Decide and document the threading signature (design gate)
+### 1. Inventory and write the dependency boundary
 
-Before code, write down (in the eventual `docs/creator-scoping.md`, or a scratch note you'll fold in at Step 6) the **one** signature convention every scoped repository function will use. Recommended: a required first parameter `creatorId: string` (not optional — optional invites callers to forget it and silently hit the default tenant). Callers obtain it via `const { creator } = await resolveCreatorFromRequest(...)` then pass `creator.id`.
+Document every quote read/write and its dependencies: identity, paid debit,
+refund, pricing, queue, live status, style, pause/control and admin permissions.
+Use one required creatorId parameter (or a small required context object) for
+scoped services; no optional default for migrated functions.
 
-**STOP** and report if you believe an ambient/async-context approach (e.g. `AsyncLocalStorage`) is required instead — that is a larger architectural decision the reviewer must approve before you build it.
+Separate request context by authority: public resolution uses plan 017; integration
+context uses verified credentials from plan 018; administrative mutations require
+session ownership/role verification. Raw headers are routing input only.
 
-**Verify**: n/a (design step; the decision is validated by the rest of the plan compiling).
+Known missing dependencies must be explicit:
+- Independent balances/ledger and quote pricing are required before another
+  creator can use paid display/refund paths.
+- A creator-specific live-state source is required before another creator can
+  use live-gated display.
+- A creator-owner management permission path is required before external owners
+  can operate the pilot themselves.
 
-### Step 2: Quotes schema — add `creator_id` and make constraints per-creator
+Technical create/read isolation may proceed, but non-default operations touching
+unscoped dependencies must fail closed before reads or side effects. List these
+as unavailable capabilities; do not claim complete external readiness. If the
+requested delivery requires paid display now, stop and scope the missing
+economy/live-state work before implementing that path.
 
-In `src/lib/db/schema.ts`, for `quotes`, `quote_overlay_state`, `quote_overlay_queue`, `obs_overlay_control`:
-- Add `creatorId` as in plan 008 (`.references(() => creators.id).notNull().default(DEFAULT_CREATOR_ID)`).
-- `quotes`: change `uniqueIndex("quotes_quote_number_idx").on(table.quoteNumber)` → `uniqueIndex("quotes_creator_quote_number_idx").on(table.creatorId, table.quoteNumber)`.
-- `quote_overlay_state`: make the key per-creator — composite primary key `(creatorId, slot)` (use drizzle's `primaryKey({ columns: [...] })` in the table callback; keep `slot` as-is otherwise).
-- `obs_overlay_control`: composite primary key `(creatorId, key)`.
-- `quote_overlay_queue`: add `creatorId` + `index("quote_overlay_queue_creator_id_idx")`.
+**Verify**: docs/creator-scoping.md contains the caller matrix, context signature,
+known release dependencies and explicit behavior for unavailable operations.
 
-**Verify**: `npx tsc --noEmit` → exit 0.
+### 2. Change quote constraints
 
-### Step 3: Generate and sanity-check the migration
+Add creator_id with the temporary default creator_ludylops and foreign key.
+Use unique (creator_id, quote_number), primary key (creator_id, slot) for
+quote_overlay_state, primary key (creator_id, key) for obs_overlay_control,
+and a creator index for quote_overlay_queue. Inspect shared control callers:
+preserve their default-creator behavior without enabling other unscoped modules.
 
-`npm run db:generate`. Inspect the new SQL: it should add columns (with the backfill default), **drop** the old single-column unique/PK and **create** the composite ones. Confirm the composite unique on `(creator_id, quote_number)` cannot fail on backfilled data (all existing rows share `creator_ludylops`, and `quote_number` was already globally unique, so `(creator, number)` stays unique — safe). If the generated SQL would violate a constraint on existing data, STOP.
+Generate schema artifacts only; no hand-inserted seed SQL. On a disposable
+database prepared by plan 014, verify backfill and composite keys.
 
-**Verify**: `git status --porcelain drizzle/` shows new files; the SQL contains the composite index/PK changes.
+**Verify**: existing rows retain values and reference the default creator;
+A and B may independently own quote number 1 and their own state/control keys.
 
-### Step 4: Scope every quote repository function
+### 3. Scope repository operations and demo behavior
 
-For each quote-related function in `repository.ts` (find them all: `grep -in "quote" src/lib/db/repository.ts | grep -i "function\|db.select\|db.insert\|db.update"`):
-- Add the `creatorId: string` parameter per Step 1's convention.
-- DB path: filter reads/updates by `eq(<table>.creatorId, creatorId)`; set `creatorId` on inserts; scope the next-`quote_number` `max()` to the creator; scope overlay-state/control lookups by creator + slot/key.
-- Demo path: filter the demo store by creator so the two paths behave identically under test.
-- Update the callers (streamerbot quotes route, `/quotes` page, `/obs/quotes` page, any admin quotes panel) to resolve the creator and pass `creator.id`.
+Require context on every quote helper. Filter reads, updates, deletes, queue
+claims and refunds by creator; stamp inserts with that creator. Check linked
+quote/queue ownership as well as individual ids. Scope number allocation and
+handle concurrent creation without producing duplicate numbers in one creator.
 
-Work in small commits; run `npx tsc --noEmit` frequently to catch every caller the type change surfaces (making the parameter required means the compiler lists every call site — use that).
+Prevent fallback to a global demo store on a real-database schema/query failure
+for non-default creators. Preserve demo mode as an explicitly separate mode,
+with separate A/B state that exercises the same context contract.
 
-**Verify**: `npx tsc --noEmit` → exit 0 (no un-updated caller remains); `npm run lint` → exit 0.
+**Verify**: typecheck catches missing arguments; tests prove A cannot read,
+claim, cancel, alter or refund B's data, including colliding local quote numbers.
 
-### Step 5: Tests — prove per-creator isolation
+### 4. Thread context through actual callers
 
-Create `src/lib/db/repository-quotes.test.ts` (model on `repository.test.ts`, demo mode). Assert:
-- A quote created under creator A is not returned by `listQuotes(creatorB)`.
-- `quote_number` sequences restart/track per creator (creator A's first quote and creator B's first quote can both be number 1).
-- The overlay state/queue for creator A is invisible to creator B.
+Update the inventoried public/viewer/OBS/integration/admin paths. Preserve the
+chosen creator through client fetches, refresh and navigation; a creator landing
+page alone does not establish context for later /api requests. A path-based
+pilot may work without plan 016, but it must carry explicit validated context
+to every request and use server-side authorization where required.
 
-**Verify**: `npm test` → all pass, including the new file; the isolation assertions fail if you remove the `creatorId` filter (sanity: temporarily break one filter, see a red test, restore).
+Use plan 018's rollout gate to permit only verified scoped quote actions.
+Keep non-default paid/display/live-state operations unavailable until their
+documented dependencies are isolated. Do not silently call global dashboard,
+pricing, balance, style or live-status loaders for those creators.
 
-### Step 6: Write the pattern document
+**Verify**: route tests use two creators, including invalid/inactive context,
+forged creator hints and a user who owns A attempting an admin action on B.
+Unimplemented owner management is recorded as a release dependency, never
+worked around by adding the streamer to the global admin allowlist.
 
-Create `docs/creator-scoping.md` capturing, concisely, what the next engineer needs to replicate this per entity:
-- the threading signature convention (Step 1) and how callers resolve the creator (`resolveCreatorFromRequest` → `creator.id`);
-- the schema recipe (add `creator_id` default-backfilled; when a table has a natural unique/PK, make it composite with `creator_id`; per-creator sequences via scoped `max()`);
-- the demo-path mirroring requirement and how to test isolation;
-- a checklist a later plan can run down for one entity;
-- an explicit list of the remaining verticals still single-tenant (bets, suggestions, redemptions, catalog, counters, balances/ledger) so the roadmap is visible from the code side.
+### 5. Verify database isolation as well as demo isolation
 
-**Verify**: the file exists and a teammate could scope `bets` from it without re-reading this plan.
+Use existing Vitest conventions in src/lib/db/repository.test.ts and the route
+tests under src/app/api. Add focused quote isolation tests and exercise the
+actual database path against a disposable database. No production fixtures.
 
-### Step 7: Full gate + document non-application
+Cover A/B quote-number collisions, wrong-creator ids, separate queue/control
+state, concurrent queue claims and existing Ludylops regressions. Demonstrate
+non-default paid/refund paths cannot invoke the global economy. Once the
+economy follow-up exists, require equivalent successful debit/refund isolation
+tests before releasing those paths.
 
-Run `npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build`. As in plan 008, the migration is generated but **not** applied; state this in your report.
+**Verify**: focused/full tests, typecheck, lint and test-environment build pass;
+record database setup and results. Demo-only green tests are insufficient to
+declare database isolation complete.
 
-**Verify**: all exit 0.
+### 6. Publish the pattern and remaining work
 
-## Test plan
+docs/creator-scoping.md must contain the signature, request-authority rules,
+schema/constraint recipe, demo/database parity, authorization checklist,
+per-creator cache-key requirement and remaining unscoped capabilities.
 
-- New `src/lib/db/repository-quotes.test.ts` proving isolation (Step 5), modeled on `repository.test.ts`.
-- Existing tests must still pass; any that call quote functions will now need a `creatorId` argument — update them to pass the default creator id, and note in your report how many test call sites changed.
-- Verification: `npm test` → all pass.
+Remaining work is unnumbered: economy/pricing, bets, suggestions/products,
+catalog/resgates/bridge credentials and queues, counters/live-state/settings,
+owner management and complete creator navigation/configuration. Existing
+plans 010–013 are performance work, not this missing migration program.
+
+**Verify**: another executor can identify each missing release dependency without
+reading this conversation. Report technical completion separately from product
+readiness; no shared/production database changes.
 
 ## Done criteria
 
-- [ ] `npx tsc --noEmit` exits 0 (proves no caller of a scoped quote function was missed)
-- [ ] `npm test` exits 0; `repository-quotes.test.ts` exists and its isolation assertions pass
-- [ ] `npm run lint` and `npm run build` exit 0
-- [ ] New migration present with quotes `creator_id` + composite `(creator_id, quote_number)` unique + per-creator overlay key; no destructive change to row data
-- [ ] `grep -c "creatorId" src/lib/db/repository.ts` increased (quotes functions now scoped)
-- [ ] `docs/creator-scoping.md` exists and includes the per-entity checklist and the remaining-verticals list
-- [ ] `git status` shows only in-scope files changed
-- [ ] Report states `db:push` was NOT run and lists how many test call sites were updated
-- [ ] `plans/README.md` status row updated
+- [ ] Required context reaches all migrated quote repository and route callers.
+- [ ] Schema backfill/composite constraints pass disposable-database checks.
+- [ ] A/B isolation is proven on actual database reads/writes and queue/control.
+- [ ] Non-default unscoped economy/configuration/live-state paths fail closed.
+- [ ] Authenticated integration context comes from plan 018, not unsigned hints.
+- [ ] No user gains global admin permission to operate another community.
+- [ ] docs/creator-scoping.md names all remaining release dependencies.
+- [ ] Typecheck, lint, focused/full tests and build pass.
+- [ ] Report separates implemented capabilities from unavailable paid/display
+      paths, and confirms no production/shared DB mutation.
 
 ## STOP conditions
 
-Stop and report back (do not improvise) if:
-- Plan 008 is not DONE in `plans/README.md` (operational tables lack `creator_id`).
-- Plan 018 is not DONE in `plans/README.md` (the Streamer.bot quote route still lacks authenticated creator identity).
-- Accessing request headers in a server component in this Next.js version isn't clear from the installed docs — report rather than guessing an API.
-- The generated migration would violate the new composite unique/PK on existing data.
-- Scoping quotes appears to require touching a non-quote repository function or `viewer_balances` — that's a later plan; report the coupling.
-- You conclude the required threading mechanism is an ambient async-context store (Step 1 STOP) — get reviewer approval first.
+- Plans 008, 017 or 018 have not delivered their required contracts.
+- A scoped request could fall back to Ludylops after invalid or missing context.
+- A path needs the global economy, shared live state or global admin rights to
+  appear functional for another creator.
+- Quote key changes require migrating an unrelated module beyond its narrow
+  default-creator compatibility adapter.
+- Generated DDL has unexplained changes or disposable-database isolation fails.
 
-## Maintenance notes
+## Git workflow and maintenance
 
-- This pilot sets the precedent for **every** remaining vertical. A reviewer should scrutinize the threading convention and the demo-path mirroring hardest — if they're wrong here, they're wrong six more times in plans 010+.
-- The `creator_id` column default (from plan 008's approach) is still a backfill crutch; the eventual "drop the defaults + fail loud on missing creator_id" cleanup applies to quotes too.
-- Remaining single-tenant verticals after this plan: `bets`/`bet_options`/`bet_entries`, `game_suggestions`/`video_suggestions`/`creator_suggestions` (+ boosts), `product_recommendations`, `redemptions`, `point_ledger`, `viewer_balances` (composite PK), `catalog_items` (composite slug unique), `streamerbot_counters` (key-based + dual-use with creator-area-access). Each is its own plan following `docs/creator-scoping.md`.
+Update the remote base before creating codex/009-creator-scoping-quotes-pilot in
+an isolated worktree. Commit schema, scoped services, callers and tests in
+reviewable units. Do not copy the whole repository per creator. Any issue PR
+must include Closes #173 in its body. Production application is a separate
+deployment step following plan 014; plan 019 is required before external module
+availability can be advertised.
