@@ -1,28 +1,14 @@
-import { env } from "@/lib/env";
 import { fail, ok } from "@/lib/api";
 import { ingestStreamerbotEvent } from "@/lib/db/repository";
 import { streamerbotEventSchema } from "@/lib/streamerbot/schemas";
-import { verifySignedRequest } from "@/lib/streamerbot/security";
+import { authenticateStreamerbotRequest, authorizeStreamerbotOperation } from "@/lib/streamerbot/authenticate";
 
 export async function POST(request: Request) {
-  const raw = await request.text();
-  const timestamp = request.headers.get("x-timestamp");
-  const signature = request.headers.get("x-signature");
-
-  const valid = verifySignedRequest({
-    body: raw,
-    timestamp,
-    signature,
-    secret: env.STREAMERBOT_SHARED_SECRET,
-  });
-  if (!valid) {
-    console.warn("[streamerbot/events] Invalid signature.", {
-      hasSecret: Boolean(env.STREAMERBOT_SHARED_SECRET),
-      hasTimestamp: Boolean(timestamp),
-      hasSignature: Boolean(signature),
-    });
-    return fail("Invalid signature.", 401);
-  }
+  const authentication = await authenticateStreamerbotRequest(request);
+  if (!authentication.ok) return authentication.response;
+  const denied = authorizeStreamerbotOperation(authentication, "events");
+  if (denied) return denied;
+  const raw = authentication.raw;
 
   try {
     const payload = streamerbotEventSchema.parse(JSON.parse(raw));
