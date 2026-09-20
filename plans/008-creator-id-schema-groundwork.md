@@ -8,19 +8,21 @@
 > maintain the index.
 >
 > **Drift check (run first)**:
-> `git diff --stat 0b73c37..HEAD -- src/lib/db/schema.ts src/lib/creators/defaults.ts drizzle`
+> `git diff --stat ec19f8f..HEAD -- src/lib/db/schema.ts src/lib/creators/defaults.ts drizzle`
 > If `src/lib/db/schema.ts` changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
 
 ## Status
 
+- **Reconciliation**: planning update only; implementation remains pending. Issue #172 is synchronized from this file.
+
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED (schema migration on a production Neon database; non-breaking by design, but touches many tables)
 - **Depends on**: plan 014 (migration/data-seed baseline must guarantee `creator_ludylops` before the foreign-keyed backfill)
 - **Category**: migration
-- **Planned at**: commit `0b73c37`, 2026-07-07
+- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15 (same file tree as remote master `f353ce2`).
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/172
 
 ## Why this matters
@@ -35,9 +37,9 @@ Tables with natural/global keys that need constraint surgery (`viewer_balances`,
   ```ts
   export const DEFAULT_CREATOR_ID = "creator_ludylops";
   ```
-  The actual `creators` **row** for this id may or may not exist in a real database — the app falls back to an in-memory `defaultCreatorTenant` when the row is absent (`src/lib/creators/tenant.ts:35-40,283`). Because this plan adds a foreign key to `creators`, **the row must exist before backfilling** (Step 1 handles this).
+  The actual `creators` **row** for this id may or may not exist in a real database — the app falls back to an in-memory `defaultCreatorTenant` when the row is absent (`src/lib/creators/tenant.ts, resolveCreatorFromRequest`). Because this plan adds a foreign key to `creators`, **the row must exist before backfilling** (Step 1 handles this).
 
-- `src/lib/db/schema.ts` — Drizzle table definitions. The foundation tables already carry `creator_id`; pattern to copy (`schema.ts:83-102`, `creator_modules`):
+- `src/lib/db/schema.ts` — Drizzle table definitions. The foundation tables already carry `creator_id`; pattern to copy (`schema.ts`, `creator_modules`):
   ```ts
   creatorId: varchar("creator_id", { length: 64 })
     .references(() => creators.id)
@@ -46,9 +48,9 @@ Tables with natural/global keys that need constraint surgery (`viewer_balances`,
   creatorIdIdx: index("creator_modules_creator_id_idx").on(table.creatorId),
   ```
 
-- Migration mechanism: editing `schema.ts` then running `npm run db:generate` (drizzle-kit) emits a new `drizzle/NNNN_*.sql` file plus a snapshot under `drizzle/meta/`. Applying to a database is `npm run db:push` — an **operator decision, not part of this plan** (see Step 5). Example of a generated migration: `drizzle/0022_naive_silk_fever.sql` is a single `ALTER TABLE ... ADD COLUMN`.
+- Migration mechanism: editing `schema.ts` then running `npm run db:generate` (drizzle-kit) emits a new `drizzle/NNNN_*.sql` file plus a snapshot under `drizzle/meta/`. The deployment path remains schema-first `npm run db:push`, preceded by plan 014's explicit data preparation and readiness check. Production application is outside this delivery; disposable-database verification is required. Example of a generated migration: `drizzle/0022_naive_silk_fever.sql` is a single `ALTER TABLE ... ADD COLUMN`.
 
-- The in-scope tables today have **surrogate primary keys** (a `varchar id`) and no `creator_id`. Representative excerpt (`schema.ts:223-245`):
+- The in-scope tables today have **surrogate primary keys** (a `varchar id`) and no `creator_id`. Representative excerpt (`schema.ts`, bets and betOptions):
   ```ts
   export const bets = pgTable("bets", {
     id: varchar("id", { length: 64 }).primaryKey(),
@@ -73,11 +75,11 @@ Tables with natural/global keys that need constraint surgery (`viewer_balances`,
 | Install            | `npm install`          | exit 0                           |
 | Generate migration | `npm run db:generate`  | new `drizzle/NNNN_*.sql` created |
 | Lint               | `npm run lint`         | exit 0                           |
-| Typecheck          | `npx tsc --noEmit`     | exit 0, no errors                |
-| Tests              | `npm test`             | all pass (300 baseline)          |
+| Typecheck          | `npm run typecheck`     | exit 0, no errors                |
+| Tests              | `npm test`             | all pass (current suite plus relevant new tests)          |
 | Build              | `npm run build`        | exit 0 (needs `NEXTAUTH_SECRET` env set for the prod build; use any non-empty dummy value locally) |
 
-Note: this is Next.js 16 / Drizzle. Do NOT run `npm run db:push` (it mutates the live database). On Windows do not round-trip source files through PowerShell `Get-Content`/`Set-Content`.
+Note: this is Next.js 16 / Drizzle. Do not run `npm run db:push` against a shared/production database; use only the disposable verification database under plan 014's runbook. On Windows do not round-trip source files through PowerShell `Get-Content`/`Set-Content`.
 
 ## Scope
 
@@ -103,12 +105,12 @@ Note: this is Next.js 16 / Drizzle. Do NOT run `npm run db:push` (it mutates the
 Plus:
 - `src/lib/db/schema.ts` (the edits above)
 - the generated `drizzle/NNNN_*.sql` and `drizzle/meta/*` snapshot files (created by `db:generate`, committed as-is)
-- a seed/ensure step for the default `creators` row (Step 1) — location decided in Step 1
+- the existing plan 014 readiness/ensure tools as prerequisites, without changing their implementation
 
 **Out of scope** (do NOT touch — these are handled by plan 009 and later because they need primary-key / unique-constraint changes or are the pilot vertical):
 
 - `quotes`, `quote_overlay_state`, `quote_overlay_queue`, `obs_overlay_control` — quotes vertical + composite-key surgery, plan 009.
-- `viewer_balances` — needs composite PK `(viewer_id, creator_id)`; plan 009/010.
+- `viewer_balances` — needs composite PK `(viewer_id, creator_id)`; a later economy-isolation plan (not yet numbered).
 - `catalog_items` — `slug` unique must become composite; later plan.
 - `streamerbot_counters` — keyed by `key`, and dual-used to store creator-area-access settings (`src/lib/creators/access.ts:9`); needs careful handling; later plan.
 - **Identity tables stay global** (a viewer is one Google identity across creators): `users`, `google_accounts`, `google_account_viewers`, `viewer_links`.
@@ -119,21 +121,32 @@ Plus:
 
 - Update local `master` from origin first, then branch: `codex/008-creator-id-schema-groundwork`.
 - Short imperative commit messages matching `git log` (e.g. `add creator_id to operational tables`).
-- Do NOT push or open a PR unless the operator instructed it. Do NOT run `db:push`.
+- Do not push or open a PR unless instructed. Never run db:push against a shared/production database; the disposable-database verification in Step 3 uses plan 014's runbook.
 
 ## Steps
 
-### Step 1: Ensure the default `creators` row exists before adding foreign keys
+### Step 1: Use plan 014's readiness gate
 
-The new columns default to `'creator_ludylops'` and reference `creators.id`. If no `creators` row with that id exists, applying the migration to a real database fails the FK check. Investigate how the default creator is (or isn't) persisted:
+Plan 014 / #180 must have delivered its schema-first push runbook, read-only
+readiness command and separately invoked idempotent ensure command. Read
+docs/database-migrations.md, then run `npm run db:baseline:check`. If records are
+missing in the disposable database, run `npm run db:baseline:ensure -- --apply`,
+then `npm run db:baseline:check` again. Require exit 0; creatorExists alone is not
+the complete gate. Do not treat db:generate as a seed runner.
 
-- Read `src/lib/creators/defaults.ts` and search for any existing seed of the default creator: `grep -rn "DEFAULT_CREATOR_ID\|creator_ludylops" src/ drizzle/`.
-- If a seed already inserts the `creator_ludylops` row (e.g. in a migration or a startup path), record where and proceed.
-- If **no** seed exists, add an idempotent seed of the default creator row (`id: DEFAULT_CREATOR_ID`, `slug: DEFAULT_CREATOR_SLUG`, `displayName: DEFAULT_CREATOR_DISPLAY_NAME`, `ownerUserId: null` or the existing convention, `status` matching `DEFAULT_CREATOR.status`) as an `INSERT ... ON CONFLICT DO NOTHING` at the **top of the migration SQL** generated in Step 3, so the row is guaranteed present before the FK columns are added in the same migration. Use the values from `DEFAULT_CREATOR` in `defaults.ts` — do not invent them.
+Run the readiness command against a disposable test database with the current
+foundation schema. If required rows are missing, use the ensure command only
+on that disposable database, then rerun readiness. Preserve customized creator,
+branding, domain and module values. Never replay drizzle/0021_hard_riptide.sql
+or add INSERT/UPDATE statements to generated SQL expecting db:push to run them.
 
-**STOP** and report if you cannot determine the shape of the `creators` row from `defaults.ts` (do not guess column values for a table with NOT NULL fields).
+For deployment, record the separate sequence: inventory/backup/review, approved
+ensure if needed, successful readiness check, approved schema push, verification.
+Unknown production state is a deployment prerequisite, not a reason to skip
+offline implementation or disposable-database tests.
 
-**Verify**: `grep -n "creator_ludylops" drizzle/*.sql` (after Step 3) shows the seed insert precedes the `ADD COLUMN ... creator_id` statements.
+**Verify**: the readiness command exits 0 and confirms creator_ludylops exists.
+Missing/conflicting foundation state exits non-zero before dependent DDL.
 
 ### Step 2: Add `creator_id` + index to each in-scope table in `schema.ts`
 
@@ -154,44 +167,59 @@ creatorIdIdx: index("<table_name>_creator_id_idx").on(table.creatorId),
 
 Import `DEFAULT_CREATOR_ID` from `@/lib/creators/defaults` at the top of `schema.ts` (verify the import path resolves — check existing imports in that file first; if `schema.ts` must not import from `creators/defaults` due to a dependency cycle, inline the literal string `"creator_ludylops"` with a comment referencing `DEFAULT_CREATOR_ID`, and note this in your report).
 
-**Verify**: `npx tsc --noEmit` → exit 0. `grep -c "creator_id_idx" src/lib/db/schema.ts` → increased by exactly 16.
+**Verify**: `npm run typecheck` → exit 0. `rg -c "creator_id_idx" src/lib/db/schema.ts` → increased by exactly 16.
 
-### Step 3: Generate the migration
+### Step 3: Generate and verify the additive schema artifact
 
-Run `npm run db:generate`. Confirm a new `drizzle/NNNN_*.sql` appears containing 16 `ALTER TABLE ... ADD COLUMN "creator_id" varchar(64) DEFAULT 'creator_ludylops' NOT NULL` statements and the `CREATE INDEX` statements, plus a new snapshot in `drizzle/meta/`. Add the default-creator seed insert from Step 1 at the top of this SQL file.
+Run npm run db:generate. Inspect the new SQL and snapshot: exactly the 16
+in-scope operational tables gain creator_id and an index. Columns reference
+creators.id and use the temporary default creator_ludylops. Generated SQL
+contains schema changes only; do not insert a data seed or edit historical SQL.
 
-**Verify**: `git status --porcelain drizzle/` shows the new `.sql` and updated `meta/` files. `grep -c "ADD COLUMN \"creator_id\"" drizzle/*.sql` (the newest file) → 16.
+On the disposable database prepared in Step 1, review and apply the schema diff
+using the path established by plan 014. Verify existing records receive the
+default creator and preserve their original values. Inspect foreign keys and
+indexes. No shared or production database is changed by this delivery.
+
+**Verify**: schema generation contains 16 new creator_id columns and matching
+indexes, no unexpected drops; disposable database checks confirm backfill and
+referential integrity. Record exact commands and results in the report.
 
 ### Step 4: Confirm no behavior change
 
 Run the full suite — nothing in application code changed, so all existing tests must still pass unchanged. Demo mode does not read the new column, so demo tests are unaffected.
 
-**Verify**: `npm test` → all pass (≥300); `npm run lint` → exit 0; `npm run build` → exit 0.
+**Verify**: `npm test` → all pass; `npm run lint` → exit 0; `npm run build` → exit 0.
 
-### Step 5: Document that the migration is generated but NOT applied
+### Step 5: Document deployment readiness separately
 
-Applying to the Neon database (`npm run db:push`) is an operator decision (matches how plan 006 handled its index migration). In your report, state clearly: the migration file is committed but has NOT been pushed; the operator must run `npm run db:push` against the target database, and the default-creator seed must succeed first.
+Report the generated schema artifact, disposable-database results and the
+required production readiness command from plan 014. State explicitly that the
+production/shared database has not been changed. A generated artifact or passing
+test does not prove that production has the required creator row.
 
-**Verify**: n/a (reporting step).
+**Verify**: report includes the exact ensure/check/push order and any unknown
+production prerequisite; it never claims db:push executes SQL seed files.
 
 ## Test plan
 
-- No new unit tests: this is a schema-only, behavior-preserving change and the repository query paths are untouched. The regression guarantee is "the existing 300 tests still pass unchanged."
-- If you want an optional guard, add a trivial assertion in a schema-level test that `bets` (and one child, `bet_options`) expose a `creatorId` column via `getTableColumns` from `drizzle-orm` — only if a similar schema test already exists to model on; otherwise skip rather than invent a new test harness.
+- Required disposable-database verification: additive schema, existing-row backfill, retained customization, and expected foreign keys/indexes. No production fixture or credential may be used.
+
+- No implementation-mirroring unit tests: this is schema-only and repository query paths are untouched. The regression guarantee is "the existing tests still pass unchanged."
 - Verification: `npm test` → all pass.
 
 ## Done criteria
 
 Machine-checkable. ALL must hold:
 
-- [ ] `npx tsc --noEmit` exits 0
-- [ ] `grep -c "creator_id_idx" src/lib/db/schema.ts` increased by exactly 16 vs. base
-- [ ] A new `drizzle/NNNN_*.sql` exists with 16 `ADD COLUMN "creator_id"` statements and a leading default-creator seed insert
-- [ ] `npm test` exits 0 with the baseline test count still passing (no test changes required)
+- [ ] `npm run typecheck` exits 0
+- [ ] `rg -c "creator_id_idx" src/lib/db/schema.ts` increased by exactly 16 vs. base
+- [ ] Generated schema SQL adds exactly 16 creator_id columns and their indexes; contains no hand-added data seed
+- [ ] `npm test` exits 0 and the existing behavior remains unchanged; disposable backfill checks pass
 - [ ] `npm run lint` exits 0 and `npm run build` exits 0
-- [ ] `git status` shows only `schema.ts`, `drizzle/**`, and (if added) the seed change modified — no other `.ts` files
+- [ ] `git status` shows only `schema.ts`, `drizzle/**`, and the plan/index reporting changes modified — no other `.ts` files
 - [ ] `plans/README.md` status row updated
-- [ ] Report explicitly states `db:push` was NOT run
+- [ ] Report identifies disposable-database checks and explicitly states no shared/production database was mutated
 
 ## STOP conditions
 
@@ -207,5 +235,5 @@ Stop and report back (do not improvise) if:
 
 - The `DEFAULT 'creator_ludylops'` on each column is a **temporary backfill aid**. A later plan (after all inserts pass `creator_id` explicitly) should drop the column default so a missing `creator_id` fails loudly instead of silently landing in the default tenant.
 - This plan does not scope any query — after it lands, the app is still effectively single-tenant at runtime. Do not mistake "column exists" for "isolation works." Plan 009 begins the actual scoping.
-- Reviewer focus: confirm the migration is additive-only (no drops), the seed precedes the FK columns, and no application code changed.
+- Reviewer focus: confirm the migration is additive-only (no drops), the readiness check precedes the FK columns, and no application code changed.
 - When plan 009+ scope reads/writes, they rely on every operational row having a non-null `creator_id` — which this plan guarantees via the default. Keep the default until that guarantee moves into application code.
