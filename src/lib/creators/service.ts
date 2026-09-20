@@ -17,7 +17,7 @@ import {
 } from "@/lib/creators/demo-store";
 import { creatorSlugFromInput, isReservedCreatorSlug, normalizeCreatorSlug } from "@/lib/creators/identity";
 import { creatorModuleCatalog } from "@/lib/creators/modules";
-import { resolveCreatorFromRequest } from "@/lib/creators/tenant";
+import { resolveCreatorFromRequest, resolvePublicCreatorFromRequest, type ResolveCreatorOptions } from "@/lib/creators/tenant";
 import { getDb } from "@/lib/db/client";
 import { creatorBranding, creatorDomains, creatorModules, creators } from "@/lib/db/schema";
 import type { CreatorRecord, CreatorTenantRecord } from "@/lib/types";
@@ -255,7 +255,9 @@ export async function listCreatorAreasForOwner(ownerUserId: string | null | unde
 
   const db = getDb();
   if (!db) {
-    return findDemoCreatorTenantsByOwner(ownerUserId).map((tenant) => toAreaSummary(tenant.creator));
+    return findDemoCreatorTenantsByOwner(ownerUserId)
+      .filter((tenant) => tenant.creator.status !== "archived")
+      .map((tenant) => toAreaSummary(tenant.creator));
   }
 
   let rows: Array<typeof creators.$inferSelect>;
@@ -272,15 +274,17 @@ export async function listCreatorAreasForOwner(ownerUserId: string | null | unde
     throw error;
   }
 
-  return rows.map((row) => toAreaSummary(serializeCreator(row)));
+  return rows.filter((row) => row.status !== "archived").map((row) => toAreaSummary(serializeCreator(row)));
 }
 
-export async function getCreatorAreaBySlug(slugInput: string | null | undefined) {
+export async function getCreatorAreaBySlug(
+  slugInput: string | null | undefined,
+  context: Omit<ResolveCreatorOptions, "slug"> = {},
+) {
   const slug = normalizeCreatorSlug(slugInput);
   if (!slug) {
     return null;
   }
 
-  const tenant = await resolveCreatorFromRequest({ slug });
-  return tenant.creator.slug === slug ? tenant : null;
+  return resolvePublicCreatorFromRequest({ ...context, slug });
 }

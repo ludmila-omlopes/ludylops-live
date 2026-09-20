@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { ArrowRight, CheckCircle2, CirclePlay } from "lucide-react";
 
 import { getEnabledCreatorModules, getCreatorModuleManifest } from "@/lib/creators/modules";
@@ -12,7 +13,10 @@ type CreatorPageProps = {
 
 export default async function CreatorAreaPage({ params }: CreatorPageProps) {
   const { creatorSlug } = await params;
-  const tenant = await getCreatorAreaBySlug(creatorSlug);
+  const requestHeaders = await headers();
+  const tenant = await getCreatorAreaBySlug(creatorSlug, {
+    hostname: requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"),
+  });
 
   if (!tenant) {
     notFound();
