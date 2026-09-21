@@ -55,10 +55,11 @@ public class CPHInline
     public bool Execute()
     {
         string appBaseUrl = ReadRequiredGlobal("lojaneon.appBaseUrl");
-        string sharedSecret = ReadRequiredGlobal("lojaneon.streamerbotSharedSecret");
+        string credentialId = ReadRequiredGlobal("lojaneon.streamerbotCredentialId");
+        string sharedSecret = ReadRequiredGlobal("lojaneon.streamerbotCredentialSecret");
         bool useBotAccount = ReadOptionalBoolGlobal("lojaneon.useBotAccount", true);
 
-        if (string.IsNullOrWhiteSpace(appBaseUrl) || string.IsNullOrWhiteSpace(sharedSecret))
+        if (string.IsNullOrWhiteSpace(appBaseUrl) || (string.IsNullOrWhiteSpace(sharedSecret) || string.IsNullOrWhiteSpace(credentialId)))
         {
             return false;
         }
@@ -92,7 +93,7 @@ public class CPHInline
             "streamerbot_chat"
         );
         string timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-        string signature = BuildSignature(body, timestamp, sharedSecret);
+        string signature = BuildSignature(body, timestamp, sharedSecret, credentialId);
 
         try
         {
@@ -101,6 +102,7 @@ public class CPHInline
                 string.Format("{0}/api/internal/streamerbot/link", appBaseUrl.TrimEnd('/'))
             ))
             {
+                request.Headers.Add("x-streamerbot-credential-id", credentialId);
                 request.Headers.TryAddWithoutValidation("x-timestamp", timestamp);
                 request.Headers.TryAddWithoutValidation("x-signature", signature);
                 request.Content = new StringContent(body, Encoding.UTF8, "application/json");
@@ -323,11 +325,11 @@ public class CPHInline
         return builder.ToString();
     }
 
-    private string BuildSignature(string body, string timestamp, string secret)
+    private string BuildSignature(string body, string timestamp, string secret, string credentialId)
     {
         using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret)))
         {
-            byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(timestamp + "." + body));
+            byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(string.Format("v2\n{0}\n{1}\nPOST\n/api/internal/streamerbot/link\n{2}", timestamp, credentialId, body)));
             return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
     }

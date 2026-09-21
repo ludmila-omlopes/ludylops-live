@@ -48,6 +48,23 @@ export const creators = pgTable(
   }),
 );
 
+export const streamerbotCredentials = pgTable(
+  "streamerbot_credentials",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+    encryptedSecret: text("encrypted_secret").notNull(),
+    status: varchar("status", { length: 16 }).default("active").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    retiringUntil: timestamp("retiring_until", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (table) => ({
+    creatorIdIdx: index("streamerbot_credentials_creator_id_idx").on(table.creatorId),
+  }),
+);
+
 export const creatorDomains = pgTable(
   "creator_domains",
   {

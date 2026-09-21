@@ -5,6 +5,8 @@ import {
   streamerbotScriptCategories,
 } from "@/lib/streamerbot/scripts-catalog";
 import { listStreamerbotScripts } from "@/lib/streamerbot/scripts.server";
+import { buildCredentialSignature } from "@/lib/streamerbot/credential-crypto";
+import { createHmac } from "node:crypto";
 
 describe("streamerbot scripts catalog", () => {
   it("loads every cataloged C# file from streamerbot/", () => {
@@ -25,5 +27,26 @@ describe("streamerbot scripts catalog", () => {
     );
     expect(grouped.every((entry) => entry.scripts.length > 0)).toBe(true);
     expect(Object.keys(streamerbotScriptCategories)).toHaveLength(6);
+  });
+
+  it("every HTTP script sends the credential ID and signs the same UTF-8 envelope as the server", () => {
+    const timestamp = "1789900000000";
+    const credentialId = `sbc_${"a".repeat(32)}`;
+    const body = '{"body":"Você chegou! 🌟"}';
+    const secret = "test-vector-secret";
+    const scripts = listStreamerbotScripts().filter((script) => script.source.includes("BuildSignature("));
+    expect(scripts).toHaveLength(11);
+    for (const script of scripts) {
+      expect(script.source).toContain('"x-streamerbot-credential-id", credentialId');
+      expect(script.source).toContain('"lojaneon.streamerbotCredentialId"');
+      expect(script.source).toContain('"lojaneon.streamerbotCredentialSecret"');
+      expect(script.source).not.toContain("lojaneon.streamerbotSharedSecret");
+      const format = script.source.match(/string\.Format\("(v2\\n[^"\r\n]+)", timestamp, credentialId, body\)/u)?.[1];
+      expect(format, script.filename).toBeDefined();
+      const canonical = format!.replaceAll("\\n", "\n").replace("{0}", timestamp).replace("{1}", credentialId).replace("{2}", body);
+      const pathname = canonical.split("\n")[4];
+      expect(script.source).toContain(pathname);
+      expect(createHmac("sha256", secret).update(canonical, "utf8").digest("hex")).toBe(buildCredentialSignature({ credentialId, timestamp, body, secret, method: "POST", pathname }));
+    }
   });
 });

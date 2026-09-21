@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { getPipetzPricing, runQuoteCommandFromChat } from "@/lib/db/repository";
-import { env } from "@/lib/env";
 import { streamerbotQuoteCommandSchema } from "@/lib/streamerbot/schemas";
-import { verifySignedRequest } from "@/lib/streamerbot/security";
+import { authenticateStreamerbotRequest, authorizeStreamerbotOperation } from "@/lib/streamerbot/authenticate";
 
 function formatQuoteReply(input: { quoteNumber: number; body: string }) {
   return `Quote #${input.quoteNumber}: "${input.body}"`;
@@ -68,31 +67,11 @@ function readPayloadContext(raw: string) {
 }
 
 export async function POST(request: Request) {
-  const raw = await request.text();
-  const timestamp = request.headers.get("x-timestamp");
-  const signature = request.headers.get("x-signature");
-
-  const valid = verifySignedRequest({
-    body: raw,
-    timestamp,
-    signature,
-    secret: env.STREAMERBOT_SHARED_SECRET,
-  });
-  if (!valid) {
-    console.warn("[streamerbot/quotes] Invalid signature.", {
-      hasSecret: Boolean(env.STREAMERBOT_SHARED_SECRET),
-      hasTimestamp: Boolean(timestamp),
-      hasSignature: Boolean(signature),
-    });
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Invalid signature.",
-        replyMessage: "Assinatura inválida no comando de quotes.",
-      },
-      { status: 401 },
-    );
-  }
+  const authentication = await authenticateStreamerbotRequest(request);
+  if (!authentication.ok) return authentication.response;
+  const denied = authorizeStreamerbotOperation(authentication, "quotes.legacy");
+  if (denied) return denied;
+  const raw = authentication.raw;
 
   try {
     const payload = streamerbotQuoteCommandSchema.parse(JSON.parse(raw));

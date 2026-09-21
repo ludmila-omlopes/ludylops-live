@@ -14,10 +14,11 @@ public class CPHInline
     public bool Execute()
     {
         string appBaseUrl = ReadRequiredGlobal("lojaneon.appBaseUrl");
-        string sharedSecret = ReadRequiredGlobal("lojaneon.streamerbotSharedSecret");
+        string credentialId = ReadRequiredGlobal("lojaneon.streamerbotCredentialId");
+        string sharedSecret = ReadRequiredGlobal("lojaneon.streamerbotCredentialSecret");
         int pointsPerCycle = 5;
 
-        if (string.IsNullOrWhiteSpace(appBaseUrl) || string.IsNullOrWhiteSpace(sharedSecret))
+        if (string.IsNullOrWhiteSpace(appBaseUrl) || (string.IsNullOrWhiteSpace(sharedSecret) || string.IsNullOrWhiteSpace(credentialId)))
         {
             return false;
         }
@@ -79,8 +80,9 @@ public class CPHInline
             ))
             {
                 request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                request.Headers.Add("x-streamerbot-credential-id", credentialId);
                 request.Headers.Add("x-timestamp", timestamp);
-                request.Headers.Add("x-signature", BuildSignature(sharedSecret, timestamp, body));
+                request.Headers.Add("x-signature", BuildSignature(sharedSecret, timestamp, body, credentialId));
 
                 try
                 {
@@ -206,11 +208,11 @@ public class CPHInline
         return user.ContainsKey(key) && user[key] != null ? user[key].ToString() : null;
     }
 
-    private static string BuildSignature(string secret, string timestamp, string body)
+    private static string BuildSignature(string secret, string timestamp, string body, string credentialId)
     {
         using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret)))
         {
-            byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(string.Format("{0}.{1}", timestamp, body)));
+            byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(string.Format("v2\n{0}\n{1}\nPOST\n/api/internal/streamerbot/events\n{2}", timestamp, credentialId, body)));
             return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
     }

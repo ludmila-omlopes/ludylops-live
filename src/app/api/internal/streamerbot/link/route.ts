@@ -1,8 +1,7 @@
-import { env } from "@/lib/env";
 import { fail, ok } from "@/lib/api";
 import { claimViewerLinkCodeFromStreamerbot } from "@/lib/db/repository";
 import { streamerbotViewerLinkSchema } from "@/lib/streamerbot/schemas";
-import { verifySignedRequest } from "@/lib/streamerbot/security";
+import { authenticateStreamerbotRequest, authorizeStreamerbotOperation } from "@/lib/streamerbot/authenticate";
 
 function buildReplyMessage(input: { displayName?: string; mergedSyntheticViewer: boolean }) {
   const prefix = input.displayName ? `${input.displayName}, ` : "";
@@ -15,24 +14,11 @@ function buildReplyMessage(input: { displayName?: string; mergedSyntheticViewer:
 }
 
 export async function POST(request: Request) {
-  const raw = await request.text();
-  const timestamp = request.headers.get("x-timestamp");
-  const signature = request.headers.get("x-signature");
-
-  const valid = verifySignedRequest({
-    body: raw,
-    timestamp,
-    signature,
-    secret: env.STREAMERBOT_SHARED_SECRET,
-  });
-
-  if (!valid) {
-    console.warn("[streamerbot/link] Invalid signature.", {
-      hasTimestamp: Boolean(timestamp),
-      hasSignature: Boolean(signature),
-    });
-    return fail("Invalid signature.", 401);
-  }
+  const authentication = await authenticateStreamerbotRequest(request);
+  if (!authentication.ok) return authentication.response;
+  const denied = authorizeStreamerbotOperation(authentication, "link");
+  if (denied) return denied;
+  const raw = authentication.raw;
 
   try {
     const payload = streamerbotViewerLinkSchema.parse(JSON.parse(raw));

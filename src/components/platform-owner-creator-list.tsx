@@ -10,6 +10,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { StreamerbotCredentials } from "@/components/streamerbot-credentials";
 import {
   Select,
   SelectContent,
@@ -401,6 +402,7 @@ export function PlatformOwnerCreatorList({
                     })}
                   </div>
                 </div>
+                <StreamerbotCredentials creatorId={instance.creator.id} enabled={instance.creator.status === "active" && instance.modules.some((module) => module.moduleKey === "streamerbot" && module.status === "installed")} />
               </article>
             );
           })}

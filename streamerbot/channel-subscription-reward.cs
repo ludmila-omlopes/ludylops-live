@@ -10,13 +10,14 @@ public class CPHInline
     public bool Execute()
     {
         string appBaseUrl = ReadRequiredGlobal("lojaneon.appBaseUrl");
-        string sharedSecret = ReadRequiredGlobal("lojaneon.streamerbotSharedSecret");
+        string credentialId = ReadRequiredGlobal("lojaneon.streamerbotCredentialId");
+        string sharedSecret = ReadRequiredGlobal("lojaneon.streamerbotCredentialSecret");
         string viewerExternalId = FirstArg("userId", "targetUserId", "user");
         string youtubeDisplayName = FirstArg("user", "userName", "displayName");
         string youtubeHandle = FirstArg("userName", "user");
         string broadcastId = FirstArg("broadcastId");
 
-        if (string.IsNullOrWhiteSpace(appBaseUrl) || string.IsNullOrWhiteSpace(sharedSecret) || string.IsNullOrWhiteSpace(viewerExternalId))
+        if (string.IsNullOrWhiteSpace(appBaseUrl) || (string.IsNullOrWhiteSpace(sharedSecret) || string.IsNullOrWhiteSpace(credentialId)) || string.IsNullOrWhiteSpace(viewerExternalId))
         {
             CPH.LogWarn("[Loja Pipetz] New Subscriber sem app, segredo ou viewerExternalId.");
             return false;
@@ -35,8 +36,9 @@ public class CPHInline
         using (var request = new HttpRequestMessage(HttpMethod.Post, string.Format("{0}/api/internal/streamerbot/events", appBaseUrl.TrimEnd('/'))))
         {
             request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            request.Headers.Add("x-streamerbot-credential-id", credentialId);
             request.Headers.Add("x-timestamp", timestamp);
-            request.Headers.Add("x-signature", BuildSignature(sharedSecret, timestamp, body));
+            request.Headers.Add("x-signature", BuildSignature(sharedSecret, timestamp, body, credentialId));
             HttpResponseMessage response = Http.SendAsync(request).GetAwaiter().GetResult();
             string responseBody = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             CPH.LogInfo(string.Format("[Loja Pipetz] channel_subscription status={0} body={1}", (int)response.StatusCode, responseBody));
@@ -80,11 +82,11 @@ public class CPHInline
         return builder.ToString();
     }
 
-    private static string BuildSignature(string secret, string timestamp, string body)
+    private static string BuildSignature(string secret, string timestamp, string body, string credentialId)
     {
         using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret)))
         {
-            byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(string.Format("{0}.{1}", timestamp, body)));
+            byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(string.Format("v2\n{0}\n{1}\nPOST\n/api/internal/streamerbot/events\n{2}", timestamp, credentialId, body)));
             return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
     }
