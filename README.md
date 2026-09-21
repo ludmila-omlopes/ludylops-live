@@ -45,6 +45,8 @@ O fluxo atual cria:
 
 Em modo demo, sem `DATABASE_URL`, as áreas ficam em memória até reiniciar o servidor. Em banco real, os registros são persistidos.
 
+A raiz de `{slug}.ludylops.live` abre a mesma página de reserva de `/c/{slug}`, desde que o domínio esteja cadastrado e o criador esteja ativo. O wildcard precisa estar configurado no DNS e na Vercel, com TLS válido. Veja [configuração e testes dos subdomínios](docs/creator-hostname-routing.md). Este roteamento cobre apenas a raiz; os módulos ainda dependem de isolamento por criador.
+
 O acesso ao beta é configurado no admin, em `Comunidade > Beta áreas`. Admins gerais continuam liberados para testar mesmo sem aparecer na lista.
 
 Observação: a criação da área já separa creator, domínio, branding e módulos. O isolamento completo de pipetz, apostas, catálogo, sugestões e overlays por criador ainda depende de adicionar `creator_id` nas tabelas operacionais e escopar as consultas do repositório.
