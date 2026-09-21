@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   cookies: vi.fn(),
   isLive: vi.fn(),
+  tenant: vi.fn(),
 }));
 
 vi.mock("next/font/google", () => ({
@@ -14,7 +15,9 @@ vi.mock("next/font/google", () => ({
   Geist: () => ({ variable: "font-sans" }),
   IBM_Plex_Mono: () => ({ variable: "font-mono" }),
 }));
-vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
+vi.mock("next/headers", () => ({ cookies: mocks.cookies, headers: async () => new Headers({ host: "localhost" }) }));
+vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("not_found"); } }));
+vi.mock("@/lib/creators/tenant", () => ({ resolvePublicCreatorFromRequest: mocks.tenant }));
 vi.mock("@/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/streamerbot/live-status", () => ({
   isStreamerbotLivestreamActive: mocks.isLive,
@@ -61,6 +64,7 @@ describe("product layouts", () => {
       user: { email: "owner@example.com", isLinked: false },
     });
     mocks.isLive.mockResolvedValue(true);
+    mocks.tenant.mockResolvedValue({ creator: { id: "creator_ludylops" } });
   });
 
   it("keeps the root neutral and limited to theme cookies", async () => {
@@ -109,6 +113,13 @@ describe("product layouts", () => {
     expect(propsOf(chrome)).toMatchObject({ initialTheme: "dark", isPlatformOwner: true });
     expect(propsOf(chrome).children).toBe(children);
     expect(mocks.auth).toHaveBeenCalledOnce();
+    expect(mocks.isLive).not.toHaveBeenCalled();
+  });
+
+  it.each([null, { creator: { id: "creator_other" } }])("blocks unscoped community dependencies for other or invalid creators", async tenant => {
+    mocks.tenant.mockResolvedValue(tenant);
+    await expect(CommunityLayout({ children: null })).rejects.toThrow("not_found");
+    expect(mocks.auth).not.toHaveBeenCalled();
     expect(mocks.isLive).not.toHaveBeenCalled();
   });
 

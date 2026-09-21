@@ -17,7 +17,7 @@
 - **Category**: tech-debt / migration
 - **Planned at**: commit `ec19f8f`, reconciled 2026-09-15; same file tree as remote master `f353ce2`.
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/173
-- **State**: TODO; this reconciliation executes no application changes.
+- **State**: IMPLEMENTED in the issue worktree; awaiting PR integration and a separate reviewed database rollout. No shared/production database changes.
 
 ## Why this matters
 
@@ -32,7 +32,7 @@ can refund points. A quote-table filter alone cannot make that path safe.
 Never return another community's balance, pricing or live state to complete a
 demo of the pilot.
 
-## Current state
+## State before implementation
 
 - `src/lib/db/repository.ts`, listQuotes at line 2610:
   `db.select().from(quotes).orderBy(desc(quotes.quoteNumber))` has no creator filter.
@@ -220,15 +220,15 @@ readiness; no shared/production database changes.
 
 ## Done criteria
 
-- [ ] Required context reaches all migrated quote repository and route callers.
-- [ ] Schema backfill/composite constraints pass disposable-database checks.
-- [ ] A/B isolation is proven on actual database reads/writes and queue/control.
-- [ ] Non-default unscoped economy/configuration/live-state paths fail closed.
-- [ ] Authenticated integration context comes from plan 018, not unsigned hints.
-- [ ] No user gains global admin permission to operate another community.
-- [ ] docs/creator-scoping.md names all remaining release dependencies.
-- [ ] Typecheck, lint, focused/full tests and build pass.
-- [ ] Report separates implemented capabilities from unavailable paid/display
+- [x] Required context reaches all migrated quote repository and route callers.
+- [x] Schema backfill/composite constraints pass disposable-database checks.
+- [x] A/B isolation is proven on actual database reads/writes and queue/control.
+- [x] Non-default unscoped economy/configuration/live-state paths fail closed.
+- [x] Authenticated integration context comes from plan 018, not unsigned hints.
+- [x] No user gains global admin permission to operate another community.
+- [x] docs/creator-scoping.md names all remaining release dependencies.
+- [x] Typecheck, lint, focused/full tests and build pass.
+- [x] Report separates implemented capabilities from unavailable paid/display
       paths, and confirms no production/shared DB mutation.
 
 ## STOP conditions
@@ -249,3 +249,12 @@ reviewable units. Do not copy the whole repository per creator. Any issue PR
 must include Closes #173 in its body. Production application is a separate
 deployment step following plan 014; plan 019 is required before external module
 availability can be advertised.
+
+## Delivery evidence — 2026-09-21
+
+- Required creator context throughout quote services, four scoped tables, per-creator numbering/locks and composite keys.
+- Public `/c/[creatorSlug]/quotes` and authenticated Streamer.bot create/get are isolated. Paid display, live/style, refunds and admin controls remain default-only.
+- 607 tests / 61 files, lint, TypeScript build and demo production build passed. HTTP smoke: existing/new default quote URLs return 200; invalid creator pages and polling return 404. Authentication and the real OBS/Streamer.bot installation were not exercised by that anonymous smoke.
+- PostgreSQL 17.11 disposable baseline ready; legacy values preserved across 0025; A/B numbering and reads, concurrent creation/claim/cancellation, single debit/refund, cross-creator state preservation, constraints and schema-error fail-closed checks passed.
+- Generated 0025 required a reviewed correction to primary-key DDL ordering and missing DROP statements. `db:push` does not use this corrected SQL; production DDL must be reviewed separately, with old writers stopped before the key switch.
+- See [the caller matrix, reproduction recipe and release dependencies](../docs/creator-scoping.md).

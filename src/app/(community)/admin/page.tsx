@@ -1,3 +1,4 @@
+import { defaultCreatorContext } from "@/lib/creators/context";
 import { AdminObsOverlaysPanel } from "@/components/admin-obs-overlays-panel";
 import { AdminStreamerbotScriptsPanel } from "@/components/admin-streamerbot-scripts-panel";
 import { AdminCurrentGamePanel } from "@/components/admin-current-game-panel";
@@ -88,7 +89,7 @@ export default async function AdminPage() {
     listAdminProductRecommendations(),
     listAdminCreatorSuggestions(),
     listAdminViewerDirectory(),
-    getObsOverlayAdminStatus(),
+    getObsOverlayAdminStatus(defaultCreatorContext),
     getPipetzPricing(),
     getWheelConfig(),
     Promise.resolve(listStreamerbotScripts()),

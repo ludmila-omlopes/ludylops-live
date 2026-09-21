@@ -26,12 +26,14 @@ function mapError(message: string) {
 }
 
 export function QuoteOverlayTrigger({
+  creatorSlug,
   quoteId,
   loggedIn,
   canShow,
   viewerBalance,
   quoteOverlayCost,
 }: {
+  creatorSlug: string;
   quoteId: number;
   loggedIn: boolean;
   canShow: boolean;
@@ -48,7 +50,7 @@ export function QuoteOverlayTrigger({
     setFeedback(null);
 
     startTransition(async () => {
-      const response = await fetch(`/api/me/quotes/${quoteId}/show`, {
+      const response = await fetch(`/api/me/quotes/${quoteId}/show?creator=${encodeURIComponent(creatorSlug)}`, {
         method: "POST",
         headers: {
           "content-type": "application/json",

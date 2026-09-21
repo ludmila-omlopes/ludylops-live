@@ -42,9 +42,9 @@ Primeira revisão de remoção: **2026-10-04 ou 14 dias completos após a troca 
 
 ## Limites de autorização
 
-Todos os oito handlers operacionais mantêm um bloqueio explícito para streamers diferentes da Ludylops: eventos, vínculo, pontos, apostas, contadores, mortes, quotes e roleta. Uma credencial válida de outro streamer autentica no teste de conexão, com `operationalAccess: false`, e recebe 403 nos comandos. Isso impede que a nova autenticação acesse repositórios ainda globais.
+Eventos, vínculo, pontos, apostas, contadores, mortes e roleta continuam indisponíveis para streamers diferentes da Ludylops. Em quotes, o piloto #173 permite apenas `create` e `get` com credencial própria, criador ativo e módulos `streamerbot` e `quotes` instalados. A numeração pertence à comunidade autenticada. `show` continua respondendo 403 `operation_not_isolated` antes de consultar saldo, preço ou live globais.
 
-O plano 009 poderá liberar ações de quotes individualmente após isolar todo o caminho de dados e efeitos; não deve liberar o endpoint inteiro. O plano 019 adicionará a política completa de dependências dos módulos. Bridge e seus segredos/filas continuam em entrega separada.
+O teste de conexão mantém `operationalAccess: false` para outros streamers (acesso operacional completo indisponível), mas agora informa `quoteActions: ["create", "get"]` quando essas ações estão habilitadas. Isso não libera OBS nem a economia. O protocolo e os scripts existentes não mudam nesta entrega. Veja o [contrato de isolamento e as dependências restantes](creator-scoping.md). O plano 019 adicionará a política completa de dependências dos módulos. Bridge e seus segredos/filas continuam em entrega separada.
 
 ## Protocolo e armazenamento
 

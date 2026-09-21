@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { notFound } from "next/navigation";
+import { resolvePublicCreatorFromRequest } from "@/lib/creators/tenant";
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 
 import { auth } from "@/auth";
 import { AppChrome } from "@/components/app-chrome";
@@ -19,6 +22,9 @@ export default async function CommunityLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // This legacy shell loads global live state and navigation. Scoped modules use /c/:slug instead.
+  const tenant = await resolvePublicCreatorFromRequest({ request: new Request("http://internal/", { headers: await headers() }), pathname: "/" });
+  if (!tenant || tenant.creator.id !== DEFAULT_CREATOR_ID) notFound();
   const cookieStore = await cookies();
   const cookieTheme = cookieStore.get(themeCookieKey)?.value;
   const initialTheme = isThemeMode(cookieTheme) ? cookieTheme : null;

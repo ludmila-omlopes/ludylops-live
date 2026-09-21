@@ -32,19 +32,22 @@ export async function findStreamerbotCredential(id: string) {
 }
 
 /** Strict policy by verified ID; never resolve integration authority from host/slug. */
-export async function streamerbotCreatorIsEnabled(creatorId: string) {
+async function creatorModuleIsEnabled(creatorId: string, moduleKey: string) {
   const db = getDb();
   if (!db) {
     if (isProduction) throw new Error("integration_database_unavailable");
     const tenant = listDemoCreatorTenants().find((entry) => entry.creator.id === creatorId)
       ?? (creatorId === DEFAULT_CREATOR_ID ? defaultCreatorTenant : null);
-    return tenant?.creator.status === "active" && tenant.modules.some((entry) => entry.moduleKey === "streamerbot" && entry.status === "installed");
+    return tenant?.creator.status === "active" && tenant.modules.some((entry) => entry.moduleKey === moduleKey && entry.status === "installed");
   }
   const [row] = await db.select({ creatorStatus: creators.status, moduleStatus: creatorModules.status })
-    .from(creators).innerJoin(creatorModules, and(eq(creatorModules.creatorId, creators.id), eq(creatorModules.moduleKey, "streamerbot")))
+    .from(creators).innerJoin(creatorModules, and(eq(creatorModules.creatorId, creators.id), eq(creatorModules.moduleKey, moduleKey)))
     .where(eq(creators.id, creatorId)).limit(1);
   return row?.creatorStatus === "active" && row.moduleStatus === "installed";
 }
+
+export const streamerbotCreatorIsEnabled = (creatorId: string) => creatorModuleIsEnabled(creatorId, "streamerbot");
+export const streamerbotQuoteModuleIsEnabled = (creatorId: string) => creatorModuleIsEnabled(creatorId, "quotes");
 
 export async function markStreamerbotCredentialUsed(id: string, now: Date) {
   await database().update(streamerbotCredentials).set({ lastUsedAt: now }).where(eq(streamerbotCredentials.id, id));

@@ -36,7 +36,7 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 006  | Hardening batch: timing-safe sync auth, dep vulns, FK indexes | P2 | M | 001 | [#141](https://github.com/ludmila-omlopes/ludylops-live/issues/141) | DONE (manual index migration generated; not applied) |
 | 007  | Public landing page for the creator platform beta at `/criar-area` | P1 | M | white-label foundation committed (see plan) | [#169](https://github.com/ludmila-omlopes/ludylops-live/issues/169) | DONE ([PR #171](https://github.com/ludmila-omlopes/ludylops-live/pull/171) merged 2026-07-07) |
 | 008  | Add `creator_id` to operational tables (schema + backfill, no behavior change) | P1 | M | 014 | [#172](https://github.com/ludmila-omlopes/ludylops-live/issues/172) | IN PROGRESS (implemented and verified on disposable PostgreSQL; awaiting integration after #190) |
-| 009  | Thread creator context + scope the quotes vertical (pilot + pattern doc) | P1 | L | 008, 018 | [#173](https://github.com/ludmila-omlopes/ludylops-live/issues/173) | TODO |
+| 009  | Thread creator context + scope the quotes vertical (pilot + pattern doc) | P1 | L | 008, 017, 018 | [#173](https://github.com/ludmila-omlopes/ludylops-live/issues/173) | IMPLEMENTED (607 tests, lint, build, disposable PostgreSQL; awaiting integration and separate DB rollout) |
 | 010  | Cut OBS overlay polling cost (intervals + live gating) | P1 | S | — | [#175](https://github.com/ludmila-omlopes/ludylops-live/issues/175) | TODO |
 | 011  | Short-TTL caching for viewer-facing reads | P1 | M | — | [#176](https://github.com/ludmila-omlopes/ludylops-live/issues/176) | TODO |
 | 012  | Bound hot queries + HLTB refresh off request path | P2 | M | — | [#177](https://github.com/ludmila-omlopes/ludylops-live/issues/177) | TODO |
@@ -71,7 +71,7 @@ The white-label foundation creates creator instances, but operational data is st
 
 - **008 (IN PROGRESS; implementation verified)** — schema groundwork: `creator_id` on the 16 surrogate-PK operational tables, backfilled to `creator_ludylops`. Disposable PostgreSQL checks and application checks passed. Awaiting integration after #190; apply schema before deploying the updated application. Queries remain unscoped.
 - **009 (TODO)** — pilot: prove the request→repository threading pattern and per-creator sequence/constraint handling on the **quotes** vertical; produce `docs/creator-scoping.md`.
-- **010+ (not yet written)** — replicate 009's pattern per vertical, each depending on 009 and following the pattern doc:
+- **Unnumbered functional follow-ups (not yet written; 010–013 are performance plans)** — replicate 009's pattern per vertical, each depending on 009 and following the pattern doc:
   - bets (`bets`/`bet_options`/`bet_entries`)
   - suggestions (`game_suggestions`/`video_suggestions`/`creator_suggestions` + boosts) and `product_recommendations`
   - redemptions (`redemptions`) + bridge
