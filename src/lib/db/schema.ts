@@ -4,6 +4,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -670,6 +671,7 @@ export const quotes = pgTable(
   "quotes",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 }).default(DEFAULT_CREATOR_ID).notNull().references(() => creators.id),
     quoteNumber: integer("quote_number").notNull(),
     body: text("body").notNull(),
     createdByViewerId: varchar("created_by_viewer_id", { length: 64 })
@@ -681,7 +683,7 @@ export const quotes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
-    quoteNumberIdx: uniqueIndex("quotes_quote_number_idx").on(table.quoteNumber),
+    quoteNumberIdx: uniqueIndex("quotes_creator_quote_number_idx").on(table.creatorId, table.quoteNumber),
   }),
 );
 
@@ -696,7 +698,8 @@ export const googleRiscDeliveries = pgTable("google_risc_deliveries", {
 });
 
 export const quoteOverlayState = pgTable("quote_overlay_state", {
-  slot: varchar("slot", { length: 32 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 }).default(DEFAULT_CREATOR_ID).notNull().references(() => creators.id),
+  slot: varchar("slot", { length: 32 }).notNull(),
   overlayId: varchar("overlay_id", { length: 64 }).notNull(),
   quoteNumber: integer("quote_number").notNull(),
   quoteBody: text("quote_body").notNull(),
@@ -711,19 +714,21 @@ export const quoteOverlayState = pgTable("quote_overlay_state", {
   cost: integer("cost").notNull(),
   activatedAt: timestamp("activated_at", { withTimezone: true }).defaultNow().notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [primaryKey({ columns: [table.creatorId, table.slot] })]);
 
 export const obsOverlayControl = pgTable("obs_overlay_control", {
-  key: varchar("key", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 }).default(DEFAULT_CREATOR_ID).notNull().references(() => creators.id),
+  key: varchar("key", { length: 64 }).notNull(),
   status: varchar("status", { length: 32 }).default("active").notNull(),
   pausedAt: timestamp("paused_at", { withTimezone: true }),
   resumedAt: timestamp("resumed_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   updatedBy: varchar("updated_by", { length: 255 }),
   lastError: text("last_error"),
-});
+}, (table) => [primaryKey({ columns: [table.creatorId, table.key] })]);
 
 export const quoteOverlayQueue = pgTable("quote_overlay_queue", {
+  creatorId: varchar("creator_id", { length: 64 }).default(DEFAULT_CREATOR_ID).notNull().references(() => creators.id),
   id: varchar("id", { length: 64 }).primaryKey(),
   quoteNumber: integer("quote_number").notNull(),
   quoteBody: text("quote_body").notNull(),
@@ -743,7 +748,7 @@ export const quoteOverlayQueue = pgTable("quote_overlay_queue", {
   processedAt: timestamp("processed_at", { withTimezone: true }),
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   failureReason: text("failure_reason"),
-});
+}, (table) => [index("quote_overlay_queue_creator_id_idx").on(table.creatorId)]);
 
 export const streamerbotCounters = pgTable("streamerbot_counters", {
   key: varchar("key", { length: 64 }).primaryKey(),

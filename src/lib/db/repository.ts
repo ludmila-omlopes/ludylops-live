@@ -1,3 +1,6 @@
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import { type CreatorContext, requireCreatorContext, requireDefaultCreatorCapability } from "@/lib/creators/context";
+
 import { randomUUID } from "node:crypto";
 
 import { and, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
@@ -432,6 +435,7 @@ type DemoStore = {
   balances: ViewerBalanceRecord[];
   catalog: CatalogItemRecord[];
   ledger: LedgerEntryRecord[];
+  creatorQuotes?: Record<string, QuoteDemoStore>;
   quotes: QuoteRecord[];
   quoteOverlayState: QuoteOverlayStateRecord | null;
   obsOverlayControl: ObsOverlayControlRecord | null;
@@ -453,6 +457,16 @@ type DemoStore = {
   streamerbotCounters: StreamerbotCounterRecord[];
   streamerbotEvents: DemoStreamerbotEventLogRecord[];
 };
+
+type QuoteDemoStore = Pick<DemoStore, "quotes" | "quoteOverlayState" | "obsOverlayControl" | "quoteOverlayQueue">;
+
+function getQuoteDemoStore(context: CreatorContext): QuoteDemoStore {
+  const creatorId = requireCreatorContext(context);
+  const store = getDemoStore();
+  if (creatorId === DEFAULT_CREATOR_ID) return store;
+  store.creatorQuotes ??= Object.create(null) as Record<string, QuoteDemoStore>;
+  return store.creatorQuotes[creatorId] ??= { quotes: [], quoteOverlayState: null, obsOverlayControl: null, quoteOverlayQueue: [] };
+}
 
 type DemoStreamerbotEventLogRecord = {
   eventId: string;
@@ -2292,6 +2306,7 @@ function serializeCreatorSuggestionBoost(
 
 function serializeQuote(row: typeof quotes.$inferSelect): QuoteRecord {
   return {
+    creatorId: row.creatorId,
     id: row.id,
     quoteNumber: row.quoteNumber,
     body: row.body,
@@ -2307,6 +2322,7 @@ function serializeQuoteOverlayState(
   row: typeof quoteOverlayState.$inferSelect,
 ): QuoteOverlayStateRecord {
   return {
+    creatorId: row.creatorId,
     slot: row.slot,
     overlayId: row.overlayId,
     quoteNumber: row.quoteNumber,
@@ -2323,8 +2339,10 @@ function serializeQuoteOverlayState(
   };
 }
 
-function buildDefaultObsOverlayControl(now = new Date()): ObsOverlayControlRecord {
+function buildDefaultObsOverlayControl(context: CreatorContext, now = new Date()): ObsOverlayControlRecord {
+  const creatorId = requireCreatorContext(context);
   return {
+    creatorId,
     key: OBS_OVERLAY_CONTROL_KEY,
     status: "active",
     pausedAt: null,
@@ -2349,6 +2367,7 @@ function isMissingObsOverlayTablesError(error: unknown) {
   return (
     maybePostgresError.code === "42P01" ||
     maybePostgresError.cause?.code === "42P01" ||
+    ((maybePostgresError.code === "42703" || maybePostgresError.cause?.code === "42703") && message.includes("creator_id")) ||
     message.includes('relation "quote_overlay_queue" does not exist') ||
     message.includes('relation "obs_overlay_control" does not exist')
   );
@@ -2358,6 +2377,7 @@ function serializeObsOverlayControl(
   row: typeof obsOverlayControl.$inferSelect,
 ): ObsOverlayControlRecord {
   return {
+    creatorId: row.creatorId,
     key: row.key,
     status: row.status as ObsOverlayControlRecord["status"],
     pausedAt: row.pausedAt?.toISOString() ?? null,
@@ -2372,6 +2392,7 @@ function serializeQuoteOverlayQueue(
   row: typeof quoteOverlayQueue.$inferSelect,
 ): QuoteOverlayQueueRecord {
   return {
+    creatorId: row.creatorId,
     id: row.id,
     quoteNumber: row.quoteNumber,
     quoteBody: row.quoteBody,
@@ -2392,33 +2413,38 @@ function serializeQuoteOverlayQueue(
   };
 }
 
-async function getObsOverlayControlRecord(): Promise<ObsOverlayControlRecord> {
+export async function getObsOverlayControlRecord(context: CreatorContext): Promise<ObsOverlayControlRecord> {
+  const creatorId = requireCreatorContext(context);
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
-    store.obsOverlayControl ??= buildDefaultObsOverlayControl();
+    const store = getQuoteDemoStore(context);
+    store.obsOverlayControl ??= buildDefaultObsOverlayControl(context);
     return store.obsOverlayControl;
   }
 
   const [control] = await db
     .select()
     .from(obsOverlayControl)
-    .where(eq(obsOverlayControl.key, OBS_OVERLAY_CONTROL_KEY))
+    .where(and(eq(obsOverlayControl.creatorId, creatorId), eq(obsOverlayControl.key, OBS_OVERLAY_CONTROL_KEY)))
     .limit(1);
 
-  return control ? serializeObsOverlayControl(control) : buildDefaultObsOverlayControl();
+  return control ? serializeObsOverlayControl(control) : buildDefaultObsOverlayControl(context);
 }
 
-function buildQuoteOverlayQueueRecord(input: {
+function buildQuoteOverlayQueueRecord(context: CreatorContext, input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
   cost: number;
   displayDurationSeconds: number;
 }) {
+  const creatorId = requireCreatorContext(context);
+  if (input.quote.creatorId !== creatorId) throw new Error("quote_not_found");
   const queuedAt = new Date();
   return {
+    creatorId,
     id: randomUUID(),
     quoteNumber: input.quote.quoteNumber,
     quoteBody: input.quote.body,
@@ -2439,19 +2465,22 @@ function buildQuoteOverlayQueueRecord(input: {
   } satisfies QuoteOverlayQueueRecord;
 }
 
-function buildQuoteOverlayState(input: {
+function buildQuoteOverlayState(context: CreatorContext, input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
   cost?: number;
   durationSeconds?: number;
 }) {
+  const creatorId = requireCreatorContext(context);
+  if (input.quote.creatorId !== creatorId) throw new Error("quote_not_found");
   const activatedAt = new Date();
   const expiresAt = new Date(
     activatedAt.getTime() + (input.durationSeconds ?? QUOTE_OVERLAY_DURATION_SECONDS) * 1000,
   );
 
   return {
+    creatorId,
     slot: QUOTE_OVERLAY_SLOT,
     overlayId: randomUUID(),
     quoteNumber: input.quote.quoteNumber,
@@ -2602,39 +2631,45 @@ function buildCreatorSuggestionWithMeta(params: {
   };
 }
 
-function listDemoQuotes() {
-  const store = getDemoStore();
+function listDemoQuotes(context: CreatorContext) {
+  requireCreatorContext(context);
+  const store = getQuoteDemoStore(context);
   return [...store.quotes].sort((a, b) => a.quoteNumber - b.quoteNumber);
 }
 
-export async function listQuotes() {
+export async function listQuotes(context: CreatorContext) {
+  const creatorId = requireCreatorContext(context);
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    return [...listDemoQuotes()].sort((a, b) => b.quoteNumber - a.quoteNumber);
+    return [...listDemoQuotes(context)].sort((a, b) => b.quoteNumber - a.quoteNumber);
   }
 
-  const rows = await db.select().from(quotes).orderBy(desc(quotes.quoteNumber));
+  const rows = await db.select().from(quotes).where(eq(quotes.creatorId, creatorId)).orderBy(desc(quotes.quoteNumber));
   return rows.map(serializeQuote);
 }
 
-async function createQuoteRecord(input: {
+export async function createQuoteRecord(context: CreatorContext, input: {
   body: string;
   viewer: ViewerRecord;
   source: string;
 }) {
+  const creatorId = requireCreatorContext(context);
   const body = input.body.trim();
   if (!body) {
     throw new Error("quote_text_required");
   }
 
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const nextQuoteNumber =
       store.quotes.reduce((highest, entry) => Math.max(highest, entry.quoteNumber), 0) + 1;
     const createdAt = new Date().toISOString();
     const quote: QuoteRecord = {
+      creatorId,
       id: randomUUID(),
       quoteNumber: nextQuoteNumber,
       body,
@@ -2649,15 +2684,18 @@ async function createQuoteRecord(input: {
   }
 
   return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(42002, hashtext(${creatorId}))`);
     const [latestQuote] = await tx
       .select({ quoteNumber: quotes.quoteNumber })
       .from(quotes)
+      .where(eq(quotes.creatorId, creatorId))
       .orderBy(desc(quotes.quoteNumber))
       .limit(1);
 
     const [createdQuote] = await tx
       .insert(quotes)
       .values({
+        creatorId,
         id: randomUUID(),
         quoteNumber: (latestQuote?.quoteNumber ?? 0) + 1,
         body,
@@ -2677,12 +2715,14 @@ async function createQuoteRecord(input: {
   });
 }
 
-async function getQuoteRecord(input: { quoteId?: number | null }) {
+async function getQuoteRecord(context: CreatorContext, input: { quoteId?: number | null }) {
+  const creatorId = requireCreatorContext(context);
   const quoteId = input.quoteId ?? null;
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const quotes = listDemoQuotes();
+    const quotes = listDemoQuotes(context);
     if (quotes.length === 0) {
       throw new Error("quote_list_empty");
     }
@@ -2702,7 +2742,7 @@ async function getQuoteRecord(input: { quoteId?: number | null }) {
     const [quote] = await db
       .select()
       .from(quotes)
-      .where(eq(quotes.quoteNumber, quoteId))
+      .where(and(eq(quotes.creatorId, creatorId), eq(quotes.quoteNumber, quoteId)))
       .limit(1);
 
     if (!quote) {
@@ -2712,7 +2752,7 @@ async function getQuoteRecord(input: { quoteId?: number | null }) {
     return serializeQuote(quote);
   }
 
-  const allQuotes = await db.select().from(quotes).orderBy(desc(quotes.quoteNumber));
+  const allQuotes = await db.select().from(quotes).where(eq(quotes.creatorId, creatorId)).orderBy(desc(quotes.quoteNumber));
   if (allQuotes.length === 0) {
     throw new Error("quote_list_empty");
   }
@@ -2720,19 +2760,21 @@ async function getQuoteRecord(input: { quoteId?: number | null }) {
   return serializeQuote(allQuotes[Math.floor(Math.random() * allQuotes.length)]!);
 }
 
-export async function getActiveQuoteOverlay() {
+export async function getActiveQuoteOverlay(context: CreatorContext) {
+  const creatorId = requireCreatorContext(context);
   const now = Date.now();
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const overlay = getDemoStore().quoteOverlayState;
+    const overlay = getQuoteDemoStore(context).quoteOverlayState;
     return isQuoteOverlayActive(overlay, now) ? overlay : null;
   }
 
   const [overlay] = await db
     .select()
     .from(quoteOverlayState)
-    .where(eq(quoteOverlayState.slot, QUOTE_OVERLAY_SLOT))
+    .where(and(eq(quoteOverlayState.creatorId, creatorId), eq(quoteOverlayState.slot, QUOTE_OVERLAY_SLOT)))
     .limit(1);
 
   if (!overlay) {
@@ -2744,18 +2786,22 @@ export async function getActiveQuoteOverlay() {
 }
 
 async function refundQueuedQuoteOverlay(
+  context: CreatorContext,
   queueEntry: QuoteOverlayQueueRecord,
   reason: "cancelled" | "expired" | "failed",
 ) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  if (queueEntry.creatorId !== creatorId) throw new Error("quote_not_found");
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
-    const balance = getBalance(store, queueEntry.requestedByViewerId);
+    const balance = getBalance(getDemoStore(), queueEntry.requestedByViewerId);
     balance.currentBalance += queueEntry.cost;
     balance.lifetimeSpent = Math.max(0, balance.lifetimeSpent - queueEntry.cost);
     balance.lastSyncedAt = new Date().toISOString();
-    createLedgerEntry(store, {
+    createLedgerEntry(getDemoStore(), {
       viewerId: queueEntry.requestedByViewerId,
       kind: "quote_overlay_debit",
       amount: queueEntry.cost,
@@ -2781,6 +2827,7 @@ async function refundQueuedQuoteOverlay(
       .where(eq(viewerBalances.viewerId, queueEntry.requestedByViewerId));
 
     await tx.insert(pointLedger).values({
+      creatorId,
       id: randomUUID(),
       viewerId: queueEntry.requestedByViewerId,
       kind: "quote_overlay_debit",
@@ -2797,12 +2844,15 @@ async function refundQueuedQuoteOverlay(
   });
 }
 
-async function expireQueuedQuoteOverlays() {
+async function expireQueuedQuoteOverlays(context: CreatorContext) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
   const now = new Date();
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const expired = store.quoteOverlayQueue.filter(
       (entry) => entry.status === "queued" && new Date(entry.expiresAt).getTime() <= now.getTime(),
     );
@@ -2810,7 +2860,7 @@ async function expireQueuedQuoteOverlays() {
       entry.status = "expired";
       entry.cancelledAt = now.toISOString();
       entry.failureReason = "queue_expired";
-      await refundQueuedQuoteOverlay(entry, "expired");
+      await refundQueuedQuoteOverlay(context, entry, "expired");
     }
     return expired.length;
   }
@@ -2822,39 +2872,43 @@ async function expireQueuedQuoteOverlays() {
       cancelledAt: now,
       failureReason: "queue_expired",
     })
-    .where(and(eq(quoteOverlayQueue.status, "queued"), lt(quoteOverlayQueue.expiresAt, now)))
+    .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.status, "queued"), lt(quoteOverlayQueue.expiresAt, now)))
     .returning();
 
   for (const row of expiredRows) {
-    await refundQueuedQuoteOverlay(serializeQuoteOverlayQueue(row), "expired");
+    await refundQueuedQuoteOverlay(context, serializeQuoteOverlayQueue(row), "expired");
   }
 
   return expiredRows.length;
 }
 
-async function enqueueQuoteOverlay(input: {
+async function enqueueQuoteOverlay(context: CreatorContext, input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
   cost: number;
   displayDurationSeconds: number;
 }) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  if (input.quote.creatorId !== creatorId) throw new Error("quote_not_found");
   await requireActiveLivestream({
     failureError: "livestream_not_live",
   });
-  await expireQueuedQuoteOverlays();
+  await expireQueuedQuoteOverlays(context);
 
-  const queued = buildQuoteOverlayQueueRecord(input);
+  const queued = buildQuoteOverlayQueueRecord(context, input);
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const pendingCount = store.quoteOverlayQueue.filter((entry) => entry.status === "queued").length;
     if (pendingCount >= QUOTE_OVERLAY_QUEUE_LIMIT) {
       throw new Error("quote_overlay_queue_full");
     }
 
-    const balance = getBalance(store, input.viewer.id);
+    const balance = getBalance(getDemoStore(), input.viewer.id);
     if (balance.currentBalance < input.cost) {
       throw new Error("saldo_insuficiente");
     }
@@ -2862,7 +2916,7 @@ async function enqueueQuoteOverlay(input: {
     balance.currentBalance -= input.cost;
     balance.lifetimeSpent += input.cost;
     balance.lastSyncedAt = queued.queuedAt;
-    createLedgerEntry(store, {
+    createLedgerEntry(getDemoStore(), {
       viewerId: input.viewer.id,
       kind: "quote_overlay_debit",
       amount: -input.cost,
@@ -2881,12 +2935,12 @@ async function enqueueQuoteOverlay(input: {
   }
 
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY})`);
+    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY}, hashtext(${creatorId}))`);
 
     const [{ pendingCount }] = await tx
       .select({ pendingCount: sql<number>`count(*)::int` })
       .from(quoteOverlayQueue)
-      .where(eq(quoteOverlayQueue.status, "queued"));
+      .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.status, "queued")));
 
     if ((pendingCount ?? 0) >= QUOTE_OVERLAY_QUEUE_LIMIT) {
       throw new Error("quote_overlay_queue_full");
@@ -2912,6 +2966,7 @@ async function enqueueQuoteOverlay(input: {
     }
 
     await tx.insert(pointLedger).values({
+      creatorId,
       id: randomUUID(),
       viewerId: input.viewer.id,
       kind: "quote_overlay_debit",
@@ -2930,6 +2985,7 @@ async function enqueueQuoteOverlay(input: {
     const [created] = await tx
       .insert(quoteOverlayQueue)
       .values({
+        creatorId,
         id: queued.id,
         quoteNumber: queued.quoteNumber,
         quoteBody: queued.quoteBody,
@@ -2951,24 +3007,27 @@ async function enqueueQuoteOverlay(input: {
   });
 }
 
-async function hasPendingQuoteOverlayQueue() {
-  await expireQueuedQuoteOverlays();
+async function hasPendingQuoteOverlayQueue(context: CreatorContext) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  await expireQueuedQuoteOverlays(context);
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    return getDemoStore().quoteOverlayQueue.some((entry) => entry.status === "queued");
+    return getQuoteDemoStore(context).quoteOverlayQueue.some((entry) => entry.status === "queued");
   }
 
   const [entry] = await db
     .select({ id: quoteOverlayQueue.id })
     .from(quoteOverlayQueue)
-    .where(eq(quoteOverlayQueue.status, "queued"))
+    .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.status, "queued")))
     .limit(1);
 
   return Boolean(entry);
 }
 
-async function activateQuoteOverlay(input: {
+async function activateQuoteOverlay(context: CreatorContext, input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
@@ -2977,12 +3036,15 @@ async function activateQuoteOverlay(input: {
   debit?: boolean;
   queueId?: string | null;
 }) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  if (input.quote.creatorId !== creatorId) throw new Error("quote_not_found");
   await requireActiveLivestream({
     failureError: "livestream_not_live",
   });
 
   const cost = input.cost ?? QUOTE_OVERLAY_COST;
-  const overlay = buildQuoteOverlayState({
+  const overlay = buildQuoteOverlayState(context, {
     quote: input.quote,
     viewer: input.viewer,
     source: input.source,
@@ -2991,16 +3053,17 @@ async function activateQuoteOverlay(input: {
   });
 
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
   const shouldDebit = input.debit ?? true;
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const activeOverlay = store.quoteOverlayState;
     if (isQuoteOverlayActive(activeOverlay)) {
       throw new Error("quote_overlay_busy");
     }
 
     if (shouldDebit) {
-      const balance = getBalance(store, input.viewer.id);
+      const balance = getBalance(getDemoStore(), input.viewer.id);
       if (balance.currentBalance < cost) {
         throw new Error("saldo_insuficiente");
       }
@@ -3009,7 +3072,7 @@ async function activateQuoteOverlay(input: {
       balance.lifetimeSpent += cost;
       balance.lastSyncedAt = overlay.activatedAt;
 
-      createLedgerEntry(store, {
+      createLedgerEntry(getDemoStore(), {
         viewerId: input.viewer.id,
         kind: "quote_overlay_debit",
         amount: -cost,
@@ -3030,12 +3093,12 @@ async function activateQuoteOverlay(input: {
   }
 
   await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY})`);
+    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY}, hashtext(${creatorId}))`);
 
     const [existingOverlay] = await tx
       .select()
       .from(quoteOverlayState)
-      .where(eq(quoteOverlayState.slot, QUOTE_OVERLAY_SLOT))
+      .where(and(eq(quoteOverlayState.creatorId, creatorId), eq(quoteOverlayState.slot, QUOTE_OVERLAY_SLOT)))
       .limit(1);
 
     if (existingOverlay && existingOverlay.expiresAt.getTime() > Date.now()) {
@@ -3063,6 +3126,7 @@ async function activateQuoteOverlay(input: {
       }
 
       await tx.insert(pointLedger).values({
+      creatorId,
         id: randomUUID(),
         viewerId: input.viewer.id,
         kind: "quote_overlay_debit",
@@ -3082,6 +3146,7 @@ async function activateQuoteOverlay(input: {
     await tx
       .insert(quoteOverlayState)
       .values({
+        creatorId,
         slot: overlay.slot,
         overlayId: overlay.overlayId,
         quoteNumber: overlay.quoteNumber,
@@ -3097,7 +3162,7 @@ async function activateQuoteOverlay(input: {
         expiresAt: new Date(overlay.expiresAt),
       })
       .onConflictDoUpdate({
-        target: quoteOverlayState.slot,
+        target: [quoteOverlayState.creatorId, quoteOverlayState.slot],
         set: {
           overlayId: overlay.overlayId,
           quoteNumber: overlay.quoteNumber,
@@ -3118,13 +3183,17 @@ async function activateQuoteOverlay(input: {
   return overlay;
 }
 
-async function activateQueuedQuoteOverlay(entry: QuoteOverlayQueueRecord) {
+async function activateQueuedQuoteOverlay(context: CreatorContext, entry: QuoteOverlayQueueRecord) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  if (entry.creatorId !== creatorId) throw new Error("quote_not_found");
   const viewer = await withViewerById(entry.requestedByViewerId);
   if (!viewer) {
     throw new Error("viewer_not_ready");
   }
 
   const quote: QuoteRecord = {
+    creatorId,
     id: `queued:${entry.id}`,
     quoteNumber: entry.quoteNumber,
     body: entry.quoteBody,
@@ -3135,7 +3204,7 @@ async function activateQueuedQuoteOverlay(entry: QuoteOverlayQueueRecord) {
     createdAt: entry.queuedAt,
   };
 
-  return activateQuoteOverlay({
+  return activateQuoteOverlay(context, {
     quote,
     viewer,
     source: entry.source,
@@ -3146,22 +3215,25 @@ async function activateQueuedQuoteOverlay(entry: QuoteOverlayQueueRecord) {
   });
 }
 
-export async function processNextQueuedQuoteOverlay() {
-  const control = await getObsOverlayControlRecord();
+export async function processNextQueuedQuoteOverlay(context: CreatorContext) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  const control = await getObsOverlayControlRecord(context);
   if (control.status === "paused") {
     return null;
   }
 
-  await expireQueuedQuoteOverlays();
+  await expireQueuedQuoteOverlays(context);
 
-  const activeOverlay = await getActiveQuoteOverlay();
+  const activeOverlay = await getActiveQuoteOverlay(context);
   if (activeOverlay) {
     return activeOverlay;
   }
 
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const entry = [...store.quoteOverlayQueue]
       .filter((item) => item.status === "queued")
       .sort((left, right) => +new Date(left.queuedAt) - +new Date(right.queuedAt))[0];
@@ -3172,7 +3244,7 @@ export async function processNextQueuedQuoteOverlay() {
 
     entry.status = "processing";
     try {
-      const overlay = await activateQueuedQuoteOverlay(entry);
+      const overlay = await activateQueuedQuoteOverlay(context, entry);
       entry.status = "completed";
       entry.processedAt = overlay.activatedAt;
       return overlay;
@@ -3180,17 +3252,18 @@ export async function processNextQueuedQuoteOverlay() {
       entry.status = "failed";
       entry.cancelledAt = new Date().toISOString();
       entry.failureReason = error instanceof Error ? error.message : "queue_processing_failed";
+      await refundQueuedQuoteOverlay(context, entry, "failed");
       throw error;
     }
   }
 
   const [claimed] = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY})`);
+    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY}, hashtext(${creatorId}))`);
 
     const [entry] = await tx
       .select()
       .from(quoteOverlayQueue)
-      .where(eq(quoteOverlayQueue.status, "queued"))
+      .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.status, "queued")))
       .orderBy(quoteOverlayQueue.queuedAt)
       .limit(1);
 
@@ -3201,7 +3274,7 @@ export async function processNextQueuedQuoteOverlay() {
     return tx
       .update(quoteOverlayQueue)
       .set({ status: "processing" })
-      .where(eq(quoteOverlayQueue.id, entry.id))
+      .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.id, entry.id)))
       .returning();
   });
 
@@ -3211,14 +3284,14 @@ export async function processNextQueuedQuoteOverlay() {
 
   const queued = serializeQuoteOverlayQueue(claimed);
   try {
-    const overlay = await activateQueuedQuoteOverlay(queued);
+    const overlay = await activateQueuedQuoteOverlay(context, queued);
     await db
       .update(quoteOverlayQueue)
       .set({
         status: "completed",
         processedAt: new Date(overlay.activatedAt),
       })
-      .where(eq(quoteOverlayQueue.id, queued.id));
+      .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.id, queued.id)));
     return overlay;
   } catch (error) {
     const message = error instanceof Error ? error.message : "queue_processing_failed";
@@ -3229,24 +3302,27 @@ export async function processNextQueuedQuoteOverlay() {
         cancelledAt: new Date(),
         failureReason: message,
       })
-      .where(eq(quoteOverlayQueue.id, queued.id));
-    await refundQueuedQuoteOverlay(queued, "failed");
+      .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.id, queued.id)));
+    await refundQueuedQuoteOverlay(context, queued, "failed");
     throw error;
   }
 }
 
-async function requestQuoteOverlay(input: {
+async function requestQuoteOverlay(context: CreatorContext, input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
   durationSeconds?: number;
 }) {
-  const control = await getObsOverlayControlRecord();
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  if (input.quote.creatorId !== creatorId) throw new Error("quote_not_found");
+  const control = await getObsOverlayControlRecord(context);
   const cost = (await getPipetzPricing()).quoteOverlayCost;
   const displayDurationSeconds = input.durationSeconds ?? QUOTE_OVERLAY_DURATION_SECONDS;
 
-  if (control.status === "paused" || (await hasPendingQuoteOverlayQueue())) {
-    const queued = await enqueueQuoteOverlay({
+  if (control.status === "paused" || (await hasPendingQuoteOverlayQueue(context))) {
+    const queued = await enqueueQuoteOverlay(context, {
       quote: input.quote,
       viewer: input.viewer,
       source: input.source,
@@ -3260,7 +3336,7 @@ async function requestQuoteOverlay(input: {
     };
   }
 
-  const overlay = await activateQuoteOverlay({
+  const overlay = await activateQuoteOverlay(context, {
     quote: input.quote,
     viewer: input.viewer,
     source: input.source,
@@ -3274,18 +3350,21 @@ async function requestQuoteOverlay(input: {
   };
 }
 
-export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusRecord> {
+export async function getObsOverlayAdminStatus(context: CreatorContext): Promise<ObsOverlayAdminStatusRecord> {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
   try {
-    await expireQueuedQuoteOverlays();
+    await expireQueuedQuoteOverlays(context);
     const [control, activeOverlay, overlayStyle] = await Promise.all([
-      getObsOverlayControlRecord(),
-      getActiveQuoteOverlay(),
+      getObsOverlayControlRecord(context),
+      getActiveQuoteOverlay(context),
       getObsOverlayStyleConfig(),
     ]);
     const db = getDb();
+    if (!isDemoMode && !db) throw new Error("database_unavailable");
 
     if (isDemoMode || !db) {
-      const queue = [...getDemoStore().quoteOverlayQueue];
+      const queue = [...getQuoteDemoStore(context).quoteOverlayQueue];
       const pending = queue
         .filter((entry) => entry.status === "queued")
         .sort((left, right) => +new Date(left.queuedAt) - +new Date(right.queuedAt));
@@ -3304,6 +3383,7 @@ export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusR
     const queue = (await db
       .select()
       .from(quoteOverlayQueue)
+      .where(eq(quoteOverlayQueue.creatorId, creatorId))
       .orderBy(quoteOverlayQueue.queuedAt)
       .limit(50)).map(serializeQuoteOverlayQueue);
     const pending = queue.filter((entry) => entry.status === "queued");
@@ -3324,12 +3404,12 @@ export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusR
 
     return {
       control: {
-        ...buildDefaultObsOverlayControl(),
+        ...buildDefaultObsOverlayControl(context),
         status: "error",
-        lastError: "Migration pendente: crie as tabelas obs_overlay_control e quote_overlay_queue.",
+        lastError: "Migração pendente: atualize as tabelas de frases e overlays.",
       },
       overlayStyle: await getObsOverlayStyleConfig(),
-      activeOverlay: await getActiveQuoteOverlay(),
+      activeOverlay: null,
       pending: [],
       pendingCount: 0,
       processingCount: 0,
@@ -3338,14 +3418,17 @@ export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusR
   }
 }
 
-export async function setObsOverlayPaused(input: { paused: boolean; updatedBy?: string | null }) {
+export async function setObsOverlayPaused(context: CreatorContext, input: { paused: boolean; updatedBy?: string | null }) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
   const now = new Date();
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     store.obsOverlayControl = {
-      ...(store.obsOverlayControl ?? buildDefaultObsOverlayControl(now)),
+      ...(store.obsOverlayControl ?? buildDefaultObsOverlayControl(context, now)),
       status: input.paused ? "paused" : "active",
       pausedAt: input.paused ? now.toISOString() : store.obsOverlayControl?.pausedAt ?? null,
       resumedAt: input.paused ? store.obsOverlayControl?.resumedAt ?? null : now.toISOString(),
@@ -3354,14 +3437,15 @@ export async function setObsOverlayPaused(input: { paused: boolean; updatedBy?: 
       lastError: null,
     };
     if (!input.paused) {
-      await processNextQueuedQuoteOverlay();
+      await processNextQueuedQuoteOverlay(context);
     }
-    return getObsOverlayAdminStatus();
+    return getObsOverlayAdminStatus(context);
   }
 
   await db
     .insert(obsOverlayControl)
     .values({
+      creatorId,
       key: OBS_OVERLAY_CONTROL_KEY,
       status: input.paused ? "paused" : "active",
       pausedAt: input.paused ? now : null,
@@ -3371,7 +3455,7 @@ export async function setObsOverlayPaused(input: { paused: boolean; updatedBy?: 
       lastError: null,
     })
     .onConflictDoUpdate({
-      target: obsOverlayControl.key,
+      target: [obsOverlayControl.creatorId, obsOverlayControl.key],
       set: {
         status: input.paused ? "paused" : "active",
         pausedAt: input.paused ? now : sql`${obsOverlayControl.pausedAt}`,
@@ -3383,31 +3467,34 @@ export async function setObsOverlayPaused(input: { paused: boolean; updatedBy?: 
     });
 
   if (!input.paused) {
-    await processNextQueuedQuoteOverlay();
+    await processNextQueuedQuoteOverlay(context);
   }
 
-  return getObsOverlayAdminStatus();
+  return getObsOverlayAdminStatus(context);
 }
 
-export async function cancelQueuedQuoteOverlays(input: { updatedBy?: string | null }) {
+export async function cancelQueuedQuoteOverlays(context: CreatorContext, input: { updatedBy?: string | null }) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
   const now = new Date();
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const pending = store.quoteOverlayQueue.filter((entry) => entry.status === "queued");
     for (const entry of pending) {
       entry.status = "cancelled";
       entry.cancelledAt = now.toISOString();
       entry.failureReason = "cancelled_by_admin";
-      await refundQueuedQuoteOverlay(entry, "cancelled");
+      await refundQueuedQuoteOverlay(context, entry, "cancelled");
     }
     store.obsOverlayControl = {
-      ...(store.obsOverlayControl ?? buildDefaultObsOverlayControl(now)),
+      ...(store.obsOverlayControl ?? buildDefaultObsOverlayControl(context, now)),
       updatedAt: now.toISOString(),
       updatedBy: input.updatedBy ?? null,
     };
-    return getObsOverlayAdminStatus();
+    return getObsOverlayAdminStatus(context);
   }
 
   const cancelled = await db
@@ -3417,16 +3504,17 @@ export async function cancelQueuedQuoteOverlays(input: { updatedBy?: string | nu
       cancelledAt: now,
       failureReason: "cancelled_by_admin",
     })
-    .where(eq(quoteOverlayQueue.status, "queued"))
+    .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.status, "queued")))
     .returning();
 
   for (const row of cancelled) {
-    await refundQueuedQuoteOverlay(serializeQuoteOverlayQueue(row), "cancelled");
+    await refundQueuedQuoteOverlay(context, serializeQuoteOverlayQueue(row), "cancelled");
   }
 
   await db
     .insert(obsOverlayControl)
     .values({
+      creatorId,
       key: OBS_OVERLAY_CONTROL_KEY,
       status: "active",
       pausedAt: null,
@@ -3436,14 +3524,14 @@ export async function cancelQueuedQuoteOverlays(input: { updatedBy?: string | nu
       lastError: null,
     })
     .onConflictDoUpdate({
-      target: obsOverlayControl.key,
+      target: [obsOverlayControl.creatorId, obsOverlayControl.key],
       set: {
         updatedAt: now,
         updatedBy: input.updatedBy ?? null,
       },
     });
 
-  return getObsOverlayAdminStatus();
+  return getObsOverlayAdminStatus(context);
 }
 
 function sortGameSuggestionWithMeta(left: GameSuggestionWithMeta, right: GameSuggestionWithMeta) {
@@ -7784,6 +7872,7 @@ async function ensureViewerFromStreamerbotIdentity(input: {
   viewerExternalId: string;
   youtubeDisplayName?: string | null;
   youtubeHandle?: string | null;
+  initializeBalance?: boolean;
 }) {
   const youtubeDisplayName = input.youtubeDisplayName?.trim() || undefined;
   const youtubeHandle = normalizeYoutubeHandle(input.youtubeHandle);
@@ -7805,7 +7894,7 @@ async function ensureViewerFromStreamerbotIdentity(input: {
         isLinked: false,
       });
       store.viewers.push(viewer);
-      getBalance(store, viewer.id);
+      if (input.initializeBalance !== false) getBalance(store, viewer.id);
       return viewer;
     }
 
@@ -7845,7 +7934,7 @@ async function ensureViewerFromStreamerbotIdentity(input: {
       createdAt: new Date(viewer.createdAt),
     });
 
-    await db.insert(viewerBalances).values({
+    if (input.initializeBalance !== false) await db.insert(viewerBalances).values({
       viewerId: viewer.id,
       currentBalance: 0,
       lifetimeEarned: 0,
@@ -8302,7 +8391,7 @@ export async function getViewerBalanceFromChatCommand(input: {
   };
 }
 
-export async function runQuoteCommandFromChat(input: {
+export async function runQuoteCommandFromChat(context: CreatorContext, input: {
   action: "create" | "get" | "show";
   viewerExternalId?: string;
   youtubeDisplayName?: string | null;
@@ -8315,6 +8404,9 @@ export async function runQuoteCommandFromChat(input: {
   isAdmin?: boolean;
   source: string;
 }) {
+  const creatorId = requireCreatorContext(context);
+  if (!isDemoMode && !getDb()) throw new Error("database_unavailable");
+  if (input.action === "show") requireDefaultCreatorCapability(context);
   if (input.action === "create") {
     if (!input.viewerExternalId?.trim()) {
       throw new Error("viewer_external_id_required");
@@ -8328,9 +8420,10 @@ export async function runQuoteCommandFromChat(input: {
       viewerExternalId: input.viewerExternalId,
       youtubeDisplayName: input.youtubeDisplayName,
       youtubeHandle: input.youtubeHandle,
+      initializeBalance: creatorId === DEFAULT_CREATOR_ID,
     });
     const unifiedViewer = await resolveUnifiedViewerForLinkedChannel(viewer);
-    const quote = await createQuoteRecord({
+    const quote = await createQuoteRecord(context, {
       body: input.quoteText,
       viewer: unifiedViewer,
       source: input.source,
@@ -8358,8 +8451,8 @@ export async function runQuoteCommandFromChat(input: {
       youtubeHandle: input.youtubeHandle,
     });
     const unifiedViewer = await resolveUnifiedViewerForLinkedChannel(viewer);
-    const quote = await getQuoteRecord({ quoteId: input.quoteId });
-    const request = await requestQuoteOverlay({
+    const quote = await getQuoteRecord(context, { quoteId: input.quoteId });
+    const request = await requestQuoteOverlay(context, {
       quote,
       viewer: unifiedViewer,
       source: input.source,
@@ -8375,7 +8468,7 @@ export async function runQuoteCommandFromChat(input: {
     };
   }
 
-  const quote = await getQuoteRecord({ quoteId: input.quoteId });
+  const quote = await getQuoteRecord(context, { quoteId: input.quoteId });
   return {
     action: "get" as const,
     quote,
@@ -8383,19 +8476,21 @@ export async function runQuoteCommandFromChat(input: {
   };
 }
 
-export async function showQuoteOverlayForViewer(input: {
+export async function showQuoteOverlayForViewer(context: CreatorContext, input: {
   viewerId: string;
   quoteId: number;
   source: string;
   displayDurationSeconds?: number | null;
 }) {
+  requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
   const viewer = await withViewerById(input.viewerId);
   if (!viewer) {
     throw new Error("Viewer not found.");
   }
 
-  const quote = await getQuoteRecord({ quoteId: input.quoteId });
-  const request = await requestQuoteOverlay({
+  const quote = await getQuoteRecord(context, { quoteId: input.quoteId });
+  const request = await requestQuoteOverlay(context, {
     quote,
     viewer,
     source: input.source,
@@ -10533,6 +10628,14 @@ export async function ingestStreamerbotEvent(input: {
 
     const serializedViewer = serializeViewer(viewer);
     const creditedViewer = await resolveUnifiedViewerForLinkedChannel(serializedViewer);
+    // A shared identity may have been created by another community's quote command,
+    // which deliberately does not initialize the default creator's economy.
+    await db.insert(viewerBalances).values({
+      viewerId: creditedViewer.id,
+      currentBalance: 0,
+      lifetimeEarned: 0,
+      lifetimeSpent: 0,
+    }).onConflictDoNothing({ target: viewerBalances.viewerId });
     if (input.eventType === "channel_subscription") {
       const [existingSubscriptionReward] = await db
         .select()

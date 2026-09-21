@@ -347,6 +347,7 @@ export interface BridgeClientRecord {
 }
 
 export interface QuoteRecord {
+  creatorId: string;
   id: string;
   quoteNumber: number;
   body: string;
@@ -358,6 +359,7 @@ export interface QuoteRecord {
 }
 
 export interface QuoteOverlayStateRecord {
+  creatorId: string;
   slot: string;
   overlayId: string;
   quoteNumber: number;
@@ -378,6 +380,7 @@ export type ObsOverlayControlStatus = "active" | "paused" | "processing" | "erro
 export type QuoteOverlayQueueStatus = "queued" | "processing" | "completed" | "cancelled" | "expired" | "failed";
 
 export interface ObsOverlayControlRecord {
+  creatorId: string;
   key: string;
   status: ObsOverlayControlStatus;
   pausedAt: string | null;
@@ -388,6 +391,7 @@ export interface ObsOverlayControlRecord {
 }
 
 export interface QuoteOverlayQueueRecord {
+  creatorId: string;
   id: string;
   quoteNumber: number;
   quoteBody: string;

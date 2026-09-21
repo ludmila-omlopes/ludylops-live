@@ -176,6 +176,13 @@
       "when": 1789939967481,
       "tag": "0024_lonely_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790004139482,
+      "tag": "0025_dazzling_sabretooth",
+      "breakpoints": true
     }
   ]
 }

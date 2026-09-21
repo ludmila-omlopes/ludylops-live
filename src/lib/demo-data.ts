@@ -266,6 +266,7 @@ export const demoBridgeClients: BridgeClientRecord[] = [
 
 export const demoQuotes: QuoteRecord[] = [
   {
+    creatorId: "creator_ludylops",
     id: "quote_1",
     quoteNumber: 1,
     body: "isso aqui vai dar muito certo, confia",
@@ -276,6 +277,7 @@ export const demoQuotes: QuoteRecord[] = [
     createdAt: new Date(now.getTime() - 1000 * 60 * 90).toISOString(),
   },
   {
+    creatorId: "creator_ludylops",
     id: "quote_2",
     quoteNumber: 2,
     body: "se eu morrer, foi estrategia",
