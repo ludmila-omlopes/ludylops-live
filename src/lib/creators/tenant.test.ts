@@ -9,6 +9,7 @@ vi.mock("@/lib/env", () => ({ isDemoMode: false }));
 
 import { DEFAULT_CREATOR_ID, DEFAULT_CREATOR_SLUG } from "@/lib/creators/defaults";
 import { getEnabledModuleNav } from "@/lib/creators/modules";
+import { getCreatorRootPath } from "@/lib/creators/hostname-routing";
 import { defaultCreatorTenant, requireCreator, resolveCreatorFromRequest, resolvePublicCreatorFromRequest } from "@/lib/creators/tenant";
 import { listPlatformCreatorInstances, updatePlatformCreatorStatus } from "@/lib/creators/instances";
 import { getCreatorAreaBySlug, listCreatorAreasForOwner } from "@/lib/creators/service";
@@ -284,6 +285,11 @@ describe("public creator lifecycle policy", () => {
       expect(result?.creator.id ?? null).toBe(status === "active" ? cozy.id : null);
     }
     expect((await getCreatorAreaBySlug("cozy"))?.creator.id ?? null).toBe(status === "active" ? cozy.id : null);
+    const request = new Request("https://cozy.ludylops.live/");
+    const destination = getCreatorRootPath(request);
+    expect(destination).toBe("/c/cozy");
+    const rewritten = new Request(new URL(destination!, request.url));
+    expect((await resolvePublicCreatorFromRequest(rewritten))?.creator.id ?? null).toBe(status === "active" ? cozy.id : null);
   });
 
   it.each([

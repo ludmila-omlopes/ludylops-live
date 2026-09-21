@@ -10,7 +10,7 @@ import {
   DEFAULT_CREATOR_SLUG,
 } from "@/lib/creators/defaults";
 import { findDemoCreatorTenantByHostname, findDemoCreatorTenantBySlug, listDemoCreatorTenants } from "@/lib/creators/demo-store";
-import { normalizeCreatorSlug, normalizeHostname } from "@/lib/creators/identity";
+import { normalizeCreatorSlug, normalizeHostname, normalizePublicHostname } from "@/lib/creators/identity";
 import { getDb } from "@/lib/db/client";
 import { creatorBranding, creatorDomains, creatorModules, creators } from "@/lib/db/schema";
 import type {
@@ -317,14 +317,7 @@ function publicRequestHostname(options: ResolveCreatorOptions) {
     ? options.hostname
     : request?.headers.get("x-forwarded-host") ?? request?.headers.get("host")
       ?? (request ? new URL(request.url).host : null);
-  const host = value?.split(",")[0]?.trim().toLowerCase();
-  if (!host || !/^(?:\[::1\]|::1|[a-z0-9-]+(?:\.[a-z0-9-]+)*)(?::[0-9]+)?$/u.test(host)) return null;
-  const hostname = host === "::1" ? host : normalizeHostname(host);
-  if (hostname !== "::1" && hostname?.split(".").some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(label))) return null;
-  if (host !== "::1") {
-    try { new URL(`http://${host}`); } catch { return null; }
-  }
-  return hostname;
+  return normalizePublicHostname(value);
 }
 
 /**
