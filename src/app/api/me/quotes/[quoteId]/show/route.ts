@@ -1,6 +1,8 @@
 import { fail, isTrustedAppMutationRequest, ok, requireLinkedApiSession } from "@/lib/api";
 import { showQuoteOverlayForViewer } from "@/lib/db/repository";
 import { showQuoteOverlaySchema } from "@/lib/streamerbot/schemas";
+import { resolveQuoteRequest } from "@/lib/creators/quote-context";
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 
 export async function POST(
   request: Request,
@@ -15,6 +17,10 @@ export async function POST(
     return fail("Unauthorized", 401);
   }
 
+  const tenant = await resolveQuoteRequest(request);
+  if (!tenant) return fail("creator_unavailable", 404);
+  if (tenant.creator.id !== DEFAULT_CREATOR_ID) return fail("operation_not_isolated", 403);
+
   const { quoteId } = await params;
   const parsedQuoteId = Number.parseInt(quoteId, 10);
   if (!Number.isInteger(parsedQuoteId) || parsedQuoteId <= 0) {
@@ -24,7 +30,7 @@ export async function POST(
   const payload = showQuoteOverlaySchema.parse(await request.json());
 
   try {
-    const result = await showQuoteOverlayForViewer({
+    const result = await showQuoteOverlayForViewer({ creatorId: tenant.creator.id }, {
       viewerId: session.user.activeViewerId,
       quoteId: parsedQuoteId,
       source: payload.source,

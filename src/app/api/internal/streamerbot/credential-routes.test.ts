@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ record: vi.fn(), enabled: vi.fn(), used: vi.fn(), effect: vi.fn() }));
+const state = vi.hoisted(() => ({ record: vi.fn(), enabled: vi.fn(), quotesEnabled: vi.fn(), used: vi.fn(), effect: vi.fn() }));
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/env", () => ({ env: { STREAMERBOT_SHARED_SECRET: "legacy-test", STREAMERBOT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64") } }));
 vi.mock("@/lib/db/client", () => ({ getDb: () => null }));
 vi.mock("@/lib/streamerbot/credentials", async (original) => ({
   ...await original<typeof import("@/lib/streamerbot/credentials")>(), findStreamerbotCredential: state.record,
   streamerbotCreatorIsEnabled: state.enabled, markStreamerbotCredentialUsed: state.used,
+  streamerbotQuoteModuleIsEnabled: state.quotesEnabled,
 }));
 vi.mock("@/lib/db/repository", () => ({
   ingestStreamerbotEvent: state.effect, claimViewerLinkCodeFromStreamerbot: state.effect,
@@ -47,10 +48,11 @@ describe("credential rollout at every Streamer.bot handler", () => {
     vi.restoreAllMocks();
     vi.spyOn(console, "info").mockImplementation(() => {});
     state.effect.mockReset(); state.used.mockReset(); state.enabled.mockReset().mockResolvedValue(true);
+    state.quotesEnabled.mockReset().mockResolvedValue(true);
     setCreator("creator-other");
   });
   it.each(routes)("%s denies another creator before parsing/effects", async (path, handler) => {
-    const response = await handler(request(path));
+    const response = await handler(request(path, false, path === "quotes" ? JSON.stringify({ action: "show", quoteId: 1, viewerExternalId: "viewer", source: "streamerbot_chat" }) : "not-json"));
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ error: "operation_not_isolated" });
     expect(state.effect).not.toHaveBeenCalled();
@@ -67,10 +69,31 @@ describe("credential rollout at every Streamer.bot handler", () => {
     expect(response.status).toBe(200);
     expect(state.effect).toHaveBeenCalledTimes(1);
   });
-  it("checks non-default credentials without enabling operations or invoking repositories", async () => {
+  it.each(["create", "get"])("allows scoped quote %s using verified identity despite forged hints", async action => {
+    state.effect.mockResolvedValue({ action, quote: { quoteNumber: 1, body: "Frase" }, viewer: null });
+    const payload = { action, quoteText: "Frase", quoteId: 1, viewerExternalId: "viewer", source: "streamerbot_chat", creatorId: DEFAULT_CREATOR_ID };
+    const response = await quotes(request("quotes", false, JSON.stringify(payload)));
+    expect(response.status).toBe(200);
+    expect(state.effect).toHaveBeenCalledWith({ creatorId: "creator-other" }, expect.objectContaining({ action }));
+    expect(state.effect).toHaveBeenCalledTimes(1);
+    expect(state.quotesEnabled).toHaveBeenCalledWith("creator-other");
+  });
+  it("denies quote reads when the authenticated creator's quotes module is disabled", async () => {
+    state.quotesEnabled.mockResolvedValue(false);
+    expect((await quotes(request("quotes", false, JSON.stringify({ action: "get", source: "streamerbot_chat" })))).status).toBe(403);
+    expect(state.effect).not.toHaveBeenCalled();
+  });
+  it("reports scoped quote actions without enabling unscoped operations or invoking repositories", async () => {
     const response = await check(request("credentials/check"));
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ data: { creatorId: "creator-other", credentialId: id, operationalAccess: false } });
+    expect(await response.json()).toMatchObject({ data: { creatorId: "creator-other", credentialId: id, operationalAccess: false, quoteActions: ["create", "get"] } });
+    expect(state.effect).not.toHaveBeenCalled();
+  });
+  it("reports disabled quotes and fails closed when their availability cannot be checked", async () => {
+    state.quotesEnabled.mockResolvedValue(false);
+    expect(await (await check(request("credentials/check"))).json()).toMatchObject({ data: { quoteActions: [] } });
+    state.quotesEnabled.mockRejectedValue(new Error("database unavailable"));
+    expect((await check(request("credentials/check"))).status).toBe(503);
     expect(state.effect).not.toHaveBeenCalled();
   });
 });

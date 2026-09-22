@@ -41,10 +41,11 @@ export async function authenticateStreamerbotRequest(request: Request): Promise<
   }
 }
 
-export type StreamerbotOperation = "events" | "link" | "points" | "bets.place" | "counters" | "deaths" | "quotes.legacy" | "wheel";
+export type StreamerbotOperation = "events" | "link" | "points" | "bets.place" | "counters" | "deaths" | "quotes.legacy" | "quotes.create" | "quotes.get" | "wheel";
 
 /** Explicit rollout boundary. Future scoped actions need their own entry and tests. */
 export function authorizeStreamerbotOperation(context: AuthenticatedStreamerbot, operation: StreamerbotOperation): Response | null {
+  if (operation === "quotes.create" || operation === "quotes.get") return null;
   const legacyOperations: readonly StreamerbotOperation[] = ["events", "link", "points", "bets.place", "counters", "deaths", "quotes.legacy", "wheel"];
   if (context.creatorId === DEFAULT_CREATOR_ID && legacyOperations.includes(operation)) return null;
   return Response.json({ ok: false, error: "operation_not_isolated", replyMessage: "Este comando ainda não está disponível para este streamer." }, { status: 403 });

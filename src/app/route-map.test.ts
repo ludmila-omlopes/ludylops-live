@@ -22,6 +22,7 @@ const expectedPageRoutes = new Set([
   "/owner",
   "/criar-area",
   "/c/[creatorSlug]",
+  "/c/[creatorSlug]/quotes",
   "/obs/bets",
   "/obs/likes",
   "/obs/quotes",
