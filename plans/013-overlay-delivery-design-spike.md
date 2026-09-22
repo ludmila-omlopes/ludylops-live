@@ -1,80 +1,105 @@
-# Plan 013: Design spike — overlay/live-data delivery for multi-tenant scale
+# Plan 013: Measure overlay delivery cost before a realtime redesign
 
-> **Executor instructions**: This is a **design spike, not a build plan**. The
-> deliverable is a decision document plus (optionally) a throwaway prototype in
-> a scratch branch — no production code changes. If you cannot ground a claim
-> in documentation or a measurement, mark it as an assumption in the doc rather
-> than asserting it. When done, update this plan's row in `plans/README.md`.
->
-> **Best run by a strong executor with web access** (it requires reading
-> current Vercel platform documentation and pricing pages).
+> **Executor instructions**: This is a small measurement/design task.
+> Record assumptions separately from observations. It does not block a
+> controlled two-creator pilot and does not authorize infrastructure changes.
 
 ## Status
 
-- **Priority**: P2
-- **Effort**: M (research + writing; prototype optional)
-- **Risk**: LOW (no production changes)
-- **Depends on**: none. Informs the white-label rollout (plans 008/009+); plan 010 is the stopgap it may eventually replace.
+- **Priority**: P3; deferred broad architecture comparison.
+- **Effort**: S for the first measurement; a later study needs a separate scope.
+- **Risk**: LOW; read-only measurement and documentation.
+- **Depends on**: no code prerequisite for inventory. Use observed pilot data
+  when available and state whether plan 010 / #175 has actually landed.
 - **Category**: direction / tech-debt
-- **Planned at**: commit `f245ee1` (origin/master), 2026-07-07
+- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15; same file tree as master `f353ce2`.
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/178
+- **State**: IMPLEMENTED; documentation and local measurement complete, awaiting PR review/merge.
+- **Drift check**: `git diff --stat ec19f8f..HEAD -- src/components src/app/api/obs bridge package.json`
 
 ## Why this matters
 
-All live surfaces — 5 OBS overlays plus viewer-page data — are **pull-based**: clients poll `force-dynamic` endpoints; every poll is a Vercel invocation + Neon query. Plan 010 trims the frequency and plan 011 caches shared reads, but the architecture still costs `O(clients × poll rate)` at all times. White-label multiplies this per creator: M creators streaming simultaneously = M × overlay pollers + M audiences. Before onboarding real creators, we need a grounded decision on whether polling remains viable (and at what creator count it stops being), or whether to move to push — and if push, which mechanism actually works on this stack (Vercel serverless functions + Neon; no long-lived server process). Guessing wrong here either wastes a migration or bakes in a cost curve that scales with success.
+Creator count multiplies polling traffic. Measure that load before deciding to
+replace transport. The previous plan made a broad SSE/managed-realtime/local
+bridge comparison a prerequisite for onboarding; this revision removes that
+gate. Isolation, permissions and configuration remain pilot release gates.
 
-## Current state (facts to reason from)
+## State at planning (before #175)
 
-- Stack: Next.js 16 on Vercel serverless + Neon serverless Postgres. There is **no long-lived server** — SSE/WebSocket options must account for function duration limits and per-connection-second billing.
-- Poll inventory (after plan 010 lands): per OBS instance while live ≈ 1 req/s × 5 overlays + live-status; viewer pages are request/response (plan 011 caches shared reads server-side, but each viewer still invokes functions).
-- The quotes overlay endpoint is a **mutating GET** (`processNextQueuedQuoteOverlay()` dequeues) — any push design must preserve exactly-once display semantics for the queue.
-- A **local bridge already exists**: `bridge/` runs on the streamer's PC, polls the hosted app for redemptions, and calls the local Streamer.bot HTTP server (`POST /DoAction`). OBS also runs on that same PC. This is a real architectural asset: overlay data could plausibly be delivered locally (bridge → local endpoint → OBS browser source) without touching Vercel at all per frame.
-- Streamer.bot itself exposes a local WebSocket/HTTP server that OBS browser sources on the same machine can subscribe to (verify current capabilities in the Streamer.bot docs — per AGENTS.md, always check their up-to-date documentation).
-- Per-creator context: each white-label creator runs their own OBS + (presumably) own bridge on their own PC; overlays are per-creator browser sources resolved by subdomain (plans 008/009 add tenancy).
+- src/components/obs-quote-overlay.tsx polls quotes every 200 ms while live and
+  live status every 5 s. Four other OBS overlays poll their data about once a
+  second without live gating.
+- Plan 010 proposes quotes at 1 s and four additional live-status checks at 15 s.
+  For five open sources, its configured steady-state upper rates are about
+  5.47 requests/s while live and 0.47 while offline, excluding retries and
+  initial requests. Self-rescheduling loops may run slower with request latency.
+- src/app/api/obs/quotes/current/route.ts mutates queue state on GET. Count its
+  actual queries/side effects; do not label every request as one database query.
+- Viewer page renders and bridge polling are separate load sources.
+  Plan 011's page data cache does not cache OBS operations.
+- Hosting topology, current bills and limits must be verified when measuring;
+  repository configuration alone does not prove the deployed environment.
 
-## Deliverable
+## Scope and deliverable
 
-`docs/overlay-delivery-design.md` containing:
+Write docs/overlay-delivery-design.md with:
+1. Endpoint inventory: active sources, interval, live/offline gating,
+   read-only versus mutating operation, and observed query count when available.
+2. Load table for 1, 2 and 5 concurrent creators, with stream duration and
+   OBS-open-offline assumptions. Separate requests, queries and monetary cost.
+3. Available pilot measurements: errors, pickup latency, requests and database
+   load. Missing telemetry/prices must be marked unknown.
+4. Recommendation to retain/tune polling or commission a larger design study,
+   with an evidence-based review trigger. A forecast is not measured capacity.
 
-1. **Load model** — a small table: requests/hour and Neon queries/hour for 1 / 5 / 20 concurrently-live creators, under (a) today, (b) after plans 010+011, (c) each candidate architecture. State viewer-count assumptions explicitly.
-2. **Candidate evaluation** — for each option below: how it works on this stack, cost curve vs. creator count, failure modes, migration effort (S/M/L), and what it does to the quote-queue semantics:
-   - **A. Status quo + tuning** (polling with 010/011; possibly ETag/`If-None-Match` 304s to cut Neon reads while keeping invocations)
-   - **B. SSE from Vercel functions** (streaming responses; research current function duration caps and per-connection cost on the relevant plan; reconnection behavior in OBS browser sources)
-   - **C. Managed realtime** (e.g. Pusher/Ably/Upstash Redis pub-sub; app publishes on state change, overlays subscribe; monthly cost at 5/20 creators)
-   - **D. Local-first via bridge/Streamer.bot** (overlays subscribe to the streamer's local machine; hosted app pushes to — or is polled by — the bridge once, instead of per-overlay; leverages the existing `bridge/` and Streamer.bot's local server)
-3. **Recommendation** — one option (or staged combination, e.g. "A until 5 creators, then D"), with the trigger metric that forces the migration (e.g. "when X invocations/month or Y concurrently-live creators").
-4. **Migration sketch** for the recommended option — enough for a future build plan: components touched, rollout/rollback, and how demo mode keeps working.
+No production code, new services, prototype, subscription, DNS or deployment
+changes. Do not cache/dequeue real viewers' events to perform measurement.
 
-## Method / steps
+## Steps and verification
 
-1. Read the current Vercel docs on streaming/function duration/pricing and the Streamer.bot WebSocket/HTTP server docs (both change over time — do not answer from memory). Record doc URLs + retrieved values in the design doc.
-2. Inventory the actual endpoints polled (grep `src/components/obs-*.tsx` for fetch targets) and what each returns; note which are pure reads vs. the mutating quotes GET.
-3. Build the load model (deliverable 1) from that inventory.
-4. Evaluate A–D (deliverable 2). For D, verify concretely whether an OBS browser source pointed at the hosted overlay page can receive data from `localhost` (mixed-content/CORS constraints) or whether the overlay page itself must be served locally — this determines D's real feasibility, so treat it as the spike's key open question.
-5. (Optional, if it materially de-risks the recommendation) a throwaway prototype in a scratch branch — clearly marked, never merged.
-6. Write the doc, get it reviewed.
+1. Inventory fetch targets in src/components/obs-*.tsx using rg with a quoted
+   glob and inspect their route handlers. Record current configuration and
+   the separate hypothetical result of plan 010.
+   **Verify**: every active overlay's data and live-status request is counted.
 
-## Scope
+2. Observe a disposable/local pilot or read existing telemetry if authorized
+   access exists. Do not load-test production. For monetary estimates, verify
+   current official hosting/database prices and limits; cite source URLs and
+   retrieval dates. If access is absent, finish the bounded inventory/model and
+   explicitly leave measured-cost conclusions open.
+   **Verify**: each number is labeled observed, calculated or unknown.
 
-**In scope**: research, measurement, `docs/overlay-delivery-design.md`, optional scratch-branch prototype.
-
-**Out of scope**: ANY production code change; changing plans 010/011 (they proceed regardless); committing prototype code to master.
+3. Write the recommendation. Retain polling if the evidence does not justify
+   redesign. If a problem is shown, identify the smallest next investigation,
+   covering only relevant candidates and preserving creator authorization,
+   queue claim/display behavior, reconnects and failure recovery.
+   **Verify**: the document states the trigger, assumptions and remaining unknowns.
 
 ## Done criteria
 
-- [ ] `docs/overlay-delivery-design.md` exists with all four deliverable sections
-- [ ] Every platform limit/price cited has a source URL and retrieval date
-- [ ] The D-option feasibility question (local delivery to OBS browser sources) is answered concretely, not hand-waved
-- [ ] A single recommendation with a numeric migration trigger
-- [ ] No production files changed (`git status` on master clean)
-- [ ] `plans/README.md` status row updated
+- [x] Complete poll inventory with separate live/offline scenarios.
+- [x] Arithmetic is reproducible and counts status polls and bridge separately.
+- [x] Measurements and forecasts are clearly distinguished.
+- [x] Every quoted external price/limit has a current primary-source citation.
+- [x] A bounded recommendation and review trigger are recorded.
+- [x] No production code, shared data or infrastructure was changed.
 
-## STOP conditions
+## Git workflow and maintenance
 
-- No web access to verify Vercel/Streamer.bot current limits — report; a design doc built on stale training data is worse than none.
-- The load model reveals plans 010+011 already keep 20 concurrent creators within comfortable budgets — then the recommendation may legitimately be "do nothing further; re-evaluate at N creators," and the doc should say so rather than inventing work.
+Update remote base before making a documentation branch. Include Closes #178
+if an issue PR completes this revised deliverable. The larger comparison is
+deferred; completing this measurement does not imply a transport migration.
+Revisit when pilot costs/latency exceed the documented trigger or actual usage
+changes. Do not delay the two-creator pilot solely because telemetry is missing.
 
-## Maintenance notes
+## Delivery — 2026-09-22
 
-- Revisit this doc when: white-label onboards its first external creator; Vercel/Neon pricing changes; or an overlay needs sub-second latency (e.g. interactive wheel spins).
-- The chosen option becomes a build plan (014+) only when the trigger metric fires or before the first multi-creator live event.
+Completed against master 12ef75c, after PRs #199 and #200 merged.
+See [the decision and model](../docs/overlay-delivery-design.md) and
+[local request evidence](../docs/measurements/overlay-delivery-2026-09-22.json).
+Five-source offline observation and synthetic live client-cadence measurement
+completed with no observed HTTP/JavaScript errors. Query counts are static code
+analysis; production SQL, latency, capacity and money remain unknown.
+Retain polling while completing functional creator isolation. No infrastructure
+or production data changed. Validation covers arithmetic, local evidence, source
+links and documentation-only diff; no new application test/build was needed.

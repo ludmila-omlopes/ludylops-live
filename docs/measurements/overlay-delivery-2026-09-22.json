@@ -1,0 +1,856 @@
+{
+  "measuredAt": "2026-09-22T20:24:33.078Z",
+  "sourceCommit": "12ef75c",
+  "runtime": {
+    "node": "v26.2.0",
+    "browser": "153.0.4234.48",
+    "next": "16.2.9"
+  },
+  "environment": "localhost production build, no DATABASE_URL or external API credentials; five sources for default demo creator",
+  "scenarios": [
+    {
+      "mode": "offline-real-demo-handler",
+      "waitAfterLastNavigationMs": 16000,
+      "samples": [
+        {
+          "source": "quotes",
+          "durationMs": 16464,
+          "requests": [
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 167
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 5182
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 10187
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 15193
+            }
+          ],
+          "httpErrors": [],
+          "javascriptErrors": []
+        },
+        {
+          "source": "bets",
+          "durationMs": 16288,
+          "requests": [
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 76
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 15079
+            }
+          ],
+          "httpErrors": [],
+          "javascriptErrors": []
+        },
+        {
+          "source": "likes",
+          "durationMs": 16209,
+          "requests": [
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 70
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 15078
+            }
+          ],
+          "httpErrors": [],
+          "javascriptErrors": []
+        },
+        {
+          "source": "subscribers",
+          "durationMs": 16134,
+          "requests": [
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 72
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 15080
+            }
+          ],
+          "httpErrors": [],
+          "javascriptErrors": []
+        },
+        {
+          "source": "wheel",
+          "durationMs": 16057,
+          "requests": [
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 59
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 15064
+            }
+          ],
+          "httpErrors": [],
+          "javascriptErrors": []
+        }
+      ]
+    },
+    {
+      "mode": "live-synthetic-responses",
+      "waitAfterLastNavigationMs": 31000,
+      "samples": [
+        {
+          "source": "quotes",
+          "durationMs": 31547,
+          "requests": [
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 104
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 117
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 1130
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 2140
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 3149
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 4159
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 5125
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 5171
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 6180
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 7189
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 8201
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 9211
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 10143
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 10220
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 11233
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 12243
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 13255
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 14265
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 15149
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 15274
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 16284
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 17294
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 18305
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 19316
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 20155
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 20326
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 21337
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 22347
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 23358
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 24366
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 25160
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 25377
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 26388
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 27397
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 28408
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 29418
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 30164
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 30428
+            },
+            {
+              "path": "/api/obs/quotes/current",
+              "atMs": 31440
+            }
+          ],
+          "httpErrors": [],
+          "javascriptErrors": []
+        },
+        {
+          "source": "bets",
+          "durationMs": 31436,
+          "requests": [
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 109
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 122
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 1128
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 2138
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 3147
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 4157
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 5169
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 6178
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 7187
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 8198
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 9209
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 10219
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 11230
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 12240
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 13252
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 14263
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 15132
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 15272
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 16282
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 17291
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 18303
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 19314
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 20324
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 21334
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 22345
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 23355
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 24364
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 25375
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 26385
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 27395
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 28404
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 29416
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 30135
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 30426
+            },
+            {
+              "path": "/api/obs/bets/current",
+              "atMs": 31437
+            }
+          ],
+          "httpErrors": [],
+          "javascriptErrors": []
+        },
+        {
+          "source": "likes",
+          "durationMs": 31320,
+          "requests": [
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 108
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 120
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 1137
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 2146
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 3155
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 4166
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 5178
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 6186
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 7196
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 8207
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 9218
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 10228
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 11239
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 12248
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 13260
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 14270
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 15126
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 15281
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 16290
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 17300
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 18312
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 19322
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 20333
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 21343
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 22353
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 23364
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 24373
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 25383
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 26394
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 27403
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 28413
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 29425
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 30139
+            },
+            {
+              "path": "/api/obs/likes/current",
+              "atMs": 30434
+            }
+          ],
+          "httpErrors": [],
+          "javascriptErrors": []
+        },
+        {
+          "source": "subscribers",
+          "durationMs": 31207,
+          "requests": [
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 106
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 124
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 1133
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 2141
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 3150
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 4162
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 5173
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 6181
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 7191
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 8203
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 9213
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 10223
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 11235
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 12245
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 13256
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 14266
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 15121
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 15276
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 16285
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 17295
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 18307
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 19318
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 20329
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 21339
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 22349
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 23359
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 24368
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 25379
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 26389
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 27398
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 28409
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 29420
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 30134
+            },
+            {
+              "path": "/api/obs/subscribers/current",
+              "atMs": 30430
+            }
+          ],
+          "httpErrors": [],
+          "javascriptErrors": []
+        },
+        {
+          "source": "wheel",
+          "durationMs": 31092,
+          "requests": [
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 92
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 95
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 1111
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 2120
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 3130
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 4140
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 5151
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 6159
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 7170
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 8181
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 9192
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 10203
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 11214
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 12224
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 13236
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 14245
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 15099
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 15255
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 16264
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 17275
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 18286
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 19298
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 20307
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 21317
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 22328
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 23338
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 24347
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 25358
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 26368
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 27377
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 28388
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 29399
+            },
+            {
+              "path": "/api/obs/live-status",
+              "atMs": 30114
+            },
+            {
+              "path": "/api/obs/wheel/current",
+              "atMs": 30409
+            }
+          ],
+          "httpErrors": [],
+          "javascriptErrors": []
+        }
+      ]
+    }
+  ]
+}
