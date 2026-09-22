@@ -1,3 +1,4 @@
+import { requireModulePage } from '@/lib/creators/module-page-access';
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -19,6 +20,8 @@ type ProdutinhosPageProps = {
 };
 
 export default async function ProdutinhosPage({ searchParams }: ProdutinhosPageProps) {
+  await requireModulePage(["product_recommendations"]);
+
   const resolvedSearchParams = await searchParams;
   const selectedCategoryParam = Array.isArray(resolvedSearchParams.categoria)
     ? resolvedSearchParams.categoria[0]

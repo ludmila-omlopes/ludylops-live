@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ record: vi.fn(), enabled: vi.fn(), quotesEnabled: vi.fn(), used: vi.fn(), effect: vi.fn() }));
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/env", () => ({ env: { STREAMERBOT_SHARED_SECRET: "legacy-test", STREAMERBOT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64") } }));
+vi.mock("@/lib/env", () => ({ isDemoMode: true, env: { STREAMERBOT_SHARED_SECRET: "legacy-test", STREAMERBOT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64") } }));
 vi.mock("@/lib/db/client", () => ({ getDb: () => null }));
 vi.mock("@/lib/streamerbot/credentials", async (original) => ({
   ...await original<typeof import("@/lib/streamerbot/credentials")>(), findStreamerbotCredential: state.record,
@@ -25,11 +25,14 @@ import { POST as quotes } from "./quotes/route";
 import { POST as wheel } from "./wheel/route";
 import { POST as check } from "./credentials/check/route";
 import { buildCredentialSignature, encryptCredentialSecret } from "@/lib/streamerbot/credential-crypto";
+import { defaultCreatorTenant } from "@/lib/creators/tenant";
+import { listDemoCreatorTenants } from "@/lib/creators/demo-store";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { buildSignature } from "@/lib/streamerbot/security";
 const routes = [ ["events", events], ["link", link], ["points", points], ["bets/place", bets], ["counters", counters], ["deaths", deaths], ["quotes", quotes], ["wheel", wheel] ] as const;
 const id = `sbc_${"a".repeat(32)}`;
 const secret = "new-test";
+const originalDefaultModules = structuredClone(defaultCreatorTenant.modules);
 function setCreator(creatorId: string) {
   state.record.mockResolvedValue({ id, creatorId, status: "active", revokedAt: null,
     encryptedSecret: encryptCredentialSecret(secret, id, creatorId, Buffer.alloc(32, 7).toString("base64")) });
@@ -44,11 +47,14 @@ function request(path: string, legacy = false, body = "not-json") {
   } });
 }
 describe("credential rollout at every Streamer.bot handler", () => {
+  afterEach(() => { defaultCreatorTenant.modules = structuredClone(originalDefaultModules); });
   beforeEach(() => {
+    defaultCreatorTenant.modules = structuredClone(originalDefaultModules);
     vi.restoreAllMocks();
     vi.spyOn(console, "info").mockImplementation(() => {});
     state.effect.mockReset(); state.used.mockReset(); state.enabled.mockReset().mockResolvedValue(true);
     state.quotesEnabled.mockReset().mockResolvedValue(true);
+    listDemoCreatorTenants().splice(0, Infinity, { ...structuredClone(defaultCreatorTenant), creator: { ...defaultCreatorTenant.creator, id: "creator-other" } });
     setCreator("creator-other");
   });
   it.each(routes)("%s denies another creator before parsing/effects", async (path, handler) => {
@@ -68,6 +74,29 @@ describe("credential rollout at every Streamer.bot handler", () => {
     const response = await events(request("events", false, JSON.stringify(payload)));
     expect(response.status).toBe(200);
     expect(state.effect).toHaveBeenCalledTimes(1);
+  });
+  it.each(routes)("%s rejects disabled operations even with a valid enabled integration", async (path, handler) => {
+    setCreator(DEFAULT_CREATOR_ID);
+    defaultCreatorTenant.modules = originalDefaultModules.map(row => ({ ...row, status: row.moduleKey === "streamerbot" ? "installed" : "disabled" }));
+    // Counter/death operations belong to the integration itself.
+    if (path === "counters" || path === "deaths") defaultCreatorTenant.modules = [];
+    const payload = path === "quotes" ? JSON.stringify({ action: "get", source: "streamerbot_chat" }) : "not-json";
+    for (const legacy of [true, false]) expect((await handler(request(path, legacy, payload))).status).toBe(403);
+    expect(state.effect).not.toHaveBeenCalled();
+  });
+  it("denies scoped quote actions when a transitive dependency is missing", async () => {
+    listDemoCreatorTenants()[0].modules = listDemoCreatorTenants()[0].modules.filter(row => row.moduleKey !== "streamerbot");
+    expect((await quotes(request("quotes", false, JSON.stringify({ action: "get", source: "streamerbot_chat" })))).status).toBe(403);
+    expect(state.effect).not.toHaveBeenCalled();
+  });
+  it("denies like-goal rewards when OBS is disabled while keeping presence events available", async () => {
+    setCreator(DEFAULT_CREATOR_ID);
+    defaultCreatorTenant.modules = originalDefaultModules.map(row => ({ ...row, status: row.moduleKey === "obs_overlays" ? "disabled" : row.status }));
+    const payload = { eventId: "test", eventType: "like_count_update", occurredAt: new Date().toISOString(), payload: {} };
+    expect((await events(request("events", false, JSON.stringify(payload)))).status).toBe(403);
+    expect(state.effect).not.toHaveBeenCalled();
+    state.effect.mockResolvedValue({ stored: true });
+    expect((await events(request("events", false, JSON.stringify({ ...payload, eventType: "presence_tick", viewerExternalId: "test" })))).status).toBe(200);
   });
   it.each(["create", "get"])("allows scoped quote %s using verified identity despite forged hints", async action => {
     state.effect.mockResolvedValue({ action, quote: { quoteNumber: 1, body: "Frase" }, viewer: null });

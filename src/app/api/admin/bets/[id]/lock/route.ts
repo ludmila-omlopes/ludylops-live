@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { fail, isTrustedAppMutationRequest, ok, requireAdminApiSession } from "@/lib/api";
 import { lockBet } from "@/lib/db/repository";
 
@@ -5,6 +6,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const moduleDenial = await guardModuleRequest(request, ["bets"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

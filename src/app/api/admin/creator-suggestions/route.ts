@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { fail, isTrustedAppMutationRequest, ok, requireAdminApiSession } from "@/lib/api";
 import { createAdminCreatorSuggestion } from "@/lib/db/repository";
 import { createAdminCreatorSuggestionSchema } from "@/lib/creator-suggestions/service";
@@ -19,6 +20,9 @@ function mapCreatorSuggestionError(message: string) {
 }
 
 export async function POST(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["creator_suggestions"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

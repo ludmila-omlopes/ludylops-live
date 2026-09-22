@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { defaultCreatorContext } from "@/lib/creators/context";
 import { z } from "zod";
 
@@ -16,6 +17,9 @@ const obsOverlayActionSchema = z.object({
 });
 
 export async function GET(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["quotes","obs_overlays"]);
+  if (moduleDenial) return moduleDenial;
+
   const session = await requireAdminApiSession();
   if (!session) {
     return fail("Forbidden", 403);
@@ -27,6 +31,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["quotes","obs_overlays"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

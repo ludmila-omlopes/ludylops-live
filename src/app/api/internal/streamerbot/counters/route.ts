@@ -19,7 +19,7 @@ function mapStreamerbotCounterReply(message: string, requestedBy?: string) {
 export async function POST(request: Request) {
   const authentication = await authenticateStreamerbotRequest(request);
   if (!authentication.ok) return authentication.response;
-  const denied = authorizeStreamerbotOperation(authentication, "counters");
+  const denied = await authorizeStreamerbotOperation(authentication, "counters");
   if (denied) return denied;
   const raw = authentication.raw;
 

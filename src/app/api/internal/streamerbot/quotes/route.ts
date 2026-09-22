@@ -75,7 +75,7 @@ export async function POST(request: Request) {
   try {
     const payload = streamerbotQuoteCommandSchema.parse(JSON.parse(raw));
     const operation = payload.action === "show" ? "quotes.legacy" : payload.action === "create" ? "quotes.create" : "quotes.get";
-    const denied = authorizeStreamerbotOperation(authentication, operation);
+    const denied = await authorizeStreamerbotOperation(authentication, operation);
     if (denied) return denied;
     if (!await streamerbotQuoteModuleIsEnabled(authentication.creatorId)) {
       return NextResponse.json({ ok: false, error: "creator_unavailable", replyMessage: "As frases estão indisponíveis para este streamer." }, { status: 403 });

@@ -1,10 +1,14 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { z } from "zod";
 
 import { fail, isTrustedAppMutationRequest, ok, requireAdminApiSession } from "@/lib/api";
 import { wheelConfigSchema } from "@/lib/streamerbot/schemas";
 import { getWheelConfig, updateWheelConfig } from "@/lib/wheel";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["obs_overlays"]);
+  if (moduleDenial) return moduleDenial;
+
   const session = await requireAdminApiSession();
   if (!session) {
     return fail("Forbidden", 403);
@@ -14,6 +18,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["obs_overlays"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

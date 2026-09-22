@@ -1,3 +1,5 @@
+import { guardVerifiedModules } from "@/lib/creators/module-access";
+import { defaultCreatorContext } from "@/lib/creators/context";
 import { env } from "@/lib/env";
 import { fail, ok } from "@/lib/api";
 import { syncSteamGameSuggestionPrices } from "@/lib/db/repository";
@@ -21,6 +23,8 @@ export async function POST(request: Request) {
     return fail("Unauthorized", 401);
   }
 
+  const moduleDenial = await guardVerifiedModules(defaultCreatorContext, ["game_suggestions"]);
+  if (moduleDenial) return moduleDenial;
   try {
     const result = await syncSteamGameSuggestionPrices({ force: true });
     console.info("[steam/sync] Price sync completed.", result);

@@ -4766,7 +4766,7 @@ export async function listViewerChannelsForGoogleAccount(googleAccountId: string
           return channel;
         }
 
-        const dashboard = await getViewerDashboard(unifiedViewer.id);
+        const dashboard = await getViewerPoints(unifiedViewer.id);
         return dashboard
           ? {
               ...channel,
@@ -5691,7 +5691,7 @@ export async function getViewerByYoutubeChannelId(youtubeChannelId: string) {
     return row;
   }
 
-  const unifiedDashboard = await getViewerDashboard(unifiedViewer.id);
+  const unifiedDashboard = await getViewerPoints(unifiedViewer.id);
   return unifiedDashboard
     ? {
         ...row,
@@ -5701,6 +5701,29 @@ export async function getViewerByYoutubeChannelId(youtubeChannelId: string) {
         lastSyncedAt: unifiedDashboard.balance.lastSyncedAt,
       }
     : row;
+}
+
+/** Points-only projection: callers must not read redemption history just to show a balance. */
+export async function getViewerPoints(viewerId: string) {
+  const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
+  const viewer = await withViewerById(viewerId);
+  if (!viewer) return null;
+  if (!db) {
+    const creditedViewer = await resolveUnifiedViewerForLinkedChannel(viewer);
+    return { viewer, balance: getBalance(getDemoStore(), creditedViewer.id) };
+  }
+  const [balance] = await db.select().from(viewerBalances).where(eq(viewerBalances.viewerId, viewer.id)).limit(1);
+  return {
+    viewer,
+    balance: {
+      viewerId: viewer.id,
+      currentBalance: balance?.currentBalance ?? 0,
+      lifetimeEarned: balance?.lifetimeEarned ?? 0,
+      lifetimeSpent: balance?.lifetimeSpent ?? 0,
+      lastSyncedAt: balance?.lastSyncedAt.toISOString() ?? new Date().toISOString(),
+    },
+  };
 }
 
 export async function getViewerDashboard(viewerId: string) {
@@ -7977,7 +8000,7 @@ async function placeBetForViewer(input: {
   source: string;
   requireLinkedViewer: boolean;
 }): Promise<{ entry: BetEntryRecord; option: BetOptionRecord }> {
-  const dashboard = await getViewerDashboard(input.viewer.id);
+  const dashboard = await getViewerPoints(input.viewer.id);
   if (!dashboard) {
     throw new Error("Viewer not found.");
   }
@@ -8379,7 +8402,7 @@ export async function getViewerBalanceFromChatCommand(input: {
   }
 
   const unifiedViewer = await resolveUnifiedViewerForLinkedChannel(viewer);
-  const dashboard = await getViewerDashboard(unifiedViewer.id);
+  const dashboard = await getViewerPoints(unifiedViewer.id);
   if (!dashboard) {
     throw new Error("viewer_not_ready");
   }
@@ -9365,7 +9388,7 @@ export async function redeemItem({
   itemId: string;
   source: string;
 }) {
-  const dashboard = await getViewerDashboard(viewerId);
+  const dashboard = await getViewerPoints(viewerId);
   if (!dashboard) {
     throw new Error("Viewer not found.");
   }

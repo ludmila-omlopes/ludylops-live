@@ -32,7 +32,7 @@ function mapChatBetReply(message: string, viewerName?: string) {
 export async function POST(request: Request) {
   const authentication = await authenticateStreamerbotRequest(request);
   if (!authentication.ok) return authentication.response;
-  const denied = authorizeStreamerbotOperation(authentication, "bets.place");
+  const denied = await authorizeStreamerbotOperation(authentication, "bets.place");
   if (denied) return denied;
   const raw = authentication.raw;
 

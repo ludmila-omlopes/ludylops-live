@@ -22,7 +22,7 @@ function mapViewerBalanceReply(message: string, viewerName?: string) {
 export async function POST(request: Request) {
   const authentication = await authenticateStreamerbotRequest(request);
   if (!authentication.ok) return authentication.response;
-  const denied = authorizeStreamerbotOperation(authentication, "points");
+  const denied = await authorizeStreamerbotOperation(authentication, "points");
   if (denied) return denied;
   const raw = authentication.raw;
 

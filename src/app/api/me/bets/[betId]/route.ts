@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { fail, isTrustedAppMutationRequest, ok, requireLinkedApiSession } from "@/lib/api";
 import { placeBet } from "@/lib/db/repository";
 import { placeBetSchema } from "@/lib/streamerbot/schemas";
@@ -6,6 +7,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ betId: string }> },
 ) {
+  const moduleDenial = await guardModuleRequest(request, ["bets"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

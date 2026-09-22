@@ -8,7 +8,7 @@ import { triggerWheelSpin } from "@/lib/wheel";
 export async function POST(request: Request) {
   const authentication = await authenticateStreamerbotRequest(request);
   if (!authentication.ok) return authentication.response;
-  const denied = authorizeStreamerbotOperation(authentication, "wheel");
+  const denied = await authorizeStreamerbotOperation(authentication, "wheel");
   if (denied) return denied;
   const raw = authentication.raw;
 

@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { creatorModuleCatalog } from "@/lib/creators/modules";
+import { creatorModuleCatalog, getModuleAvailability } from "@/lib/creators/modules";
 import type {
   CreatorModuleRecord,
   CreatorModuleStatus,
@@ -326,6 +326,7 @@ export function PlatformOwnerCreatorList({
                   <div className="grid gap-2">
                     {modules.map(({ manifest, module }) => {
                       const status = module?.status ?? "missing";
+                      const availability = getModuleAvailability(instance.modules, manifest.key);
                       const key = `${instance.creator.id}:${manifest.key}`;
                       const busy = busyKey === key;
                       const enableStatus: CreatorModuleStatus = "installed";
@@ -348,6 +349,11 @@ export function PlatformOwnerCreatorList({
                                 {moduleStatusLabels[status]}
                               </span>
                             </div>
+                            {status === "installed" && !availability.available ? (
+                              <p className="mt-2 text-sm font-bold text-[var(--color-ink)]">
+                                Indisponível. Ative: {availability.missing.map(key => creatorModuleCatalog.find(item => item.key === key)?.label ?? key).join(", ")}.
+                              </p>
+                            ) : null}
                             <p className="mt-1 text-xs font-bold text-[var(--color-ink-soft)]">
                               {[...manifest.publicRoutes, ...manifest.obsRoutes].join(", ") ||
                                 "Sem rota pública"}
@@ -402,7 +408,7 @@ export function PlatformOwnerCreatorList({
                     })}
                   </div>
                 </div>
-                <StreamerbotCredentials creatorId={instance.creator.id} enabled={instance.creator.status === "active" && instance.modules.some((module) => module.moduleKey === "streamerbot" && module.status === "installed")} />
+                <StreamerbotCredentials creatorId={instance.creator.id} enabled={instance.creator.status === "active" && getModuleAvailability(instance.modules, "streamerbot").available} />
               </article>
             );
           })}

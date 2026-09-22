@@ -33,6 +33,7 @@ export function AppChrome({
   isLive = false,
   session,
   showViewerLinkingAlert = false,
+  allowedModulePaths,
 }: {
   children: React.ReactNode;
   initialTheme?: ThemeMode | null;
@@ -41,6 +42,7 @@ export function AppChrome({
   isLive?: boolean;
   session: Session | null;
   showViewerLinkingAlert?: boolean;
+  allowedModulePaths: string[];
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -60,7 +62,7 @@ export function AppChrome({
   const primaryLinks: NavLink[] = [
     { href: "/apostas", label: "Apostas" },
     { href: "/ranking", label: "Ranking" },
-  ];
+  ].filter(link => allowedModulePaths.includes(link.href));
 
   const navGroups: NavGroup[] = [
     {
@@ -79,11 +81,11 @@ export function AppChrome({
         { href: "/quotes", label: "Quotes" },
       ],
     },
-  ];
+  ].map(group => ({ ...group, links: group.links.filter(link => allowedModulePaths.includes(link.href)) })).filter(group => group.links.length > 0);
 
   const authedLinks: NavLink[] = [
     { href: "/me", label: "Meus Pipetz" },
-  ];
+  ].filter(link => allowedModulePaths.includes(link.href));
   const adminLinks: NavLink[] = isAdmin ? [{ href: "/admin", label: "Admin" }] : [];
   const ownerLinks: NavLink[] = isPlatformOwner ? [{ href: "/owner", label: "Plataforma" }] : [];
   const hasUsableSession = hasUsableAppSession(session);
@@ -253,7 +255,7 @@ export function AppChrome({
         ) : null}
       </header>
 
-      {showViewerLinkingAlert ? (
+      {showViewerLinkingAlert && allowedModulePaths.includes("/me") ? (
         <Link
           href="/me"
           className="sticky top-[75px] z-30 border-b-[3px] border-[var(--color-ink)] bg-[var(--color-yellow)] text-[var(--color-accent-ink)] transition-colors hover:bg-[var(--color-mint)] md:top-[78px]"
