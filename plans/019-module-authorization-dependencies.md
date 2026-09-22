@@ -8,7 +8,7 @@
 
 ## Status
 
-- **State**: IMPLEMENTED on `codex/019-module-authorization-dependencies`, based on merged quote pilot `f85aaf3` (2026-09-22); awaiting review/merge.
+- **State**: IMPLEMENTED on `codex/019-module-authorization-dependencies`, based on merged quote pilot `f85aaf3` (2026-09-22); PR #198 open for review/merge.
 - **Implementation and coverage**: [docs/module-authorization.md](../docs/module-authorization.md). The selected transition policy rejects invalid changes and names blockers; no automatic cascade. PostgreSQL row locks serialize concurrent mutations. No new migration.
 
 - **Priority**: P1
