@@ -133,7 +133,60 @@ Resultados locais: preservação do backfill e todos os cenários PostgreSQL
 passaram. Os testes Vitest cobrem ainda domínio/slug inválido, criador desativado,
 módulo ausente, hints forjados, dono de A tentando administrar B, layout e
 renderização sem dependências globais. Isso não substitui teste da instalação
-real do Streamer.bot/OBS. **Nenhum banco compartilhado/produção foi alterado.**
+real do Streamer.bot/OBS. Na entrega inicial, nenhum banco compartilhado foi
+alterado. A aplicação posterior autorizada está registrada abaixo.
+
+## Aplicação autorizada em produção — 2026-09-22, 00:24 UTC
+
+Após autorização explícita da operadora, a migração 0025 foi aplicada ao banco
+configurado em produção, em uma transação com limite de espera por lock de 5 s
+e de statement de 20 s. O PR #197 ainda estava aberto; o merge continua manual.
+
+- Inventário confirmado: 47 frases, um estado de overlay, um controle e fila
+  vazia. Nenhum overlay ativo nem credencial operacional de outro criador.
+- Backup completo em formato custom do PostgreSQL, armazenado fora do Git.
+  A restauração integral em PostgreSQL 17.11 local passou; o mesmo DDL foi
+  ensaiado nessa cópia antes da aplicação.
+- Quatro `creator_id` com default/NOT NULL/FK, duas PKs compostas e os índices
+  novos verificados após commit. Contagens e hashes dos campos anteriores
+  permaneceram iguais dentro da transação, inclusive os timestamps.
+- Baseline check passou antes e depois. Os leitores do código novo retornaram
+  as 47 frases da Ludylops, controle ativo e nenhum overlay ativo. A versão
+  publicada respondeu HTTP 200 em `/quotes` e `/obs/quotes`.
+
+Como a versão publicada ainda usa `ON CONFLICT (slot)` e `ON CONFLICT (key)`,
+foram mantidos **dois índices únicos temporários de compatibilidade**:
+
+```sql
+CREATE UNIQUE INDEX quote_overlay_state_legacy_slot_rollout_idx
+  ON public.quote_overlay_state(slot);
+CREATE UNIQUE INDEX obs_overlay_control_legacy_key_rollout_idx
+  ON public.obs_overlay_control(key);
+```
+
+Esses índices permitem os upserts antigos durante a transição, além dos novos
+alvos compostos. A resolução dos quatro alvos foi conferida com `EXPLAIN`, sem
+executar exibições/cobranças de teste em produção. Não houve alteração de
+credenciais nem configuração do Streamer.bot.
+
+**Etapa final após o merge/deploy:** confirmar que produção e demais escritores
+usam o código novo, que não há rollback antigo em andamento e que o OBS está
+funcionando. Só então remover esses dois índices:
+
+```sql
+DROP INDEX public.quote_overlay_state_legacy_slot_rollout_idx;
+DROP INDEX public.obs_overlay_control_legacy_key_rollout_idx;
+```
+
+Até essa remoção, estado e controle ainda têm a restrição global adicional.
+Isso não libera nem impede os fluxos pagos de outros criadores: eles continuam
+bloqueados pelo piloto. Não inicializar estado/controle de outro criador enquanto
+essa compatibilidade existir, nem liberar suas credenciais enquanto houver
+leitores antigos sem filtro. Os índices são uma diferença operacional temporária
+em relação ao schema final do PR; não executar `db:push` para removê-los antes
+de confirmar a troca dos escritores. O SQL corrigido e revisado foi aplicado
+diretamente nesta operação devido à falha do gerador descrita acima; não houve
+reexecução de migrations antigas, seeds ou criação de histórico fictício.
 
 ## Antes de disponibilizar o produto para outros streamers
 

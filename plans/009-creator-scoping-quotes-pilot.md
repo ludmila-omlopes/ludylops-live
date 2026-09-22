@@ -17,7 +17,7 @@
 - **Category**: tech-debt / migration
 - **Planned at**: commit `ec19f8f`, reconciled 2026-09-15; same file tree as remote master `f353ce2`.
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/173
-- **State**: IMPLEMENTED in the issue worktree; awaiting PR integration and a separate reviewed database rollout. No shared/production database changes.
+- **State**: IMPLEMENTED in PR #197. Initial delivery did not change production; the separately authorized database rollout was applied on 2026-09-22 at 00:24 UTC. Awaiting merge/deploy and removal of two temporary legacy compatibility indexes; see docs/creator-scoping.md.
 
 ## Why this matters
 
