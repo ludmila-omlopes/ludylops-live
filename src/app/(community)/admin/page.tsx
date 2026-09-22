@@ -78,7 +78,7 @@ export default async function AdminPage() {
     deathCounters,
   ] = await Promise.all([
     can("redemptions") ? getCatalog() : Promise.resolve([]),
-    can("ranking") ? getLeaderboard() : Promise.resolve([]),
+    can("ranking") ? getLeaderboard({ limit: null }) : Promise.resolve([]),
     can("redemptions") ? getBridgeStatus() : Promise.resolve([]),
     can("streamerbot") ? getStreamerbotLivestreamStatus() : Promise.resolve(null),
     can("streamerbot") ? getCurrentGame() : Promise.resolve(null),

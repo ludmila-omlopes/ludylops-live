@@ -5614,20 +5614,25 @@ export async function getCatalog() {
   }));
 }
 
-export async function getLeaderboard() {
+export async function getLeaderboard({ limit = 100 }: { limit?: number | null } = {}) {
+  // Only authenticated admin callers may explicitly request the full list.
+  if (limit !== null && (!Number.isSafeInteger(limit) || limit < 1 || limit > 100)) {
+    throw new Error("invalid_leaderboard_limit");
+  }
   const db = getDb();
 
   if (isDemoMode || !db) {
     const store = getDemoStore();
-    return store.viewers
+    const entries = store.viewers
       .map((viewer) => ({
         viewer,
         balance: getBalance(store, viewer.id),
       }))
       .sort((a, b) => b.balance.currentBalance - a.balance.currentBalance);
+    return limit === null ? entries : entries.slice(0, limit);
   }
 
-  const rows = await db
+  const query = db
     .select({
       id: users.id,
       youtubeChannelId: users.youtubeChannelId,
@@ -5644,7 +5649,7 @@ export async function getLeaderboard() {
     .where(eq(users.excludeFromRanking, false))
     .orderBy(desc(viewerBalances.currentBalance));
 
-  return rows;
+  return limit === null ? await query : await query.limit(limit);
 }
 
 export async function getViewerByYoutubeChannelId(youtubeChannelId: string) {
@@ -6094,7 +6099,10 @@ export async function adminAttachYoutubeChannelToGoogleAccount(input: {
   };
 }
 
-export async function listGameSuggestions(viewerId?: string | null) {
+export async function listGameSuggestions(
+  viewerId?: string | null,
+  { refreshHltb = false }: { refreshHltb?: boolean } = {},
+) {
   const db = getDb();
 
   if (isDemoMode || !db) {
@@ -6120,7 +6128,9 @@ export async function listGameSuggestions(viewerId?: string | null) {
     throw error;
   }
 
-  suggestionRows = await refreshStaleHowLongToBeatRows(db, suggestionRows);
+  if (refreshHltb) {
+    suggestionRows = await refreshStaleHowLongToBeatRows(db, suggestionRows);
+  }
 
   const serializedSuggestions = suggestionRows.map(serializeGameSuggestion);
   const viewerIds = [...new Set(serializedSuggestions.map((entry) => entry.viewerId))];
@@ -6129,13 +6139,19 @@ export async function listGameSuggestions(viewerId?: string | null) {
     : [];
   const viewerMap = new Map(suggestionViewers.map((row) => [row.id, serializeViewer(row)]));
   const serializedBoosts = boostRows.map(serializeGameSuggestionBoost);
+  const boostsBySuggestion = new Map<string, GameSuggestionBoostRecord[]>();
+  for (const boost of serializedBoosts) {
+    const entries = boostsBySuggestion.get(boost.suggestionId);
+    if (entries) entries.push(boost);
+    else boostsBySuggestion.set(boost.suggestionId, [boost]);
+  }
 
   return serializedSuggestions
     .map((suggestion) =>
       buildGameSuggestionWithMeta({
         suggestion,
         viewer: viewerMap.get(suggestion.viewerId) ?? null,
-        boosts: serializedBoosts.filter((entry) => entry.suggestionId === suggestion.id),
+        boosts: boostsBySuggestion.get(suggestion.id) ?? [],
         boostSettings,
       }),
     )
@@ -6143,7 +6159,7 @@ export async function listGameSuggestions(viewerId?: string | null) {
 }
 
 export async function listAdminGameSuggestions() {
-  return listGameSuggestions();
+  return listGameSuggestions(undefined, { refreshHltb: true });
 }
 
 export async function listVideoSuggestions(viewerId?: string | null) {
@@ -6177,12 +6193,18 @@ export async function listVideoSuggestions(viewerId?: string | null) {
     : [];
   const viewerMap = new Map(suggestionViewers.map((row) => [row.id, serializeViewer(row)]));
   const serializedBoosts = boostRows.map(serializeVideoSuggestionBoost);
+  const boostsBySuggestion = new Map<string, VideoSuggestionBoostRecord[]>();
+  for (const boost of serializedBoosts) {
+    const entries = boostsBySuggestion.get(boost.suggestionId);
+    if (entries) entries.push(boost);
+    else boostsBySuggestion.set(boost.suggestionId, [boost]);
+  }
 
   return serializedSuggestions.map((suggestion) =>
     buildVideoSuggestionWithMeta({
       suggestion,
       viewer: viewerMap.get(suggestion.viewerId) ?? null,
-      boosts: serializedBoosts.filter((entry) => entry.suggestionId === suggestion.id),
+      boosts: boostsBySuggestion.get(suggestion.id) ?? [],
     }),
   );
 }
