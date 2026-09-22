@@ -17,8 +17,9 @@ export default async function RankingPage() {
               className="text-4xl uppercase sm:text-6xl lg:text-7xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Quem ta mandando na live.
+              Quem tá mandando na live.
             </h1>
+            <p className="mt-4 text-lg">Os 100 maiores saldos de pipetz da comunidade.</p>
           </div>
         </div>
       </section>
