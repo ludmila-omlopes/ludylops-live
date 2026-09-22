@@ -9,6 +9,7 @@ import {
 import {
   isCreatorModuleStatus,
   updatePlatformCreatorModuleStatus,
+  ModuleTransitionError,
 } from "@/lib/creators/instances";
 
 const creatorModuleStatusSchema = z.object({
@@ -27,17 +28,28 @@ export async function PATCH(
     return fail("Origem inválida.", 403);
   }
 
-  const { id, moduleKey } = await params;
-  const payload = creatorModuleStatusSchema.parse(await request.json());
-  const updatedModule = await updatePlatformCreatorModuleStatus({
-    creatorId: id,
-    moduleKey,
-    status: payload.status,
-  });
+  try {
+    const { id, moduleKey } = await params;
+    const payload = creatorModuleStatusSchema.parse(await request.json());
+    const updatedModule = await updatePlatformCreatorModuleStatus({
+      creatorId: id,
+      moduleKey,
+      status: payload.status,
+    });
 
-  if (!updatedModule) {
-    return fail("Módulo não encontrado.", 404);
+    if (!updatedModule) {
+      return fail("Módulo não encontrado.", 404);
+    }
+
+    return ok(updatedModule);
+  } catch (error) {
+    if (error instanceof ModuleTransitionError)
+      return Response.json(
+        { ok: false, error: error.message, transition: error.details },
+        { status: 409 },
+      );
+    if (error instanceof z.ZodError || error instanceof SyntaxError)
+      return fail("Dados inválidos.", 400);
+    return fail("Não foi possível atualizar o módulo agora.", 503);
   }
-
-  return ok(updatedModule);
 }
