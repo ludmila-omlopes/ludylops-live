@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { ZodError, z } from "zod";
 
 import { fail, isTrustedAppMutationRequest, ok, requireAdminApiSession } from "@/lib/api";
@@ -10,6 +11,9 @@ const adminAttachChannelSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["points","streamerbot"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

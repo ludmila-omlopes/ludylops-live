@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { ZodError } from "zod";
 
 import { fail, isTrustedAppMutationRequest, ok } from "@/lib/api";
@@ -8,6 +9,9 @@ import {
 } from "@/lib/recommendation-schemas";
 
 export async function POST(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["product_recommendations"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

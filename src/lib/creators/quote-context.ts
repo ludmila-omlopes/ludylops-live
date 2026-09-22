@@ -1,4 +1,5 @@
 import { resolvePublicCreatorFromRequest } from "@/lib/creators/tenant";
+import { canUseModules } from "./module-access";
 
 /** Public routing input is validated against the creator/domain registry, not used as admin authority. */
 export async function resolveQuoteRequest(request: Request, pathSlug?: string) {
@@ -10,6 +11,6 @@ export async function resolveQuoteRequest(request: Request, pathSlug?: string) {
     pathname: "/quotes",
     ...(slug !== undefined ? { slug } : {}),
   });
-  if (!tenant?.modules.some(module => module.moduleKey === "quotes" && module.status === "installed")) return null;
+  if (!canUseModules(tenant, ["quotes"], "quotes.read")) return null;
   return tenant;
 }

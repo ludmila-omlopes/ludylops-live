@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { ZodError } from "zod";
 
 import { fail, isTrustedAppMutationRequest, ok, requireLinkedApiSession } from "@/lib/api";
@@ -12,6 +13,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const moduleDenial = await guardModuleRequest(request, ["game_suggestions"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

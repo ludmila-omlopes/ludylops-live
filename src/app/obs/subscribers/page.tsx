@@ -1,3 +1,4 @@
+import { requireModulePage } from '@/lib/creators/module-page-access';
 import { Suspense } from "react";
 
 import { ObsSubscriberOverlay } from "@/components/obs-subscriber-overlay";
@@ -8,6 +9,8 @@ export default async function ObsSubscribersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireModulePage(["points","obs_overlays"]);
+
   const initialStyle = await resolveObsOverlayInitialStyle(searchParams);
 
   return (

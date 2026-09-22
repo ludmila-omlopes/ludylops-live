@@ -16,7 +16,7 @@ function buildReplyMessage(input: { displayName?: string; mergedSyntheticViewer:
 export async function POST(request: Request) {
   const authentication = await authenticateStreamerbotRequest(request);
   if (!authentication.ok) return authentication.response;
-  const denied = authorizeStreamerbotOperation(authentication, "link");
+  const denied = await authorizeStreamerbotOperation(authentication, "link");
   if (denied) return denied;
   const raw = authentication.raw;
 

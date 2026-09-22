@@ -37,6 +37,8 @@ vi.mock("@/components/obs-shell", () => ({
     React.createElement("obs-shell", null, children),
 }));
 
+import { DEFAULT_CREATOR_MODULES } from "@/lib/creators/defaults";
+
 import RootLayout from "@/app/layout";
 import BuilderLayout, { metadata as builderMetadata } from "@/app/(builder)/layout";
 import CommunityLayout, { metadata as communityMetadata } from "@/app/(community)/layout";
@@ -64,7 +66,7 @@ describe("product layouts", () => {
       user: { email: "owner@example.com", isLinked: false },
     });
     mocks.isLive.mockResolvedValue(true);
-    mocks.tenant.mockResolvedValue({ creator: { id: "creator_ludylops" } });
+    mocks.tenant.mockResolvedValue({ creator: { id: "creator_ludylops", status: "active" }, modules: DEFAULT_CREATOR_MODULES });
   });
 
   it("keeps the root neutral and limited to theme cookies", async () => {

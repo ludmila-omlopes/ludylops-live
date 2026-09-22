@@ -49,7 +49,7 @@ describe("Streamer.bot authentication boundary", () => {
     expect(read).toHaveBeenCalledTimes(1);
     expect(store.enabled).toHaveBeenCalledWith("creator-a");
     expect(store.used).toHaveBeenCalledWith(id, expect.any(Date));
-    if (result.ok) expect(authorizeStreamerbotOperation(result, "quotes.legacy")?.status).toBe(403);
+    if (result.ok) expect((await authorizeStreamerbotOperation(result, "quotes.legacy"))?.status).toBe(403);
   });
   it("does not expose secrets or payloads in authentication logs", async () => {
     await authenticateStreamerbotRequest(request());

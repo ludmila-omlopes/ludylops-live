@@ -1,3 +1,4 @@
+import { requireModulePage } from '@/lib/creators/module-page-access';
 import Image from "next/image";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
@@ -7,7 +8,7 @@ import { auth } from "@/auth";
 import { AuthButtons } from "@/components/auth-buttons";
 import { BetList } from "@/components/bet-list";
 import { StickerBadge } from "@/components/sticker-badge";
-import { getViewerDashboard, listBets } from "@/lib/db/repository";
+import { getViewerPoints, listBets } from "@/lib/db/repository";
 import { formatPipetz } from "@/lib/utils";
 
 const LUDYLOPS_PROFILE_IMAGE = "/selfie2.png";
@@ -45,11 +46,13 @@ function MetricTile({ metric }: { metric: BetMetric }) {
 }
 
 export default async function ApostasPage() {
+  await requireModulePage(["bets"]);
+
   const session = await auth();
   const activeViewerId = session?.user?.activeViewerId ?? null;
   const [bets, dashboard] = await Promise.all([
     listBets(activeViewerId),
-    activeViewerId ? getViewerDashboard(activeViewerId) : Promise.resolve(null),
+    activeViewerId ? getViewerPoints(activeViewerId) : Promise.resolve(null),
   ]);
 
   const openBets = bets.filter((bet) => bet.status === "open");

@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { fail, isTrustedAppMutationRequest, ok, requireAdminApiSession } from "@/lib/api";
 import {
   getGameSuggestionBoostSettings,
@@ -8,7 +9,10 @@ import {
   updateGameSuggestionBoostSettingsSchema,
 } from "@/lib/game-suggestions/service";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["game_suggestions"]);
+  if (moduleDenial) return moduleDenial;
+
   const session = await requireAdminApiSession();
   if (!session) {
     return fail("Forbidden", 403);
@@ -18,6 +22,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["game_suggestions"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

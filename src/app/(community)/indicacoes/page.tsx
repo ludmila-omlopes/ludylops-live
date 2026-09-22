@@ -1,3 +1,4 @@
+import { requireModulePage } from '@/lib/creators/module-page-access';
 /* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -6,7 +7,7 @@ import { ExternalLinkIcon } from "lucide-react";
 import { auth } from "@/auth";
 import { CreatorSuggestionList } from "@/components/creator-suggestion-list";
 import {
-  getViewerDashboard,
+  getViewerPoints,
   listCreatorSuggestions,
   listFeaturedCreatorSuggestions,
 } from "@/lib/db/repository";
@@ -83,12 +84,14 @@ function AdminCreatorCard({
 }
 
 export default async function IndicacoesPage() {
+  await requireModulePage(["creator_suggestions"]);
+
   const session = await auth();
   const activeViewerId = session?.user?.activeViewerId ?? null;
   const [featuredCreators, creatorSuggestions, dashboard] = await Promise.all([
     listFeaturedCreatorSuggestions(),
     listCreatorSuggestions(activeViewerId),
-    activeViewerId ? getViewerDashboard(activeViewerId) : Promise.resolve(null),
+    activeViewerId ? getViewerPoints(activeViewerId) : Promise.resolve(null),
   ]);
   const viewerBalance = dashboard?.balance.currentBalance ?? null;
   const canInteract = Boolean(activeViewerId && dashboard?.viewer.isLinked);

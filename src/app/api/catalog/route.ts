@@ -1,6 +1,10 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { ok } from "@/lib/api";
 import { getCatalog } from "@/lib/db/repository";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["redemptions"]);
+  if (moduleDenial) return moduleDenial;
+
   return ok(await getCatalog());
 }

@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { resolvePublicCreatorFromRequest } from "@/lib/creators/tenant";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import { getEnabledModuleNav, getModuleAvailability } from "@/lib/creators/modules";
 
 import { auth } from "@/auth";
 import { AppChrome } from "@/components/app-chrome";
@@ -24,11 +25,11 @@ export default async function CommunityLayout({
 }>) {
   // This legacy shell loads global live state and navigation. Scoped modules use /c/:slug instead.
   const tenant = await resolvePublicCreatorFromRequest({ request: new Request("http://internal/", { headers: await headers() }), pathname: "/" });
-  if (!tenant || tenant.creator.id !== DEFAULT_CREATOR_ID) notFound();
+  if (!tenant || tenant.creator.id !== DEFAULT_CREATOR_ID || tenant.creator.status !== "active") notFound();
   const cookieStore = await cookies();
   const cookieTheme = cookieStore.get(themeCookieKey)?.value;
   const initialTheme = isThemeMode(cookieTheme) ? cookieTheme : null;
-  const [session, isLive] = await Promise.all([auth(), isStreamerbotLivestreamActive()]);
+  const [session, isLive] = await Promise.all([auth(), getModuleAvailability(tenant.modules, "streamerbot").available ? isStreamerbotLivestreamActive() : Promise.resolve(false)]);
   const isAdmin = Boolean(
     session?.user?.email && (isDemoMode || adminEmails.has(session.user.email.toLowerCase())),
   );
@@ -40,6 +41,7 @@ export default async function CommunityLayout({
   return (
     <Providers>
       <AppChrome
+        allowedModulePaths={getEnabledModuleNav(tenant.modules).map(item => item.href)}
         session={session}
         isAdmin={isAdmin}
         isPlatformOwner={isPlatformOwner}

@@ -4,16 +4,19 @@
 > merely navigation metadata. Implement one server-side policy and use it at
 > every entry point. Do not rely on hidden links or client checks.
 >
-> **Drift check (run first)**: `git diff --stat 2565323..HEAD -- src/lib/creators/modules.ts src/lib/creators/instances.ts src/app src/components/platform-owner-creator-list.tsx`
+> **Drift check (run first)**: `git diff --stat ec19f8f..HEAD -- src/lib/creators/modules.ts src/lib/creators/instances.ts src/app src/components/platform-owner-creator-list.tsx`
 
 ## Status
+
+- **State**: IMPLEMENTED on `codex/019-module-authorization-dependencies`, based on merged quote pilot `f85aaf3` (2026-09-22); awaiting review/merge.
+- **Implementation and coverage**: [docs/module-authorization.md](../docs/module-authorization.md). The selected transition policy rejects invalid changes and names blockers; no automatic cascade. PostgreSQL row locks serialize concurrent mutations. No new migration.
 
 - **Priority**: P1
 - **Effort**: L
 - **Risk**: HIGH
-- **Depends on**: plan 009; coordinate Streamer.bot adoption with plan 018
+- **Depends on**: plans 009 / #173, 017 / #183 and 018 / #184
 - **Category**: security / tech-debt
-- **Planned at**: commit `2565323`, 2026-07-13
+- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15 (same file tree as remote master `f353ce2`).
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/185
 
 ## Why this matters
@@ -24,7 +27,7 @@ Direct public pages, APIs, OBS routes, and Streamer.bot endpoints remain
 callable. Status updates also permit impossible states such as bets installed
 without points or Streamer.bot.
 
-## Current state
+## State before implementation
 
 - `modules.ts:getEnabledCreatorModules` checks only the row's own installed
   status; `requiredCapabilities` is unused for authorization.
@@ -67,7 +70,10 @@ runtime plugins, or silently enabling dependencies without operator visibility.
 
 Given the catalog and current module rows, compute effective availability,
 missing requirements, transitive dependents, and a proposed transition plan.
-Reject catalog cycles and unknown requirements at startup/test time. Correct
+Reject catalog cycles and unknown requirements at startup/test time. Verify
+actual dependencies, including quote pricing/debit/refund, against the call
+graph before editing the catalog; never remove a dependency to conceal missing
+isolation or make the pilot appear ready. Correct
 stale manifest routes and add a test that catalog routes correspond to actual
 route files or an explicit virtual-route allowlist.
 
@@ -100,6 +106,14 @@ the quotes vertical established by plan 009, then continue catalog module by
 module. Add a checked-in coverage matrix so future modules cannot omit a class
 of entry point.
 
+Track authorization coverage separately from data-isolation readiness. Start
+with the migrated quote actions; deny non-default access to every still-unscoped
+module/action even when its installation row says installed. Preserve the
+existing default creator's supported behavior. Do not turn this plan into all
+remaining data migrations or mark the product ready when only guards exist.
+The quote pilot has known pricing/debit/refund/live-state dependencies: an
+installed points module is not proof those paths have been isolated.
+
 **Verify**: integration/route tests show direct URLs and APIs fail when disabled,
 not only navigation links. Streamer.bot tests prove no side effect occurs.
 
@@ -125,12 +139,14 @@ duplicate dependency logic in React components.
 
 ## Done criteria
 
-- [ ] Module state is enforced server-side at every cataloged entry-point class.
-- [ ] Dependency-invalid states cannot be newly persisted.
-- [ ] Existing invalid states fail closed and are visible to operators.
-- [ ] Catalog routes are validated against actual routes.
-- [ ] Navigation and authorization share one policy.
-- [ ] Lint, typecheck, tests, and build pass.
+- [x] Module state is enforced server-side at every cataloged entry-point class.
+- [x] Unscoped modules/actions stay unavailable to non-default creators even if installed.
+- [x] Coverage matrix distinguishes authorization, data isolation and product readiness.
+- [x] Dependency-invalid states cannot be newly persisted.
+- [x] Existing invalid states fail closed and are visible to operators.
+- [x] Catalog routes are validated against actual routes.
+- [x] Navigation and authorization share one policy.
+- [x] Lint, typecheck, tests, and build pass.
 
 ## STOP conditions
 

@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { z } from "zod";
 
 import { fail, isTrustedAppMutationRequest, ok, requireAdminApiSession } from "@/lib/api";
@@ -9,7 +10,10 @@ const pricingSchema = z.object({
   quoteOverlayCost: z.number().int().min(1).max(1_000_000),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["points"]);
+  if (moduleDenial) return moduleDenial;
+
   const session = await requireAdminApiSession();
   if (!session) {
     return fail("Forbidden", 403);
@@ -19,6 +23,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["points"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

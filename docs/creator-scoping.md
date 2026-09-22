@@ -169,7 +169,7 @@ alvos compostos. A resolução dos quatro alvos foi conferida com `EXPLAIN`, sem
 executar exibições/cobranças de teste em produção. Não houve alteração de
 credenciais nem configuração do Streamer.bot.
 
-**Etapa final após o merge/deploy:** confirmar que produção e demais escritores
+**Procedimento previsto após o merge/deploy (concluído abaixo):** confirmar que produção e demais escritores
 usam o código novo, que não há rollback antigo em andamento e que o OBS está
 funcionando. Só então remover esses dois índices:
 
@@ -188,9 +188,20 @@ de confirmar a troca dos escritores. O SQL corrigido e revisado foi aplicado
 diretamente nesta operação devido à falha do gerador descrita acima; não houve
 reexecução de migrations antigas, seeds ou criação de histórico fictício.
 
+## Limpeza concluída — 2026-09-22, 14:12 UTC
+
+O PR #197 foi integrado no commit f85aaf3a61799ccdb44828e29352bcdb655461b3.
+O deployment de produção 6592659041 confirmou esse commit às 14:09:40 UTC;
+o endereço de frases da Ludylops respondeu HTTP 200 com o código novo.
+Às 14:12:41 UTC, os dois índices temporários acima foram removidos em transação,
+com limites de espera de 5 s por lock e 15 s por statement. A verificação após
+commit confirmou a ausência dos dois índices e a permanência das duas PKs
+compostas. A compatibilidade transitória descrita acima está encerrada.
+Nenhuma credencial ou configuração do Streamer.bot foi alterada.
+
 ## Antes de disponibilizar o produto para outros streamers
 
-- Plano 019 / #185: política completa de autorização e dependências dos módulos.
+- Plano 019 / #185: política implementada; cobertura em [module-authorization.md](module-authorization.md), aguardando revisão/merge.
 - Ainda sem número: economia independente (`viewer_balances` com chave composta,
   ledger e todas as operações), preços, estado de live e configuração visual.
 - Ainda sem número: administração pelo dono da comunidade, navegação/configuração

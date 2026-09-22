@@ -1,7 +1,10 @@
+import { requireModulePage } from '@/lib/creators/module-page-access';
 import { LeaderboardTable } from "@/components/leaderboard-table";
 import { getLeaderboard } from "@/lib/db/repository";
 
 export default async function RankingPage() {
+  await requireModulePage(["ranking"]);
+
   const leaderboard = await getLeaderboard();
 
   return (

@@ -1,3 +1,5 @@
+import { guardVerifiedModules } from "@/lib/creators/module-access";
+import { defaultCreatorContext } from "@/lib/creators/context";
 import { fail, ok } from "@/lib/api";
 import { bridgeHeartbeat } from "@/lib/db/repository";
 import { env } from "@/lib/env";
@@ -15,6 +17,8 @@ export async function POST(request: Request) {
   if (!valid) {
     return fail("Invalid signature.", 401);
   }
+  const moduleDenial = await guardVerifiedModules(defaultCreatorContext, ["redemptions"]);
+  if (moduleDenial) return moduleDenial;
   const payload = bridgeHeartbeatSchema.parse(JSON.parse(raw));
   return ok(await bridgeHeartbeat(payload));
 }
