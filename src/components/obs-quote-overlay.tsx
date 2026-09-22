@@ -25,7 +25,7 @@ type LiveStatusPayload = {
   isLive: boolean;
 };
 
-const QUOTE_POLL_INTERVAL_MS = 200;
+const QUOTE_POLL_INTERVAL_MS = 1_000;
 const LIVE_STATUS_POLL_INTERVAL_MS = 5_000;
 
 const DEMO_OVERLAY: QuoteOverlayPayload = {

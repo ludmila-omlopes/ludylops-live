@@ -7,6 +7,9 @@ import { getObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-styl
 import type { BetWithOptionsRecord } from "@/lib/types";
 import { formatPipetz } from "@/lib/utils";
 
+const BET_POLL_INTERVAL_MS = 1_000;
+const LIVE_STATUS_POLL_INTERVAL_MS = 15_000;
+
 const DEMO_BET: BetWithOptionsRecord = {
   id: "demo-bet",
   question: "Ela passa o boss sem morrer?",
@@ -39,21 +42,65 @@ function formatRemaining(closesAt: string, now: number) {
 export function ObsBetOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
+  const creatorQuery = new URLSearchParams(searchParams.getAll("creator").map(slug => ["creator", slug])).toString();
+  const creatorSuffix = creatorQuery ? `?${creatorQuery}` : "";
+  const [liveStatus, setLiveStatus] = useState<{ creatorSuffix: string; isLive: boolean } | null>(null);
+  const isLive = liveStatus?.creatorSuffix === creatorSuffix && liveStatus.isLive;
   const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
   const [liveBet, setLiveBet] = useState<BetWithOptionsRecord | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (isDemo) {
+    if (isDemo) return undefined;
+    let cancelled = false;
+    let timeout: number | undefined;
+    const controller = new AbortController();
+
+    async function loadLiveStatus() {
+      let nextIsLive = false;
+      try {
+        const response = await fetch(`/api/obs/live-status${creatorSuffix}`, {
+          cache: "no-store", signal: controller.signal,
+        });
+        if (response.ok) {
+          const payload = await response.json() as { ok?: boolean; data?: { isLive?: boolean } };
+          nextIsLive = payload.ok === true && payload.data?.isLive === true;
+        }
+      } catch {
+        // Failed status checks pause data polling until the next successful check.
+      }
+      if (!cancelled) {
+        setLiveStatus({ creatorSuffix, isLive: nextIsLive });
+        if (!nextIsLive) setLiveBet(null);
+      }
+    }
+
+    function schedule() {
+      timeout = window.setTimeout(() => {
+        void loadLiveStatus().finally(() => { if (!cancelled) schedule(); });
+      }, LIVE_STATUS_POLL_INTERVAL_MS);
+    }
+    void loadLiveStatus().finally(() => { if (!cancelled) schedule(); });
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [isDemo, creatorSuffix]);
+
+  useEffect(() => {
+    if (isDemo || !isLive) {
       return undefined;
     }
 
     let cancelled = false;
+    let timeout: number | undefined;
+    const controller = new AbortController();
 
     async function loadBet() {
       try {
-        const response = await fetch("/api/obs/bets/current", {
-          cache: "no-store",
+        const response = await fetch(`/api/obs/bets/current${creatorSuffix}`, {
+          cache: "no-store", signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -75,23 +122,26 @@ export function ObsBetOverlay({ initialStyle = "classic" }: { initialStyle?: Obs
       }
     }
 
-    void loadBet();
-    const interval = window.setInterval(() => {
-      void loadBet();
-    }, 1000);
+    function schedule() {
+      timeout = window.setTimeout(() => {
+        void loadBet().finally(() => { if (!cancelled) schedule(); });
+      }, BET_POLL_INTERVAL_MS);
+    }
+    void loadBet().finally(() => { if (!cancelled) schedule(); });
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      controller.abort();
+      if (timeout !== undefined) window.clearTimeout(timeout);
     };
-  }, [isDemo]);
+  }, [isDemo, isLive, creatorSuffix]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
   }, []);
 
-  const bet = isDemo ? DEMO_BET : liveBet;
+  const bet = isDemo ? DEMO_BET : isLive ? liveBet : null;
   const totalPool = bet?.totalPool ?? 0;
   const remaining = bet ? formatRemaining(bet.closesAt, now) : "00:00";
 

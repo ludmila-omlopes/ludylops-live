@@ -6,6 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import { getObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-style";
 import type { WheelConfigRecord, WheelSpinRecord } from "@/lib/types";
 
+const WHEEL_POLL_INTERVAL_MS = 1_000;
+const LIVE_STATUS_POLL_INTERVAL_MS = 15_000;
+
 const DEMO_CONFIG: WheelConfigRecord = {
   title: "Roleta da live",
   spinDurationMs: 5200,
@@ -65,6 +68,10 @@ function isSpinVisible(spin: WheelSpinRecord | null) {
 export function ObsWheelOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
+  const creatorQuery = new URLSearchParams(searchParams.getAll("creator").map(slug => ["creator", slug])).toString();
+  const creatorSuffix = creatorQuery ? `?${creatorQuery}` : "";
+  const [liveStatus, setLiveStatus] = useState<{ creatorSuffix: string; isLive: boolean } | null>(null);
+  const isLive = liveStatus?.creatorSuffix === creatorSuffix && liveStatus.isLive;
   const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
   const [config, setConfig] = useState<WheelConfigRecord | null>(isDemo ? DEMO_CONFIG : null);
   const [rotation, setRotation] = useState(0);
@@ -75,15 +82,55 @@ export function ObsWheelOverlay({ initialStyle = "classic" }: { initialStyle?: O
   const gradient = useMemo(() => buildGradient(activeOptions), [activeOptions]);
 
   useEffect(() => {
-    if (isDemo) {
+    if (isDemo) return undefined;
+    let cancelled = false;
+    let timeout: number | undefined;
+    const controller = new AbortController();
+
+    async function loadLiveStatus() {
+      let nextIsLive = false;
+      try {
+        const response = await fetch(`/api/obs/live-status${creatorSuffix}`, {
+          cache: "no-store", signal: controller.signal,
+        });
+        if (response.ok) {
+          const payload = await response.json() as { ok?: boolean; data?: { isLive?: boolean } };
+          nextIsLive = payload.ok === true && payload.data?.isLive === true;
+        }
+      } catch {
+        // Failed status checks pause data polling until the next successful check.
+      }
+      if (!cancelled) {
+        setLiveStatus({ creatorSuffix, isLive: nextIsLive });
+        if (!nextIsLive) setConfig(null);
+      }
+    }
+
+    function schedule() {
+      timeout = window.setTimeout(() => {
+        void loadLiveStatus().finally(() => { if (!cancelled) schedule(); });
+      }, LIVE_STATUS_POLL_INTERVAL_MS);
+    }
+    void loadLiveStatus().finally(() => { if (!cancelled) schedule(); });
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [isDemo, creatorSuffix]);
+
+  useEffect(() => {
+    if (isDemo || !isLive) {
       return undefined;
     }
 
     let cancelled = false;
+    let timeout: number | undefined;
+    const controller = new AbortController();
 
     async function loadWheel() {
       try {
-        const response = await fetch("/api/obs/wheel/current", { cache: "no-store" });
+        const response = await fetch(`/api/obs/wheel/current${creatorSuffix}`, { cache: "no-store", signal: controller.signal });
         if (!response.ok) {
           return;
         }
@@ -98,16 +145,19 @@ export function ObsWheelOverlay({ initialStyle = "classic" }: { initialStyle?: O
       }
     }
 
-    void loadWheel();
-    const interval = window.setInterval(() => {
-      void loadWheel();
-    }, 1000);
+    function schedule() {
+      timeout = window.setTimeout(() => {
+        void loadWheel().finally(() => { if (!cancelled) schedule(); });
+      }, WHEEL_POLL_INTERVAL_MS);
+    }
+    void loadWheel().finally(() => { if (!cancelled) schedule(); });
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      controller.abort();
+      if (timeout !== undefined) window.clearTimeout(timeout);
     };
-  }, [isDemo]);
+  }, [isDemo, isLive, creatorSuffix]);
 
   useEffect(() => {
     if (!spin || !config || spin.spinId === lastSpinId) {
@@ -123,7 +173,7 @@ export function ObsWheelOverlay({ initialStyle = "classic" }: { initialStyle?: O
     return () => window.clearTimeout(timeout);
   }, [config, lastSpinId, spin]);
 
-  if (!config || activeOptions.length < 2) {
+  if ((!isDemo && !isLive) || !config || activeOptions.length < 2) {
     return null;
   }
 
