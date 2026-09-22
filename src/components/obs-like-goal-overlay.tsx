@@ -7,6 +7,9 @@ import { getObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-styl
 import type { LiveLikeGoalOverlayStateRecord } from "@/lib/types";
 import { formatPipetz } from "@/lib/utils";
 
+const LIKE_GOAL_POLL_INTERVAL_MS = 1_000;
+const LIVE_STATUS_POLL_INTERVAL_MS = 15_000;
+
 const DEMO_UPDATED_AT = "2026-06-01T21:00:00.000Z";
 
 const DEMO_STATE: LiveLikeGoalOverlayStateRecord = {
@@ -34,20 +37,64 @@ function formatNumber(value: number) {
 export function ObsLikeGoalOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
+  const creatorQuery = new URLSearchParams(searchParams.getAll("creator").map(slug => ["creator", slug])).toString();
+  const creatorSuffix = creatorQuery ? `?${creatorQuery}` : "";
+  const [liveStatus, setLiveStatus] = useState<{ creatorSuffix: string; isLive: boolean } | null>(null);
+  const isLive = liveStatus?.creatorSuffix === creatorSuffix && liveStatus.isLive;
   const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
   const [liveState, setLiveState] = useState<LiveLikeGoalOverlayStateRecord | null>(null);
 
   useEffect(() => {
-    if (isDemo) {
+    if (isDemo) return undefined;
+    let cancelled = false;
+    let timeout: number | undefined;
+    const controller = new AbortController();
+
+    async function loadLiveStatus() {
+      let nextIsLive = false;
+      try {
+        const response = await fetch(`/api/obs/live-status${creatorSuffix}`, {
+          cache: "no-store", signal: controller.signal,
+        });
+        if (response.ok) {
+          const payload = await response.json() as { ok?: boolean; data?: { isLive?: boolean } };
+          nextIsLive = payload.ok === true && payload.data?.isLive === true;
+        }
+      } catch {
+        // Failed status checks pause data polling until the next successful check.
+      }
+      if (!cancelled) {
+        setLiveStatus({ creatorSuffix, isLive: nextIsLive });
+        if (!nextIsLive) setLiveState(null);
+      }
+    }
+
+    function schedule() {
+      timeout = window.setTimeout(() => {
+        void loadLiveStatus().finally(() => { if (!cancelled) schedule(); });
+      }, LIVE_STATUS_POLL_INTERVAL_MS);
+    }
+    void loadLiveStatus().finally(() => { if (!cancelled) schedule(); });
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [isDemo, creatorSuffix]);
+
+  useEffect(() => {
+    if (isDemo || !isLive) {
       return undefined;
     }
 
     let cancelled = false;
+    let timeout: number | undefined;
+    const controller = new AbortController();
 
     async function loadState() {
       try {
-        const response = await fetch("/api/obs/likes/current", {
-          cache: "no-store",
+        const response = await fetch(`/api/obs/likes/current${creatorSuffix}`, {
+          cache: "no-store", signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -69,21 +116,26 @@ export function ObsLikeGoalOverlay({ initialStyle = "classic" }: { initialStyle?
       }
     }
 
-    void loadState();
-    const interval = window.setInterval(() => {
-      void loadState();
-    }, 1000);
+    function schedule() {
+      timeout = window.setTimeout(() => {
+        void loadState().finally(() => { if (!cancelled) schedule(); });
+      }, LIKE_GOAL_POLL_INTERVAL_MS);
+    }
+    void loadState().finally(() => { if (!cancelled) schedule(); });
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      controller.abort();
+      if (timeout !== undefined) window.clearTimeout(timeout);
     };
-  }, [isDemo]);
+  }, [isDemo, isLive, creatorSuffix]);
 
   const state = isDemo ? DEMO_STATE : liveState;
   const goal = state?.goal ?? null;
   const currentLikeCount = state?.currentLikeCount ?? 0;
   const progressPercent = state?.progressPercent ?? 0;
+
+  if (!isDemo && !isLive) return null;
 
   if (isObscurStyle) {
     return (
