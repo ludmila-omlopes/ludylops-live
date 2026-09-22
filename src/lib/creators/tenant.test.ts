@@ -218,7 +218,7 @@ describe("creator tenant resolution", () => {
     expect(tenant).toBe(defaultCreatorTenant);
   });
 
-  it("derives public navigation from installed modules", () => {
+  it("hides installed modules when their dependencies are missing", () => {
     const nav = getEnabledModuleNav([
       {
         id: "creator_module_test_bets",
@@ -240,13 +240,7 @@ describe("creator tenant resolution", () => {
       },
     ]);
 
-    expect(nav).toEqual([
-      {
-        key: "bets",
-        label: "Apostas",
-        href: "/apostas",
-      },
-    ]);
+    expect(nav).toEqual([]);
   });
 });
 
