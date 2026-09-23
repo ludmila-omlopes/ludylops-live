@@ -3,7 +3,7 @@
 Issue: [#209](https://github.com/ludmila-omlopes/ludylops-live/issues/209).
 Parte de [#203](https://github.com/ludmila-omlopes/ludylops-live/issues/203).
 
-Estado: IMPLEMENTED, aguardando merge. Base: `7cf4cec`, após o merge do PR #208.
+Estado: DONE, integrado no PR #210. Base: `7cf4cec`, após o merge do PR #208.
 
 ## Entrega
 

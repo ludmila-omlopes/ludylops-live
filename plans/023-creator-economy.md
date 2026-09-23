@@ -24,7 +24,7 @@ histórico legados preservaram contagens, somas e checksums. PR #206 integrado e
 O PR #208, [#207 / Plan 024](024-creator-chat-rewards.md), entregou
 ganhos automáticos por mensagem no chat, com quantidade e intervalo por
 comunidade. O [Plan 025](025-creator-ranking.md) implementa o ranking público
-isolado da moeda, com a #209 aguardando integração. Presença, inscrições e preços
+isolado da moeda, integrado no PR #210. Presença, inscrições e preços
 continuam pendentes.
 
 A #203 permanece aberta para regras automáticas de ganho/preços por creator,
