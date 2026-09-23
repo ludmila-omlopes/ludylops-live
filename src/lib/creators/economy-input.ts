@@ -1,17 +1,19 @@
 import { z } from "zod";
 
+const operationKey = z.string().min(1).max(128).refine((key) => !key.startsWith("chat:"), "Chave de operação reservada.");
+
 export const economyMutationSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.enum(["credit", "debit"]),
     viewerId: z.string().min(1).max(64),
-    operationKey: z.string().min(1).max(128),
+    operationKey,
     amount: z.number().int().positive().max(1_000_000),
     reason: z.string().trim().min(1).max(160),
   }).strict(),
   z.object({
     kind: z.literal("refund"),
     viewerId: z.string().min(1).max(64),
-    operationKey: z.string().min(1).max(128),
+    operationKey,
     refundOf: z.string().min(1).max(64),
     reason: z.string().trim().min(1).max(160),
   }).strict(),

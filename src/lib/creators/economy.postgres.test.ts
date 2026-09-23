@@ -9,7 +9,9 @@ const state = vi.hoisted(() => ({ db: vi.fn(), env: { CREATOR_ECONOMY_ENABLED: "
 vi.mock("@/lib/db/client", () => ({ getDb: state.db }));
 vi.mock("@/lib/env", () => ({ isDemoMode: false, env: state.env }));
 import * as schema from "@/lib/db/schema";
-import { mutateCreatorEconomy, readCreatorEconomy } from "./economy";
+import { mutateCreatorEconomy, readCreatorEconomy, rewardCreatorChat } from "./economy";
+import { updateOwnedChatRewards, getOwnedChatRewards } from "./chat-rewards-settings.server";
+import { updateOwnedCurrency } from "./currency.server";
 import { consolidateAccountEconomies, mergeCreatorEconomies } from "./economy-identity";
 
 const url = process.env.MODULE_TEST_DATABASE_URL;
@@ -45,7 +47,8 @@ describe.skipIf(!url)("isolated currency on PostgreSQL", () => {
       INSERT INTO users VALUES ('viewer','UCabcdefghijklmnopqrstuv'),('target','UC1234567890123456789012'),('other','UCother');
       INSERT INTO creators (id,owner_user_id,status) VALUES ('a','owner-a','active'),('b','owner-b','active'),('creator_ludylops','lud','active');
       INSERT INTO creator_modules (id,creator_id,module_key,status,config_json) VALUES
-        ('a-points','a','points','installed','{"currencyLabel":"cristais"}'),('b-points','b','points','installed','{"currencyLabel":"estrelas"}');
+        ('a-points','a','points','installed','{"currencyLabel":"cristais"}'),('b-points','b','points','installed','{"currencyLabel":"estrelas"}'),
+        ('a-bot','a','streamerbot','installed','{}'),('b-bot','b','streamerbot','installed','{}');
     `);
     const migration = readFileSync("drizzle/0026_creator_economy.sql", "utf8").replaceAll('"public".', `"${namespace}".`);
     await pool.query(migration);
@@ -58,6 +61,70 @@ describe.skipIf(!url)("isolated currency on PostgreSQL", () => {
   afterAll(async () => {
     if (pool) await pool.end();
     if (admin) { await admin.query(`DROP SCHEMA ${namespace} CASCADE`); await admin.end(); }
+  });
+  const rule = { enabled: true, amount: 7, cooldownSeconds: 60 };
+  const reward = (messageId: string, creatorId = "a", viewerId = "viewer") => rewardCreatorChat({ creatorId }, { viewerId, messageId, broadcastId: "abcdefghijk" });
+  it("serializes simultaneous chat messages, isolates communities and protects legacy storage", async () => {
+    await updateOwnedChatRewards("owner-a", "a", rule);
+    await updateOwnedChatRewards("owner-b", "b", { ...rule, amount: 11 });
+    const results = await Promise.all(Array.from({ length: 8 }, (_, i) => reward(`message-${i}`)));
+    expect(results.filter((r) => r.outcome === "credited")).toHaveLength(1);
+    expect(results.filter((r) => r.outcome === "cooldown")).toHaveLength(7);
+    await reward("message-0", "b");
+    expect((await read()).balance.currentBalance).toBe(7);
+    expect((await read()).entries).toHaveLength(1);
+    expect((await read("b")).balance.currentBalance).toBe(11);
+    expect((await pool.query("SELECT * FROM viewer_balances")).rows).toEqual([{ viewer_id: "viewer", current_balance: 777 }]);
+    expect((await pool.query("SELECT * FROM point_ledger")).rows).toEqual([{ id: "old-event", amount: 777 }]);
+  });
+  it("deduplicates concurrent chat retries and retains their result across config updates", async () => {
+    await updateOwnedChatRewards("owner-a", "a", rule);
+    const results = await Promise.all(Array.from({ length: 8 }, () => reward("same")));
+    expect(results.filter((r) => !r.duplicate)).toHaveLength(1);
+    await updateOwnedChatRewards("owner-a", "a", { ...rule, amount: 20 });
+    expect(await reward("same")).toMatchObject({ duplicate: true, entry: { amount: 7 } });
+    await expect(reward("same", "a", "other")).rejects.toThrow("operation_conflict");
+    expect((await read()).balance.currentBalance).toBe(7);
+  });
+  it("retains skipped events after enabling or expiration and credits a new message with the new rate", async () => {
+    await updateOwnedChatRewards("owner-a", "a", { ...rule, enabled: false });
+    expect((await reward("paused")).outcome).toBe("paused");
+    await updateOwnedChatRewards("owner-a", "a", rule);
+    expect(await reward("paused")).toMatchObject({ duplicate: true, outcome: "paused" });
+    await reward("first");
+    expect((await reward("fast")).outcome).toBe("cooldown");
+    await pool.query("UPDATE creator_ledger SET created_at=now()-interval '61 seconds' WHERE kind='chat_reward'");
+    await updateOwnedChatRewards("owner-a", "a", { ...rule, amount: 12 });
+    expect(await reward("fast")).toMatchObject({ duplicate: true, outcome: "cooldown" });
+    expect((await reward("new")).entry.amount).toBe(12);
+    expect((await read()).balance.currentBalance).toBe(19);
+  });
+  it("preserves cooldown and message receipts through a concurrent identity move", async () => {
+    await updateOwnedChatRewards("owner-a", "a", rule); await reward("first");
+    await Promise.all([reward("during"), db.transaction((tx) => mergeCreatorEconomies(tx, "viewer", "target"))]);
+    expect(await reward("first")).toMatchObject({ duplicate: true, entry: { viewerId: "target" } });
+    expect((await reward("target-message", "a", "target")).outcome).toBe("cooldown");
+    expect((await read("a", "target")).balance.currentBalance).toBe(7);
+    expect((await pool.query("SELECT * FROM creator_ledger WHERE viewer_id='viewer'")).rows).toHaveLength(0);
+  });
+  it("merges settings atomically and rejects unauthorized configuration", async () => {
+    await Promise.all([updateOwnedChatRewards("owner-a", "a", rule), updateOwnedCurrency("owner-a", "a", { currencyLabel: "corações" })]);
+    expect(await getOwnedChatRewards("owner-a", "a")).toEqual(rule);
+    expect((await reward("first")).currencyLabel).toBe("corações");
+    await expect(updateOwnedChatRewards("owner-b", "a", { ...rule, amount: 100 })).rejects.toThrow("Moeda indisponível");
+    await pool.query("UPDATE creators SET status='archived' WHERE id='a'");
+    await expect(updateOwnedChatRewards("owner-a", "a", rule)).rejects.toThrow("Moeda indisponível");
+    await expect(reward("archived")).rejects.toThrow("economy_unavailable");
+  });
+  it("rolls back chat rewards on overflow and enforces feature/module gates", async () => {
+    await updateOwnedChatRewards("owner-a", "a", rule);
+    await pool.query("INSERT INTO creator_balances (creator_id,viewer_id,current_balance,lifetime_earned) VALUES ('a','viewer',2147483647,2147483647)");
+    await expect(reward("overflow")).rejects.toThrow("balance_limit");
+    expect((await pool.query("SELECT * FROM creator_ledger")).rows).toHaveLength(0);
+    await pool.query("UPDATE creator_modules SET status='disabled' WHERE id='a-bot'");
+    await expect(reward("bot-off")).rejects.toThrow("economy_unavailable");
+    state.env.CREATOR_ECONOMY_ENABLED = "false";
+    await expect(reward("gate-off")).rejects.toThrow("economy_unavailable");
   });
   it("keeps two currencies separate, including identical event keys, without touching pipetz", async () => {
     await change("same-event", 100); await change("same-event", 20, "b"); await change("spend", 30, "a", "viewer", "debit");
