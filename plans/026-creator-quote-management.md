@@ -1,7 +1,7 @@
 # Plan 026: Cadastro e correção de frases pelo streamer
 
 Issue: [#211](https://github.com/ludmila-omlopes/ludylops-live/issues/211).
-Estado: IMPLEMENTED, aguardando merge. Base: `e379936`, após o PR #210.
+Estado: DONE, integrado no PR #212. Base: `e379936`, após o PR #210.
 
 ## Objetivo e entrega
 
