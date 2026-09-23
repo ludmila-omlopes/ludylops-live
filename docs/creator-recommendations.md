@@ -7,7 +7,8 @@ Entrega [#215](https://github.com/ludmila-omlopes/ludylops-live/issues/215).
 O dono acessa **Gerenciar produtos** em `/criar-area` ou nos produtos da própria
 comunidade, em `/c/<slug>/produtinhos`. Pode cadastrar nome, categoria, loja,
 motivo da indicação, link externo ou afiliado e uma imagem opcional. A imagem
-aceita uma URL ou caminho local; não há upload ou extração automática de metadados.
+aceita uma URL ou caminho local. A entrega #22 acrescenta a opção
+[Buscar imagem pelo link](recommendation-image-lookup.md); não há upload.
 
 **Publicar para a comunidade** começa desmarcado. Produtos ocultos ficam
 disponíveis apenas para o proprietário. O dono pode editar os campos e marcar
@@ -39,9 +40,9 @@ quando o módulo `product_recommendations` está disponível.
 - Locks no creator, módulo e produto, além de um advisory lock pelo ID, mantêm
   autorização e gravação consistentes. Campos de moderação e data de criação
   não podem ser alterados pelo corpo da requisição.
-- URLs de produto aceitam apenas HTTP/HTTPS sem credenciais. A aplicação não
-  busca metadados nem imagens no servidor; imagens opcionais carregam pelo
-  navegador com `referrerPolicy="no-referrer"`.
+- URLs de produto aceitam apenas HTTP/HTTPS sem credenciais. Imagens opcionais
+  carregam pelo navegador com `referrerPolicy="no-referrer"`. A busca opcional
+  de metadados da #22 usa uma política mais restrita de lojas e HTTPS.
 - Falha de armazenamento retorna indisponibilidade, sem substituir os dados
   por exemplos. O demo tem armazenamento próprio, separado do legado.
 
@@ -54,8 +55,8 @@ saldos, moeda ou flags de produção.
 Todas as leituras e gravações antigas de recomendações passam a exigir
 `creator_ludylops`, incluindo consultas administrativas, fallback de moderação,
 upsert, atualização e exclusão. O fluxo existente da Ludylops permanece nas
-rotas globais. Sugestões de espectadores para novas comunidades e preenchimento
-automático de produtos ficam para entregas futuras.
+rotas globais. Sugestões de espectadores para novas comunidades ficam para
+entregas futuras; a busca opcional de imagem é tratada na #22.
 
 Implante os filtros do legado junto com o novo fluxo. Depois que houver produtos
 de outros streamers, um rollback deve preservar esses filtros: versões anteriores

@@ -48,6 +48,12 @@ async function authorize(tx: Tx, creatorId: string, ownerId?: string) {
 }
 function database() { const db = getDb(); if (!db) throw new Error("recommendation_storage_unavailable"); return db; }
 
+export async function authorizeRecommendationOwner(creatorId: string, ownerId: string) {
+  identity(creatorId, ownerId);
+  if (isDemoMode) { authorizeDemo(creatorId, ownerId); return; }
+  await database().transaction((tx) => authorize(tx, creatorId, ownerId));
+}
+
 /** Omitting ownerId is the public, published-only read. A supplied ownerId comes from the session. */
 export async function listCreatorRecommendations(creatorId: string, ownerId?: string, cursor?: string) {
   identity(creatorId, ownerId); const before = cursorValue(cursor);

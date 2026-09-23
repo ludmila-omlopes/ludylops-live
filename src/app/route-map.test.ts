@@ -34,6 +34,8 @@ const expectedPageRoutes = new Set([
 ]);
 
 const expectedApiRoutes = new Set([
+  "/api/admin/recommendations/image",
+  "/api/me/creator-area/[id]/recommendations/image",
   "/api/me/creator-area/[id]/recommendations",
   "/api/me/creator-area/[id]/profile",
   "/api/me/creator-area/[id]/quotes",

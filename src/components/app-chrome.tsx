@@ -311,7 +311,7 @@ export function AppChrome({
             <span className="font-black uppercase tracking-[0.08em] text-[var(--color-ink)]">
               Siga a Ludylops
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {socialLinks.map(({ href, label, Icon }) => (
                 <a
                   key={href}
