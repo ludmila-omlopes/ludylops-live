@@ -5,6 +5,7 @@ import { Coins, Palette, Sparkles, Ticket, type LucideIcon } from "lucide-react"
 import { auth } from "@/auth";
 import { CreatorAreaCreateForm } from "@/components/creator-area-create-form";
 import { CreatorCurrencyForm } from "@/components/creator-currency-form";
+import { CreatorProfileForm } from "@/components/creator-profile-form";
 import { CreatorChatRewardsForm } from "@/components/creator-chat-rewards-form";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { CreatorLandingCta } from "@/components/creator-landing-cta";
@@ -135,6 +136,7 @@ export default async function CreateCreatorAreaPage() {
                   </span>
                 </Link>
                 {creator.status === "active" && creator.id !== DEFAULT_CREATOR_ID && <>
+                  <CreatorProfileForm creatorId={creator.id} />
                   <CreatorCurrencyForm creatorId={creator.id} />
                   <CreatorChatRewardsForm creatorId={creator.id} />
                   <Link href={`/c/${creator.slug}/quotes#gerenciar-frases`} className="mt-3 block font-bold underline">Gerenciar frases</Link>
