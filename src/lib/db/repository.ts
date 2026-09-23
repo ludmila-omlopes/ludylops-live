@@ -465,7 +465,7 @@ type DemoStore = {
 
 type QuoteDemoStore = Pick<DemoStore, "quotes" | "quoteOverlayState" | "obsOverlayControl" | "quoteOverlayQueue">;
 
-function getQuoteDemoStore(context: CreatorContext): QuoteDemoStore {
+export function getQuoteDemoStore(context: CreatorContext): QuoteDemoStore {
   const creatorId = requireCreatorContext(context);
   const store = getDemoStore();
   if (creatorId === DEFAULT_CREATOR_ID) return store;
