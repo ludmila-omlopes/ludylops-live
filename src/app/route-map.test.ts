@@ -91,6 +91,7 @@ const expectedApiRoutes = new Set([
   "/api/me/balance",
   "/api/me/bets/[betId]",
   "/api/me/creator-area",
+  "/api/me/creator-area/[id]/currency",
   "/api/me/creator-suggestions",
   "/api/me/creator-suggestions/[id]/boost",
   "/api/me/game-suggestions",

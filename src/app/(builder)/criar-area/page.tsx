@@ -4,6 +4,8 @@ import { Coins, Palette, Sparkles, Ticket, type LucideIcon } from "lucide-react"
 
 import { auth } from "@/auth";
 import { CreatorAreaCreateForm } from "@/components/creator-area-create-form";
+import { CreatorCurrencyForm } from "@/components/creator-currency-form";
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { CreatorLandingCta } from "@/components/creator-landing-cta";
 import { canCreateCreatorArea } from "@/lib/creators/access";
 import { PLATFORM_NAME, resolveCreatorLandingState } from "@/lib/creators/platform";
@@ -86,7 +88,7 @@ export default async function CreateCreatorAreaPage() {
   const landingState = resolveCreatorLandingState({ hasUsableSession, canCreateArea });
 
   const creatorAreas =
-    landingState === "approved" ? await listCreatorAreasForOwner(session!.user!.activeViewerId) : [];
+    hasUsableSession ? await listCreatorAreasForOwner(session!.user!.activeViewerId) : [];
 
   return (
     <div className="surface-section flex w-full flex-col">
@@ -105,7 +107,7 @@ export default async function CreateCreatorAreaPage() {
 
           <CommunitySection />
 
-          {landingState === "approved" && creatorAreas.length > 0 ? (
+          {creatorAreas.length > 0 ? (
             <div className="mt-8 grid gap-3">
               <h2
                 className="text-2xl uppercase text-[var(--color-ink)]"
@@ -114,8 +116,8 @@ export default async function CreateCreatorAreaPage() {
                 Suas áreas
               </h2>
               {creatorAreas.map((creator) => (
+                <div key={creator.id}>
                 <Link
-                  key={creator.id}
                   href={creator.publicPath}
                   className="group flex items-center justify-between gap-3 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-4 shadow-[4px_4px_0_var(--shadow-color)] transition-transform hover:-translate-y-0.5"
                 >
@@ -131,6 +133,8 @@ export default async function CreateCreatorAreaPage() {
                     →
                   </span>
                 </Link>
+                {creator.status === "active" && creator.id !== DEFAULT_CREATOR_ID && <CreatorCurrencyForm creatorId={creator.id} />}
+                </div>
               ))}
             </div>
           ) : null}

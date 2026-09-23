@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2, CirclePlay } from "lucide-react";
 
 import { getEnabledCreatorModules, getCreatorModuleManifest } from "@/lib/creators/modules";
 import { getCreatorAreaBySlug } from "@/lib/creators/service";
+import { getCurrencyLabel } from "@/lib/creators/currency";
 
 type CreatorPageProps = {
   params: Promise<{
@@ -23,7 +24,10 @@ export default async function CreatorAreaPage({ params }: CreatorPageProps) {
   }
 
   const modules = getEnabledCreatorModules(tenant.modules)
-    .map((module) => getCreatorModuleManifest(module.moduleKey))
+    .map((module) => {
+      const manifest = getCreatorModuleManifest(module.moduleKey);
+      return manifest ? { ...manifest, label: module.moduleKey === "points" ? getCurrencyLabel(module.configJson) : manifest.label } : null;
+    })
     .filter((module) => module !== null);
   const primaryModules = modules.slice(0, 6);
 

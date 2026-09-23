@@ -1,6 +1,7 @@
 import type { CreatorModuleRecord } from "@/lib/types";
 import { moduleAvailability, validateModuleCatalog } from "./module-policy";
 import { modulePages } from "./module-entry-points";
+import { getCurrencyLabel } from "./currency";
 
 export type CreatorModuleKey =
   | "points"
@@ -34,13 +35,13 @@ export type CreatorModuleNavItem = {
 export const creatorModuleCatalog = [
   {
     key: "points",
-    label: "Pipetz",
+    label: "Pontos",
     publicRoutes: ["/me"],
     adminPanels: ["precos", "airdrop", "vinculos", "metas-likes"],
     obsRoutes: [],
     requiredCapabilities: [],
     defaultConfig: {
-      currencyLabel: "pipetz",
+      currencyLabel: "pontos",
     },
   },
   {
@@ -171,7 +172,7 @@ export function getEnabledModuleNav(modules: CreatorModuleRecord[]): CreatorModu
 
     navItems.push({
       key: manifest.key,
-      label: manifest.label,
+      label: manifest.key === "points" ? getCurrencyLabel(creatorModule.configJson) : manifest.label,
       href,
     });
   }
