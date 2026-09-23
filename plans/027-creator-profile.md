@@ -1,7 +1,7 @@
 # Plan 027: Nome, cores e acessos da comunidade
 
 Issue: [#213](https://github.com/ludmila-omlopes/ludylops-live/issues/213).
-Estado: IMPLEMENTED, aguardando merge. Base: `094d1bd`, após o PR #212.
+Estado: DONE, PR #214 integrado. Base: `094d1bd`, após o PR #212.
 
 ## Entrega
 

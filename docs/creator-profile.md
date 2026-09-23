@@ -36,9 +36,10 @@ respostas usam `Cache-Control: no-store`.
 - Moeda: `points` disponível e economia nova ativada.
 - Ranking: `ranking` e dependências disponíveis, com economia nova ativada.
 - Frases: `quotes` e suas dependências disponíveis.
+- Produtos indicados: `product_recommendations` disponível (entrega #215).
 
 Nas comunidades novas, todos os links usam `/c/<slug>/...`. A Ludylops continua
-usando `/me`, `/ranking` e `/quotes`, independentemente da flag da economia nova.
+usando `/me`, `/ranking`, `/quotes` e `/produtinhos`, independentemente da flag da economia nova.
 O resolvedor existente continua verificando hostname, slug e lifecycle.
 
 Os antigos cartões de módulos preparados, rotas globais sem navegação e link

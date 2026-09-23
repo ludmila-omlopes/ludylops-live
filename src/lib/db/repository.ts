@@ -6479,12 +6479,14 @@ export async function listProductRecommendations(options?: {
       ? await db
           .select()
           .from(productRecommendations)
+          .where(eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID))
           .orderBy(productRecommendations.sortOrder, productRecommendations.name)
       : await db
           .select()
           .from(productRecommendations)
           .where(
             and(
+              eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID),
               eq(productRecommendations.isActive, true),
               eq(productRecommendations.moderationStatus, "approved"),
             ),
@@ -6513,6 +6515,7 @@ export async function listProductRecommendations(options?: {
                 updatedAt: productRecommendations.updatedAt,
               })
               .from(productRecommendations)
+              .where(eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID))
               .orderBy(productRecommendations.sortOrder, productRecommendations.name)
           : await db
               .select({
@@ -6531,7 +6534,7 @@ export async function listProductRecommendations(options?: {
                 updatedAt: productRecommendations.updatedAt,
               })
               .from(productRecommendations)
-              .where(eq(productRecommendations.isActive, true))
+              .where(and(eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID), eq(productRecommendations.isActive, true)))
               .orderBy(productRecommendations.sortOrder, productRecommendations.name);
 
         return legacyRows.map((row) =>
@@ -9698,9 +9701,10 @@ export async function upsertProductRecommendation(input: ProductRecommendationRe
   }
 
   try {
-    await db
+    const [saved] = await db
       .insert(productRecommendations)
       .values({
+        creatorId: DEFAULT_CREATOR_ID,
         id: input.id,
         slug: input.slug,
         name: input.name,
@@ -9718,6 +9722,7 @@ export async function upsertProductRecommendation(input: ProductRecommendationRe
       })
       .onConflictDoUpdate({
         target: productRecommendations.id,
+        setWhere: eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID),
         set: {
           slug: input.slug,
           name: input.name,
@@ -9732,7 +9737,8 @@ export async function upsertProductRecommendation(input: ProductRecommendationRe
           sortOrder: input.sortOrder,
           updatedAt: new Date(input.updatedAt),
         },
-      });
+      }).returning({ id: productRecommendations.id });
+    if (!saved) throw new Error("recommendation_not_found");
   } catch (error) {
     if (isMissingProductRecommendationSchemaError(error)) {
       const store = getDemoStore();
@@ -9867,7 +9873,7 @@ export async function updateProductRecommendationStatus(input: {
     const [updated] = await db
       .update(productRecommendations)
       .set(changes)
-      .where(eq(productRecommendations.id, input.recommendationId))
+      .where(and(eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID), eq(productRecommendations.id, input.recommendationId)))
       .returning();
 
     if (!updated) {
@@ -9928,7 +9934,7 @@ export async function deleteProductRecommendation(recommendationId: string) {
   try {
     const [deleted] = await db
       .delete(productRecommendations)
-      .where(eq(productRecommendations.id, recommendationId))
+      .where(and(eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID), eq(productRecommendations.id, recommendationId)))
       .returning();
 
     if (!deleted) {
