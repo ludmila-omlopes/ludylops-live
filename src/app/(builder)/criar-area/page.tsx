@@ -5,6 +5,7 @@ import { Coins, Palette, Sparkles, Ticket, type LucideIcon } from "lucide-react"
 import { auth } from "@/auth";
 import { CreatorAreaCreateForm } from "@/components/creator-area-create-form";
 import { CreatorCurrencyForm } from "@/components/creator-currency-form";
+import { CreatorChatRewardsForm } from "@/components/creator-chat-rewards-form";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { CreatorLandingCta } from "@/components/creator-landing-cta";
 import { canCreateCreatorArea } from "@/lib/creators/access";
@@ -133,7 +134,10 @@ export default async function CreateCreatorAreaPage() {
                     →
                   </span>
                 </Link>
-                {creator.status === "active" && creator.id !== DEFAULT_CREATOR_ID && <CreatorCurrencyForm creatorId={creator.id} />}
+                {creator.status === "active" && creator.id !== DEFAULT_CREATOR_ID && <>
+                  <CreatorCurrencyForm creatorId={creator.id} />
+                  <CreatorChatRewardsForm creatorId={creator.id} />
+                </>}
                 </div>
               ))}
             </div>

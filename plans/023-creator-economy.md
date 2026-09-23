@@ -18,8 +18,12 @@ estão em [docs/creator-economy.md](../docs/creator-economy.md).
 
 Schema aplicado em produção em 2026-09-23 com autorização da usuária, backup
 restaurado e ensaio local. As três tabelas novas foram verificadas; saldos e
-histórico legados preservaram contagens, somas e checksums. Merge/deploy e
-ativação da economia nova continuam pendentes.
+histórico legados preservaram contagens, somas e checksums. PR #206 integrado em
+2026-09-23; ativação da economia nova continua pendente.
+
+A próxima entrega, [#207 / Plan 024](024-creator-chat-rewards.md), implementa
+ganhos automáticos por mensagem no chat, com quantidade e intervalo por
+comunidade. Presença, inscrições e preços continuam pendentes.
 
 A #203 permanece aberta para regras automáticas de ganho/preços por creator,
 convergência futura da economia legada e integração gradual das verticais ainda

@@ -96,6 +96,16 @@ export const streamerbotGlobalVariables = [
 
 export const streamerbotScriptDefinitions: StreamerbotScriptDefinition[] = [
   {
+    id: "community-chat-reward",
+    filename: "community-chat-reward.cs",
+    title: "Ganhos por mensagem da comunidade",
+    description: "Recompensa a participação no chat com a moeda e o intervalo definidos pelo streamer do beta.",
+    category: "live",
+    trigger: "YouTube > Chat > Message",
+    setupInstructions: "Use uma action dedicada com Execute C# Code e a credencial exclusiva deste streamer. O trigger fornece userId, broadcast.id e messageId. Configure e ative os ganhos por mensagem após a ativação da moeda. Não substitua as ações legadas da Ludylops. Em um reenvio, preserve os IDs originais. chatRewardResponse informa credited, cooldown ou paused; HTTP 200 também pode indicar que nenhum crédito era devido.",
+    sortOrder: 6,
+  },
+  {
     id: "community-currency",
     filename: "community-currency.cs",
     title: "Moeda da comunidade",

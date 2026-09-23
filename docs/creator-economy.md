@@ -22,8 +22,9 @@ uma comunidade e 20 estrelas em outra. Renomear a moeda não altera os valores.
 
 O novo núcleo aceita quantidades inteiras de 1 a 1.000.000 por crédito/débito.
 Cada ação do streamer define sua quantidade; não se reutilizam os preços globais
-da Ludylops. Automatizar taxas de presença/chat/inscrições e oferecer regras de
-preços configuráveis ainda faz parte da sequência da #203. Os endpoints antigos
+da Ludylops. Os [ganhos por mensagem](creator-chat-rewards.md) da #207 permitem
+configurar quantidade e intervalo de chat por comunidade. Automatizar presença,
+inscrições e preços ainda faz parte da sequência da #203. Os endpoints antigos
 de eventos, apostas, sugestões, catálogo/resgates, likes e OBS continuam limitados
 à Ludylops. Este PR não libera essas dependências para outros streamers.
 

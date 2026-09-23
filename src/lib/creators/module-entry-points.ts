@@ -82,6 +82,7 @@ export const integrationApiGroups: Record<string, CreatorModuleKey[]> = {
   "/api/internal/steam/sync": ["game_suggestions"],
   "/api/internal/streamerbot/events": ["points", "streamerbot"],
   "/api/internal/streamerbot/economy": ["points", "streamerbot"],
+  "/api/internal/streamerbot/chat-rewards": ["points", "streamerbot"],
   "/api/internal/streamerbot/link": ["points", "streamerbot"],
   "/api/internal/streamerbot/points": ["points", "streamerbot"],
   "/api/internal/streamerbot/bets": ["bets"],

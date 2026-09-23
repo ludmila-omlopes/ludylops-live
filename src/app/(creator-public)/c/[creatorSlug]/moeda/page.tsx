@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { CreatorEconomyManager } from "@/components/creator-economy-manager";
+import { CreatorChatRewardsForm } from "@/components/creator-chat-rewards-form";
 import { getCreatorAreaBySlug } from "@/lib/creators/service";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { canUseModules } from "@/lib/creators/module-access";
@@ -42,6 +43,9 @@ export default async function CreatorCurrencyPage({ params }: { params: Promise<
           <p>{entry.reason}</p><time dateTime={new Date(entry.createdAt).toISOString()}>{new Date(entry.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</time>
         </li>)}</ul>
       </section>}
-    {data && viewerId === tenant.creator.ownerUserId && <CreatorEconomyManager creatorId={tenant.creator.id} currencyLabel={currencyLabel} />}
+    {data && viewerId === tenant.creator.ownerUserId && <>
+      <CreatorChatRewardsForm creatorId={tenant.creator.id} />
+      <CreatorEconomyManager creatorId={tenant.creator.id} currencyLabel={currencyLabel} />
+    </>}
   </div>;
 }

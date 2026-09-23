@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { createHash, randomUUID } from "node:crypto";
+import { and, desc, eq, gte, ne, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { creators, creatorModules, creatorBalances, creatorLedger, users } from "@/lib/db/schema";
 import { env, isDemoMode } from "@/lib/env";
@@ -10,6 +10,8 @@ import { getCurrencyLabel } from "./currency";
 import { economyMutationSchema } from "./economy-input";
 import { creditedEconomyViewer, lockEconomyIdentity, type EconomyTx } from "./economy-identity";
 import { demoEconomyBalance, creditedDemoEconomyViewer, economyDemoStore, mutateDemoEconomy, sameOperation } from "./economy-demo";
+import { chatRewardInputSchema, chatRewardReason, getChatRewardSettings } from "./chat-rewards";
+import type { EconomyEntry } from "./economy-demo";
 
 export type EconomyAuthority = { kind: "viewer"; viewerId: string } | { kind: "owner"; viewerId: string } | { kind: "integration" };
 
@@ -60,7 +62,7 @@ export async function readCreatorEconomy(context: CreatorContext, authority: Eco
     const currencyLabel = authorizeDemo(creatorId, authority);
     const canonical = creditedDemoEconomyViewer(viewerId);
     return { currencyLabel, viewerId: canonical, balance: demoEconomyBalance(creatorId, canonical),
-      entries: economyDemoStore().entries.filter((e) => e.creatorId === creatorId && e.viewerId === canonical).slice(0, 50) };
+      entries: economyDemoStore().entries.filter((e) => e.creatorId === creatorId && e.viewerId === canonical && e.amount !== 0).slice(0, 50) };
   }
   const db = getDb();
   if (!db) throw new Error("economy_storage_unavailable");
@@ -71,11 +73,95 @@ export async function readCreatorEconomy(context: CreatorContext, authority: Eco
     const [balance] = await tx.select().from(creatorBalances)
       .where(and(eq(creatorBalances.creatorId, creatorId), eq(creatorBalances.viewerId, canonical)));
     const entries = await tx.select().from(creatorLedger)
-      .where(and(eq(creatorLedger.creatorId, creatorId), eq(creatorLedger.viewerId, canonical)))
+      .where(and(eq(creatorLedger.creatorId, creatorId), eq(creatorLedger.viewerId, canonical), ne(creatorLedger.amount, 0)))
       .orderBy(desc(creatorLedger.createdAt), desc(creatorLedger.id)).limit(50);
     return { currencyLabel, viewerId: canonical,
       balance: { currentBalance: balance?.currentBalance ?? 0, lifetimeEarned: balance?.lifetimeEarned ?? 0, lifetimeSpent: balance?.lifetimeSpent ?? 0 }, entries };
   }, { isolationLevel: "repeatable read" });
+}
+
+function chatResult(entry: EconomyEntry, duplicate: boolean, currencyLabel: string) {
+  const outcome = entry.kind === "chat_reward" ? "credited" : entry.kind === "chat_paused" ? "paused" : "cooldown";
+  return { entry, duplicate, currencyLabel, outcome };
+}
+
+/** Called only after credential authentication. The amount always comes from the locked module config. */
+export async function rewardCreatorChat(context: CreatorContext, input: unknown) {
+  const creatorId = validateContext(context);
+  const parsed = chatRewardInputSchema.parse(input);
+  const operationKey = `chat:${createHash("sha256").update(JSON.stringify([parsed.broadcastId, parsed.messageId])).digest("hex")}`;
+  if (isDemoMode) {
+    const currencyLabel = authorizeDemo(creatorId, { kind: "integration" });
+    const tenant = listDemoCreatorTenants().find((t) => t.creator.id === creatorId)!;
+    if (!tenant.modules.some((m) => m.moduleKey === "streamerbot" && m.status === "installed")) throw new Error("economy_unavailable");
+    const settings = getChatRewardSettings(tenant.modules.find((m) => m.moduleKey === "points")?.configJson);
+    const viewerId = creditedDemoEconomyViewer(parsed.viewerId);
+    if (!globalThis.__lojaDemoStore?.viewers.some((v) => v.id === viewerId)) throw new Error("viewer_not_found");
+    const store = economyDemoStore();
+    const prior = store.entries.find((e) => e.creatorId === creatorId && e.operationKey === operationKey);
+    if (prior) {
+      if (prior.viewerId !== viewerId) throw new Error("operation_conflict");
+      return chatResult(prior, true, currencyLabel);
+    }
+    const now = new Date();
+    const last = store.entries.filter((e) => e.creatorId === creatorId && e.viewerId === viewerId && e.kind === "chat_reward")
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    const kind = !settings.enabled ? "chat_paused" : last && now.getTime() - last.createdAt.getTime() < settings.cooldownSeconds * 1000 ? "chat_cooldown" : "chat_reward";
+    let entry: EconomyEntry;
+    if (kind === "chat_reward") {
+      entry = mutateDemoEconomy(creatorId, { kind: "credit", viewerId, operationKey, amount: settings.amount, reason: chatRewardReason }).entry;
+      entry.kind = kind;
+    } else {
+      entry = { id: randomUUID(), creatorId, viewerId, operationKey, kind, amount: 0,
+        reason: kind === "chat_paused" ? "Ganhos por mensagem pausados" : "Intervalo entre ganhos por mensagem", refundOf: null, createdAt: now };
+      store.entries.unshift(entry);
+    }
+    return chatResult(entry, false, currencyLabel);
+  }
+  const db = getDb();
+  if (!db) throw new Error("economy_storage_unavailable");
+  return db.transaction(async (tx) => {
+    await lockEconomyIdentity(tx);
+    const currencyLabel = await authorize(tx, creatorId, { kind: "integration" });
+    const [integration] = await tx.select({ status: creatorModules.status }).from(creatorModules)
+      .where(and(eq(creatorModules.creatorId, creatorId), eq(creatorModules.moduleKey, "streamerbot"))).for("share");
+    if (integration?.status !== "installed") throw new Error("economy_unavailable");
+    // authorize holds a share lock on the points row until this transaction completes.
+    const [points] = await tx.select({ config: creatorModules.configJson }).from(creatorModules)
+      .where(and(eq(creatorModules.creatorId, creatorId), eq(creatorModules.moduleKey, "points")));
+    const settings = getChatRewardSettings(points.config as Record<string, unknown>);
+    const viewerId = await creditedEconomyViewer(tx, parsed.viewerId);
+    const [viewer] = await tx.select({ id: users.id }).from(users).where(eq(users.id, viewerId)).for("key share");
+    if (!viewer) throw new Error("viewer_not_found");
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify([creatorId, operationKey])}, 203))`);
+    const [prior] = await tx.select().from(creatorLedger)
+      .where(and(eq(creatorLedger.creatorId, creatorId), eq(creatorLedger.operationKey, operationKey)));
+    if (prior) {
+      if (prior.viewerId !== viewerId) throw new Error("operation_conflict");
+      return chatResult(prior, true, currencyLabel);
+    }
+    // Different messages for linked channels share the same cooldown, including concurrent requests.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify([creatorId, viewerId])}, 207))`);
+    const [last] = await tx.select({ createdAt: creatorLedger.createdAt }).from(creatorLedger)
+      .where(and(eq(creatorLedger.creatorId, creatorId), eq(creatorLedger.viewerId, viewerId), eq(creatorLedger.kind, "chat_reward")))
+      .orderBy(desc(creatorLedger.createdAt)).limit(1);
+    const { rows: [{ now }] } = await tx.execute<{ now: string }>(sql`select clock_timestamp() as now`);
+    const createdAt = new Date(now);
+    const kind = !settings.enabled ? "chat_paused" : last && createdAt.getTime() - last.createdAt.getTime() < settings.cooldownSeconds * 1000 ? "chat_cooldown" : "chat_reward";
+    const amount = kind === "chat_reward" ? settings.amount : 0;
+    if (amount) {
+      await tx.insert(creatorBalances).values({ creatorId, viewerId }).onConflictDoNothing();
+      const [balance] = await tx.select().from(creatorBalances)
+        .where(and(eq(creatorBalances.creatorId, creatorId), eq(creatorBalances.viewerId, viewerId))).for("update");
+      if (balance.currentBalance + amount > 2147483647 || balance.lifetimeEarned + amount > 2147483647) throw new Error("balance_limit");
+      await tx.update(creatorBalances).set({ currentBalance: balance.currentBalance + amount,
+        lifetimeEarned: balance.lifetimeEarned + amount, updatedAt: createdAt })
+        .where(and(eq(creatorBalances.creatorId, creatorId), eq(creatorBalances.viewerId, viewerId)));
+    }
+    const [entry] = await tx.insert(creatorLedger).values({ id: randomUUID(), creatorId, viewerId, operationKey, kind, amount, createdAt,
+      reason: kind === "chat_reward" ? chatRewardReason : kind === "chat_paused" ? "Ganhos por mensagem pausados" : "Intervalo entre ganhos por mensagem" }).returning();
+    return chatResult(entry, false, currencyLabel);
+  });
 }
 
 /** Integration authority must originate from verified credentials, never a request field. */
