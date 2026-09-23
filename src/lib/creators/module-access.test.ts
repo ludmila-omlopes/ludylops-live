@@ -69,6 +69,18 @@ describe("server module authorization", () => {
       expect.objectContaining({ slug: "missing" }),
     );
   });
+  it("allows only the isolated ranking reader without unlocking other modules or legacy queries", () => {
+    const other = tenant("another");
+    expect(canUseModules(other, ["ranking"], "ranking.read")).toBe(true);
+    expect(canUseModules(other, ["ranking"])).toBe(false);
+    expect(canUseModules(other, ["points"], "ranking.read")).toBe(false);
+    expect(canUseModules(other, ["ranking", "bets"], "ranking.read")).toBe(false);
+    expect(canUseModules(tenant(), ["ranking"], "ranking.read")).toBe(false);
+    other.modules.find((m) => m.moduleKey === "streamerbot")!.status = "disabled";
+    expect(canUseModules(other, ["ranking"], "ranking.read")).toBe(true);
+    other.modules.find((m) => m.moduleKey === "points")!.status = "disabled";
+    expect(canUseModules(other, ["ranking"], "ranking.read")).toBe(false);
+  });
   it("fails closed on lookup errors and absent production storage", async () => {
     storage.resolve.mockRejectedValue(
       new Error("sensitive connection failure"),

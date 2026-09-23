@@ -13,6 +13,7 @@ export const modulePages: Record<string, CreatorModuleKey[]> = {
   "/quotes": ["quotes"],
   "/c/[creatorSlug]/quotes": ["quotes"],
   "/c/[creatorSlug]/moeda": ["points"],
+  "/c/[creatorSlug]/ranking": ["ranking"],
   "/obs/quotes": ["quotes", "obs_overlays"],
   "/obs/bets": ["bets", "obs_overlays"],
   "/obs/likes": ["points", "obs_overlays"],
@@ -21,6 +22,7 @@ export const modulePages: Record<string, CreatorModuleKey[]> = {
 };
 
 export const moduleApiGroups: Record<string, CreatorModuleKey[]> = {
+  "/api/c/[creatorSlug]/ranking": ["ranking"],
   "/api/bets": ["bets"],
   "/api/catalog": ["redemptions"],
   "/api/leaderboard": ["ranking"],

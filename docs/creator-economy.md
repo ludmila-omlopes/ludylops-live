@@ -19,6 +19,8 @@ uma comunidade e 20 estrelas em outra. Renomear a moeda não altera os valores.
   pode escolher o streamer ou o ID interno do espectador.
 - `/api/internal/streamerbot/points`: o comando de saldo também funciona para
   comunidades do beta e responde com o nome da moeda correspondente.
+- `/c/<slug>/ranking`: [ranking público](creator-ranking.md) de até 100 saldos
+  positivos, respeitando exclusões existentes e os módulos ranking/points.
 
 O novo núcleo aceita quantidades inteiras de 1 a 1.000.000 por crédito/débito.
 Cada ação do streamer define sua quantidade; não se reutilizam os preços globais

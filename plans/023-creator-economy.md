@@ -21,9 +21,11 @@ restaurado e ensaio local. As três tabelas novas foram verificadas; saldos e
 histórico legados preservaram contagens, somas e checksums. PR #206 integrado em
 2026-09-23; ativação da economia nova continua pendente.
 
-A próxima entrega, [#207 / Plan 024](024-creator-chat-rewards.md), implementa
+O PR #208, [#207 / Plan 024](024-creator-chat-rewards.md), entregou
 ganhos automáticos por mensagem no chat, com quantidade e intervalo por
-comunidade. Presença, inscrições e preços continuam pendentes.
+comunidade. O [Plan 025](025-creator-ranking.md) implementa o ranking público
+isolado da moeda, com a #209 aguardando integração. Presença, inscrições e preços
+continuam pendentes.
 
 A #203 permanece aberta para regras automáticas de ganho/preços por creator,
 convergência futura da economia legada e integração gradual das verticais ainda

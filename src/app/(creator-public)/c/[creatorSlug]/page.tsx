@@ -5,6 +5,7 @@ import { ArrowRight, CheckCircle2, CirclePlay } from "lucide-react";
 import { getEnabledCreatorModules, getCreatorModuleManifest } from "@/lib/creators/modules";
 import { getCreatorAreaBySlug } from "@/lib/creators/service";
 import { getCurrencyLabel } from "@/lib/creators/currency";
+import { canReadCreatorRanking } from "@/lib/creators/ranking";
 
 type CreatorPageProps = {
   params: Promise<{
@@ -55,6 +56,7 @@ export default async function CreatorAreaPage({ params }: CreatorPageProps) {
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               {tenant.modules.some((m) => m.moduleKey === "points" && m.status === "installed") && <a href={`/c/${tenant.creator.slug}/moeda`} className="btn-brutal ink-button px-5 py-3 text-xs">Consultar minha moeda</a>}
+              {canReadCreatorRanking(tenant) && <a href={`/c/${tenant.creator.slug}/ranking`} className="btn-brutal ink-button px-5 py-3 text-xs">Ver ranking</a>}
               <a
                 href={`https://${tenant.creator.slug}.ludylops.live`}
                 className="btn-brutal ink-button px-5 py-3 text-xs text-[var(--color-accent-ink)]"

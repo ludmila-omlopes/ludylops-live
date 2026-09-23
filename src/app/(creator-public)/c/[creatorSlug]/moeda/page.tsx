@@ -9,6 +9,7 @@ import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { canUseModules } from "@/lib/creators/module-access";
 import { readCreatorEconomy } from "@/lib/creators/economy";
 import { getCurrencyLabel } from "@/lib/creators/currency";
+import { canReadCreatorRanking } from "@/lib/creators/ranking";
 
 export default async function CreatorCurrencyPage({ params }: { params: Promise<{ creatorSlug: string }> }) {
   const { creatorSlug } = await params;
@@ -32,6 +33,7 @@ export default async function CreatorCurrencyPage({ params }: { params: Promise<
   return <div className="mx-auto grid w-full max-w-4xl gap-8 px-4 py-10 sm:px-6">
     <Link href={`/c/${tenant.creator.slug}`} className="font-bold underline">{tenant.creator.displayName}</Link>
     <h1 className="break-words text-4xl font-black">Seus {currencyLabel}</h1>
+    {canReadCreatorRanking(tenant) && <Link href={`/c/${tenant.creator.slug}/ranking`} className="font-bold underline">Ver ranking da comunidade</Link>}
     {!viewerId ? <a className="font-bold underline" href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/c/${tenant.creator.slug}/moeda`)}`}>Entre para consultar seu saldo</a>
       : unavailable ? <p role="alert">Não foi possível consultar sua moeda agora. Tente novamente mais tarde.</p>
       : data && <section className="grid gap-4">

@@ -3,7 +3,7 @@
 Issue: [#207](https://github.com/ludmila-omlopes/ludylops-live/issues/207).
 Parte de [#203](https://github.com/ludmila-omlopes/ludylops-live/issues/203).
 
-Estado: IMPLEMENTED, aguardando merge. Base: `6477cff`, com o núcleo da economia
+Estado: DONE, integrado no PR #208. Base: `6477cff`, com o núcleo da economia
 do PR #206 e a migração 0026 já aplicada em produção.
 
 ## Entrega
@@ -24,6 +24,6 @@ Testes gerais, PostgreSQL descartável, types, lint, build, UI desktop/mobile e
 contrato HTTP da ação C# passaram. Configuração e limites estão em
 [docs/creator-chat-rewards.md](../docs/creator-chat-rewards.md).
 
-O merge continua com a usuária. A ação precisa ser instalada no Streamer.bot de
+A ação precisa ser instalada no Streamer.bot de
 cada streamer interessado, após o deploy e a liberação da economia. Presença,
 inscrições, preços e demais verticais permanecem na #203.
