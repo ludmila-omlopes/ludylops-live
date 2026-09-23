@@ -40,10 +40,11 @@ export function insertDemoCreatorTenant(tenant: CreatorTenantRecord) {
   return tenant;
 }
 
-export function buildDemoCreatorModules(creatorId: string) {
+export function buildDemoCreatorModules(creatorId: string, currencyLabel = "pontos") {
   return DEFAULT_CREATOR_MODULES.map((module) => ({
     ...module,
     id: `${creatorId}_${module.moduleKey}`.slice(0, 64),
     creatorId,
+    configJson: module.moduleKey === "points" ? { currencyLabel } : structuredClone(module.configJson),
   }));
 }

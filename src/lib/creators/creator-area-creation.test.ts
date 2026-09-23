@@ -6,7 +6,7 @@ vi.mock("@/lib/creators/tenant", () => ({ resolveCreatorFromRequest: resolveCrea
 
 import { CreatorAreaError } from "@/lib/creators/area-errors.server";
 import { createCreatorArea } from "@/lib/creators/service";
-import { creatorBranding, creators } from "@/lib/db/schema";
+import { creatorBranding, creatorModules, creators } from "@/lib/db/schema";
 
 const input = { displayName: "Canal da Mari", slug: "canal-da-mari" };
 
@@ -59,6 +59,15 @@ function transactionDb(failureTable?: unknown) {
 
 describe("creator-area database creation", () => {
   beforeEach(() => { vi.clearAllMocks(); });
+
+  it("persists the chosen currency with the new creator's points module", async () => {
+    const { committed } = transactionDb();
+    await createCreatorArea("owner_1", { ...input, currencyLabel: "corações" });
+    const modules = committed.find((row) => row.table === creatorModules)?.value;
+    expect(modules).toEqual(expect.arrayContaining([
+      expect.objectContaining({ moduleKey: "points", configJson: { currencyLabel: "corações" }, creatorId: committed[0].value.id }),
+    ]));
+  });
 
   it("lets the unique constraint arbitrate overlapping requests without exposing another owner", async () => {
     const { db, committed, events } = transactionDb();

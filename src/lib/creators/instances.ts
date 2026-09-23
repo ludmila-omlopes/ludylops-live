@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { asc, eq, inArray } from "drizzle-orm";
 
-import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import { DEFAULT_CREATOR_ID, DEFAULT_CREATOR_MODULES } from "@/lib/creators/defaults";
 import {
   creatorModuleCatalog,
   getCreatorModuleManifest,
@@ -296,6 +296,10 @@ export async function updatePlatformCreatorModuleStatus(input: {
     return null;
   }
 
+  const defaultConfig = input.creatorId === DEFAULT_CREATOR_ID
+    ? DEFAULT_CREATOR_MODULES.find((entry) => entry.moduleKey === manifest.key)!.configJson
+    : manifest.defaultConfig;
+
   const db = getDb();
   if (isDemoMode) {
     const tenant =
@@ -314,7 +318,7 @@ export async function updatePlatformCreatorModuleStatus(input: {
       creatorId: input.creatorId,
       moduleKey: manifest.key,
       status: input.status,
-      configJson: existing?.configJson ?? manifest.defaultConfig,
+      configJson: existing?.configJson ?? defaultConfig,
       installedAt: existing?.installedAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -346,7 +350,7 @@ export async function updatePlatformCreatorModuleStatus(input: {
         creatorId: input.creatorId,
         moduleKey: manifest.key,
         status: input.status,
-        configJson: manifest.defaultConfig,
+        configJson: defaultConfig,
         installedAt: now,
         updatedAt: now,
       })

@@ -85,6 +85,7 @@ function buildDemoTenant(input: {
   slug: string;
   primaryColor: string;
   accentColor: string;
+  currencyLabel: string;
 }): CreatorTenantRecord {
   const creatorId = `creator_${input.slug}`.slice(0, 64);
   const now = nowIso();
@@ -115,7 +116,7 @@ function buildDemoTenant(input: {
         createdAt: now,
       },
     ],
-    modules: buildDemoCreatorModules(creatorId),
+    modules: buildDemoCreatorModules(creatorId, input.currencyLabel),
   };
 }
 
@@ -138,6 +139,7 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
         slug: parsed.slug,
         primaryColor: parsed.primaryColor,
         accentColor: parsed.accentColor,
+        currencyLabel: parsed.currencyLabel,
       }),
     );
   }
@@ -180,7 +182,7 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
           creatorId,
           moduleKey: module.key,
           status: "installed",
-          configJson: module.defaultConfig,
+          configJson: module.key === "points" ? { ...module.defaultConfig, currencyLabel: parsed.currencyLabel } : module.defaultConfig,
         })),
       );
     });

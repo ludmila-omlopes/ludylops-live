@@ -40,7 +40,7 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 010  | Cut OBS overlay polling cost (intervals + live gating) | P1 | S | — | [#175](https://github.com/ludmila-omlopes/ludylops-live/issues/175) | DONE (PR #199 merged 2026-09-22; offline polling gates and quote interval) |
 | 011  | Short-TTL caching for viewer-facing reads | P2 | M | isolated public loaders | [#176](https://github.com/ludmila-omlopes/ludylops-live/issues/176) | BLOCKED (ranking, current game and live state remain global; bets are personalized) |
 | 012  | Bound hot queries + HLTB refresh off request path | P2 | M | — | [#177](https://github.com/ludmila-omlopes/ludylops-live/issues/177) | DONE (PR #200 merged 2026-09-22; bounded ranking and admin HLTB refresh) |
-| 013  | Measure overlay delivery cost before a realtime redesign | P3 | S | — | [#178](https://github.com/ludmila-omlopes/ludylops-live/issues/178) | IMPLEMENTED (inventory, local measurement and model; retain polling; awaiting review/merge) |
+| 013  | Measure overlay delivery cost before a realtime redesign | P3 | S | — | [#178](https://github.com/ludmila-omlopes/ludylops-live/issues/178) | DONE (PR #201 merged; inventory, local measurement and model; retain polling) |
 | 014  | Establish a safe Drizzle migration and data-seed baseline | P1 | M | — | [#180](https://github.com/ludmila-omlopes/ludylops-live/issues/180) | IN PROGRESS (implemented and validated: 351 tests, types, lint, build; awaiting integration; no shared DB changes) |
 | 015  | Harden creator-area creation errors and concurrent slug conflicts | P1 | S | — | [#181](https://github.com/ludmila-omlopes/ludylops-live/issues/181) | IN PROGRESS (implemented; 362 tests, typecheck, lint and build passed; awaiting integration) |
 | 016  | Route creator subdomains to their public Next.js surface | P1 | M | 017 | [#182](https://github.com/ludmila-omlopes/ludylops-live/issues/182) | IN PROGRESS (implementation verified; awaiting PR merge) |
@@ -49,6 +49,8 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 019  | Enforce module authorization and dependency-safe transitions | P1 | L | 009; coordinate 018 | [#185](https://github.com/ludmila-omlopes/ludylops-live/issues/185) | DONE (PR #198 merged 2026-09-22; module policy, guards and dependency-safe transitions) |
 | 020  | Define builder, shared engine and Ludylops instance boundaries | P1 | M design / L migration | none for design; reconcile 008–019 before migration | — | DONE (architecture direction recorded; migration remains staged in follow-ups) |
 | 021  | Separate builder, community, public creator and OBS layouts, preserving routes | P1 | M | direction in 020; no database migration | — | DONE (reviewed in isolated worktree plan-021; commits 8f24f46, 6b5042b; 21 pages / 78 APIs) |
+| 022  | Name each community's currency | P1 | M | existing creator/module authorization | [#202](https://github.com/ludmila-omlopes/ludylops-live/issues/202) | IN PROGRESS (implemented and validated; awaiting review/merge; configuration only) |
+| 023  | Isolate balances, ledger and currency operations per creator | P1 | L | 009, 019; preserve 022 configuration | [#203](https://github.com/ludmila-omlopes/ludylops-live/issues/203) | TODO (next functional priority; coordinated schema/application rollout required) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -70,12 +72,14 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 The white-label foundation creates creator instances, but operational data is still single-tenant. Isolation is a phased program, tracked here so the shape and remaining cost stay visible:
 
 - **008 (IN PROGRESS; implementation verified)** — schema groundwork: `creator_id` on the 16 surrogate-PK operational tables, backfilled to `creator_ludylops`. Disposable PostgreSQL checks and application checks passed. Awaiting integration after #190; apply schema before deploying the updated application. Queries remain unscoped.
-- **009 (TODO)** — pilot: prove the request→repository threading pattern and per-creator sequence/constraint handling on the **quotes** vertical; produce `docs/creator-scoping.md`.
+- **009 (DONE)** — quote isolation pilot merged in PR #197; production migration and compatibility-index cleanup completed. See `docs/creator-scoping.md`.
+- **022 (IN PROGRESS)** — currency naming during creation and owner-only editing, persisted per creator. Ludylops keeps pipetz. No balance migration or operational unlock.
+- **023 (TODO; next functional priority)** — independent balances, ledger and currency operations, including identity merges and legacy deployment compatibility. See [Plan 023](023-creator-economy.md).
 - **Unnumbered functional follow-ups (not yet written; 010–013 are performance plans)** — replicate 009's pattern per vertical, each depending on 009 and following the pattern doc:
   - bets (`bets`/`bet_options`/`bet_entries`)
   - suggestions (`game_suggestions`/`video_suggestions`/`creator_suggestions` + boosts) and `product_recommendations`
   - redemptions (`redemptions`) + bridge
-  - economy (`point_ledger`, and `viewer_balances` — needs composite PK `(viewer_id, creator_id)`, per the confirmed **per-creator balance** decision)
+  - economy is now tracked explicitly by **023** (`point_ledger`, and `viewer_balances` — needs composite PK `(creator_id, viewer_id)`, per the confirmed **per-creator balance** decision)
   - catalog (`catalog_items` — `slug` unique must become composite `(creator_id, slug)`)
   - counters/overlays (`streamerbot_counters` — key-based **and** dual-used by creator-area-access settings in `src/lib/creators/access.ts`; handle carefully)
   - Identity stays global (not scoped): `users`, `google_accounts`, `google_account_viewers`, `viewer_links`; shared reference/infra stays global: `ps_plus_catalog_*`, `google_risc_deliveries`.

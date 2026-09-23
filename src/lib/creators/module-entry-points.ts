@@ -68,7 +68,7 @@ export const sharedApiGroups = {
   "/api/auth": "Global authentication",
   "/api/owner":
     "Platform-owner recovery and configuration; existing role checks remain mandatory",
-  "/api/me/creator-area": "Builder access and creator provisioning",
+  "/api/me/creator-area": "Builder provisioning and owner-verified currency naming; no operational balances",
   "/api/admin/creator-area-access": "Platform beta access configuration",
   "/api/internal/google": "Global account protection",
   "/api/internal/ps-plus": "Shared reference catalog synchronization",
