@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ record: vi.fn(), enabled: vi.fn(), quotesEnabled: vi.fn(), used: vi.fn(), effect: vi.fn() }));
+const state = vi.hoisted(() => ({ record: vi.fn(), enabled: vi.fn(), quotesEnabled: vi.fn(), used: vi.fn(), effect: vi.fn(), economyRead: vi.fn(), economyWrite: vi.fn() }));
+vi.mock("@/lib/creators/economy-api", async (original) => ({
+  ...await original<typeof import("@/lib/creators/economy-api")>(),
+  readIntegrationChannelEconomy: state.economyRead, mutateChannelEconomy: state.economyWrite,
+}));
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/env", () => ({ isDemoMode: true, env: { STREAMERBOT_SHARED_SECRET: "legacy-test", STREAMERBOT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64") } }));
 vi.mock("@/lib/db/client", () => ({ getDb: () => null }));
@@ -24,6 +28,7 @@ import { POST as deaths } from "./deaths/route";
 import { POST as quotes } from "./quotes/route";
 import { POST as wheel } from "./wheel/route";
 import { POST as check } from "./credentials/check/route";
+import { POST as economy } from "./economy/route";
 import { buildCredentialSignature, encryptCredentialSecret } from "@/lib/streamerbot/credential-crypto";
 import { defaultCreatorTenant } from "@/lib/creators/tenant";
 import { listDemoCreatorTenants } from "@/lib/creators/demo-store";
@@ -57,11 +62,26 @@ describe("credential rollout at every Streamer.bot handler", () => {
     listDemoCreatorTenants().splice(0, Infinity, { ...structuredClone(defaultCreatorTenant), creator: { ...defaultCreatorTenant.creator, id: "creator-other" } });
     setCreator("creator-other");
   });
-  it.each(routes)("%s denies another creator before parsing/effects", async (path, handler) => {
+  it.each(routes.filter(([path]) => path !== "points"))("%s denies another creator before parsing/effects", async (path, handler) => {
     const response = await handler(request(path, false, path === "quotes" ? JSON.stringify({ action: "show", quoteId: 1, viewerExternalId: "viewer", source: "streamerbot_chat" }) : "not-json"));
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ error: "operation_not_isolated" });
     expect(state.effect).not.toHaveBeenCalled();
+  });
+  it("passes only verified currency identity to balance reads and transactions", async () => {
+    state.economyRead.mockResolvedValue({ viewerId: "viewer", currencyLabel: "cristais", balance: { currentBalance: 9, lifetimeEarned: 9, lifetimeSpent: 0 } });
+    const payload = { viewerExternalId: "UCabcdefghijklmnopqrstuv", creatorId: DEFAULT_CREATOR_ID };
+    expect((await points(request("points", false, JSON.stringify(payload)))).status).toBe(200);
+    expect(state.economyRead).toHaveBeenCalledWith(expect.objectContaining({ creatorId: "creator-other" }), expect.objectContaining({ viewerExternalId: payload.viewerExternalId }));
+    state.economyWrite.mockResolvedValue({ duplicate: false });
+    expect((await economy(request("economy", false, JSON.stringify({ kind: "credit", amount: 1 })))).status).toBe(200);
+    expect(state.economyWrite).toHaveBeenCalledWith(expect.objectContaining({ creatorId: "creator-other" }), { kind: "integration" }, { kind: "credit", amount: 1 });
+    // Reusing a valid signature on another endpoint must fail authentication.
+    const signedForPoints = request("points", false, "{}");
+    const replay = new Request("https://untrusted.example/api/internal/streamerbot/economy", {
+      method: "POST", body: "{}", headers: signedForPoints.headers,
+    });
+    expect((await economy(replay)).status).toBe(401);
   });
   it.each(routes)("%s denies a disabled default creator with new or legacy authentication", async (path, handler) => {
     setCreator(DEFAULT_CREATOR_ID); state.enabled.mockResolvedValue(false);

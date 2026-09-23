@@ -15,7 +15,7 @@ type ModuleTenant = {
   creator: { id: string; status: string };
   modules: { moduleKey: string; status: string }[];
 };
-export type ModuleOperation = "legacy" | "quotes.read" | "quotes.create";
+export type ModuleOperation = "legacy" | "quotes.read" | "quotes.create" | "economy";
 
 /** Lifecycle/dependency check for configuration and authentication, without granting data access. */
 export function modulesAreAvailable(
@@ -37,6 +37,7 @@ export function canUseModules(
   operation: ModuleOperation = "legacy",
 ) {
   if (!tenant || !modulesAreAvailable(tenant, keys)) return false;
+  if (operation === "economy") return tenant.creator.id !== DEFAULT_CREATOR_ID && keys.every((key) => key === "points" || key === "streamerbot");
   if (tenant.creator.id === DEFAULT_CREATOR_ID) return true;
   return (
     (operation === "quotes.read" || operation === "quotes.create") &&

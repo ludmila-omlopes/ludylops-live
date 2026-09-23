@@ -2,9 +2,32 @@
 
 Issue: [#203](https://github.com/ludmila-omlopes/ludylops-live/issues/203).
 
-Estado: TODO. Prioridade: P1. Depende do contexto/autorização já entregues em
+Estado: IN PROGRESS. Prioridade: P1. Depende do contexto/autorização já entregues em
 #173/#185; preservar a configuração de moeda da #202. Não aplicar migração em
 produção como parte da implementação sem autorização da usuária.
+
+## Entrega atual — 2026-09-23
+
+Issue da entrega: [#205](https://github.com/ludmila-omlopes/ludylops-live/issues/205).
+
+Núcleo de saldo, crédito, débito, estorno, histórico, edição pelo dono e integração
+por credencial implementado em tabelas aditivas. A troca da chave da tabela legada
+proposta abaixo foi substituída para preservar deploys antigos e os pipetz.
+Inventário, decisão de compatibilidade, sequência de migração/ativação e limites
+estão em [docs/creator-economy.md](../docs/creator-economy.md).
+
+Schema aplicado em produção em 2026-09-23 com autorização da usuária, backup
+restaurado e ensaio local. As três tabelas novas foram verificadas; saldos e
+histórico legados preservaram contagens, somas e checksums. Merge/deploy e
+ativação da economia nova continuam pendentes.
+
+A #203 permanece aberta para regras automáticas de ganho/preços por creator,
+convergência futura da economia legada e integração gradual das verticais ainda
+bloqueadas. O núcleo novo já oferece operações reais independentes; os módulos
+não isolados não são liberados junto com ele.
+
+Os itens de troca de chave/backfill abaixo descrevem a proposta original, a ser
+reavaliada na convergência futura. Não devem ser executados nesta entrega.
 
 ## Objetivo
 

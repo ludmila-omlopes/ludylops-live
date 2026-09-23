@@ -5,6 +5,8 @@ import { getViewerBalanceFromChatCommand } from "@/lib/db/repository";
 import { streamerbotViewerBalanceCommandSchema } from "@/lib/streamerbot/schemas";
 import { authenticateStreamerbotRequest, authorizeStreamerbotOperation } from "@/lib/streamerbot/authenticate";
 import { formatPipetz } from "@/lib/utils";
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import { economyFailure, economyReply, readIntegrationChannelEconomy } from "@/lib/creators/economy-api";
 
 function mapViewerBalanceReply(message: string, viewerName?: string) {
   const prefix = viewerName ? `${viewerName}, ` : "";
@@ -25,6 +27,18 @@ export async function POST(request: Request) {
   const denied = await authorizeStreamerbotOperation(authentication, "points");
   if (denied) return denied;
   const raw = authentication.raw;
+
+  if (authentication.creatorId !== DEFAULT_CREATOR_ID) {
+    try {
+      const payload = streamerbotViewerBalanceCommandSchema.parse(JSON.parse(raw));
+      const result = await readIntegrationChannelEconomy(authentication, payload);
+      const viewerName = payload.youtubeDisplayName?.trim() || payload.viewerExternalId;
+      return economyReply({ ok: true, data: { viewerId: result.viewerId, viewerExternalId: payload.viewerExternalId,
+        balance: result.balance.currentBalance, lifetimeEarned: result.balance.lifetimeEarned,
+        lifetimeSpent: result.balance.lifetimeSpent, currencyLabel: result.currencyLabel,
+        replyMessage: `${viewerName}, seu saldo atual é ${formatPipetz(result.balance.currentBalance)} ${result.currencyLabel}.` } });
+    } catch (error) { return economyFailure(error); }
+  }
 
   try {
     const payload = streamerbotViewerBalanceCommandSchema.parse(JSON.parse(raw));

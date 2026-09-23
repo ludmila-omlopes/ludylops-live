@@ -96,6 +96,16 @@ export const streamerbotGlobalVariables = [
 
 export const streamerbotScriptDefinitions: StreamerbotScriptDefinition[] = [
   {
+    id: "community-currency",
+    filename: "community-currency.cs",
+    title: "Moeda da comunidade",
+    description: "Credita, debita ou estorna a moeda exclusiva de um streamer do beta.",
+    category: "pipetz",
+    trigger: "Action controlada pelo streamer",
+    setupInstructions: "Após a ativação da moeda, configure a credencial exclusiva do streamer e os argumentos currencyOperation, currencyViewerChannelId, currencyOperationKey, currencyReason e currencyAmount (ou currencyRefundOf no estorno). Reutilize a mesma chave e valores em uma repetição. Não conecte esta action a comandos públicos sem permissão. O endpoint da Ludylops continua separado.",
+    sortOrder: 5,
+  },
+  {
     id: "check-credential",
     filename: "check-credential.cs",
     title: "Testar credencial",

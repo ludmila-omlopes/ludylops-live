@@ -54,6 +54,7 @@ export default async function CreatorAreaPage({ params }: CreatorPageProps) {
               A comunidade já tem endereço reservado para lives, pontos, desafios e interações ao vivo.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
+              {tenant.modules.some((m) => m.moduleKey === "points" && m.status === "installed") && <a href={`/c/${tenant.creator.slug}/moeda`} className="btn-brutal ink-button px-5 py-3 text-xs">Consultar minha moeda</a>}
               <a
                 href={`https://${tenant.creator.slug}.ludylops.live`}
                 className="btn-brutal ink-button px-5 py-3 text-xs text-[var(--color-accent-ink)]"
