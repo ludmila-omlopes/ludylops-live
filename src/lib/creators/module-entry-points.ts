@@ -10,6 +10,7 @@ export const modulePages: Record<string, CreatorModuleKey[]> = {
   "/videos": ["video_suggestions"],
   "/indicacoes": ["creator_suggestions"],
   "/produtinhos": ["product_recommendations"],
+  "/c/[creatorSlug]/produtinhos": ["product_recommendations"],
   "/quotes": ["quotes"],
   "/c/[creatorSlug]/quotes": ["quotes"],
   "/c/[creatorSlug]/moeda": ["points"],

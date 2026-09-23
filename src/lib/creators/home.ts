@@ -16,5 +16,7 @@ export function creatorHomeLinks(tenant: CreatorTenantRecord) {
     links.push({ href: legacy ? "/ranking" : `${prefix}/ranking`, label: "Ver ranking", description: `Os maiores saldos de ${currency} da comunidade.` });
   if (canUseModules(tenant, ["quotes"], "quotes.read"))
     links.push({ href: legacy ? "/quotes" : `${prefix}/quotes`, label: "Frases da live", description: "As pérolas e as histórias que ficaram na memória." });
+  if (canUseModules(tenant, ["product_recommendations"], legacy ? "legacy" : "recommendations"))
+    links.push({ href: legacy ? "/produtinhos" : `${prefix}/produtinhos`, label: "Produtos indicados", description: "Escolhas para o setup, o jogo e o dia a dia." });
   return links;
 }

@@ -56,24 +56,24 @@ describe("owner profile", () => {
 describe("usable community home links", () => {
   it("uses only isolated routes and the configured currency", () => {
     const links = creatorHomeLinks(globalThis.__creatorTenantStore![0]);
-    expect(links.map((l) => l.href)).toEqual(["/c/canal-cristal/moeda", "/c/canal-cristal/ranking", "/c/canal-cristal/quotes"]);
+    expect(links.map((l) => l.href)).toEqual(["/c/canal-cristal/moeda", "/c/canal-cristal/ranking", "/c/canal-cristal/quotes", "/c/canal-cristal/produtinhos"]);
     expect(links[0].description).toContain("cristais");
   });
   it("hides economy links while production activation is off", () => {
     state.demo = false; state.env.CREATOR_ECONOMY_ENABLED = "false";
-    expect(creatorHomeLinks(globalThis.__creatorTenantStore![0]).map((l) => l.href)).toEqual(["/c/canal-cristal/quotes"]);
+    expect(creatorHomeLinks(globalThis.__creatorTenantStore![0]).map((l) => l.href)).toEqual(["/c/canal-cristal/quotes", "/c/canal-cristal/produtinhos"]);
   });
   it("respects dependencies and inactive communities", () => {
     const tenant = globalThis.__creatorTenantStore![0];
     tenant.modules.find((m) => m.moduleKey === "streamerbot")!.status = "disabled";
-    expect(creatorHomeLinks(tenant)).toHaveLength(2);
+    expect(creatorHomeLinks(tenant)).toHaveLength(3);
     tenant.modules.find((m) => m.moduleKey === "points")!.status = "disabled";
-    expect(creatorHomeLinks(tenant)).toEqual([]);
+    expect(creatorHomeLinks(tenant).map((l) => l.href)).toEqual(["/c/canal-cristal/produtinhos"]);
     tenant.modules.forEach((m) => { m.status = "installed"; }); tenant.creator.status = "archived";
     expect(creatorHomeLinks(tenant)).toEqual([]);
   });
   it("keeps legacy links available independently of new-economy activation", () => {
     state.demo = false; state.env.CREATOR_ECONOMY_ENABLED = "false";
-    expect(creatorHomeLinks(defaultCreatorTenant).map((l) => l.href)).toEqual(["/me", "/ranking", "/quotes"]);
+    expect(creatorHomeLinks(defaultCreatorTenant).map((l) => l.href)).toEqual(["/me", "/ranking", "/quotes", "/produtinhos"]);
   });
 });

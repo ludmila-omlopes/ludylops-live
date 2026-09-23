@@ -54,7 +54,8 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 024  | Automatic chat rewards per community | P1 | M | 023 currency core | [#207](https://github.com/ludmila-omlopes/ludylops-live/issues/207) | DONE (PR #208 merged; no new schema migration) |
 | 025  | Public currency rankings per community | P1 | M | 023 currency core | [#209](https://github.com/ludmila-omlopes/ludylops-live/issues/209) | DONE (PR #210 merged; no migration) |
 | 026  | Owner quote creation and correction | P1 | M | 009, 019 | [#211](https://github.com/ludmila-omlopes/ludylops-live/issues/211) | DONE (PR #212 merged; no migration) |
-| 027  | Owner name/colors and usable community home | P1 | M | 025, 026 | [#213](https://github.com/ludmila-omlopes/ludylops-live/issues/213) | IN PROGRESS (implemented and validated; awaiting merge; no migration) |
+| 027  | Owner name/colors and usable community home | P1 | M | 025, 026 | [#213](https://github.com/ludmila-omlopes/ludylops-live/issues/213) | DONE (PR #214 merged; no migration) |
+| 028  | Isolated owner-managed product recommendations | P1 | M | 008, 019, 027 | [#215](https://github.com/ludmila-omlopes/ludylops-live/issues/215) | IN PROGRESS (implemented and validated; awaiting merge; no migration) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -82,10 +83,11 @@ The white-label foundation creates creator instances, but operational data is st
 - **024 (DONE; PR #208 merged)** — owner-configured chat earning rules, signed native-message ingestion and concurrency-safe cooldown/retry handling. No new schema migration. Presence, subscriptions and pricing remain follow-up. See [Plan 024](024-creator-chat-rewards.md).
 - **025 (DONE; PR #210 merged)** — public positive-balance ranking per community, minimal public fields, preserved exclusions and module/lifecycle checks. No migration. See [Plan 025](025-creator-ranking.md).
 - **026 (DONE; PR #212 merged)** — owner quote creation/correction with isolated authorization, bounded listing, retry protection and concurrent-edit conflicts. See [Plan 026](026-creator-quote-management.md).
-- **027 (IN PROGRESS; #213 implemented)** — owner-controlled name/colors and a public home with scoped links only for available features. See [Plan 027](027-creator-profile.md).
+- **027 (DONE; PR #214 merged)** — owner-controlled name/colors and a public home with scoped links only for available features. See [Plan 027](027-creator-profile.md).
+- **028 (IN PROGRESS; #215 implemented)** — isolated product recommendations, owner creation/editing/publication and default-creator guards for legacy reads/writes. See [Plan 028](028-creator-recommendations.md).
 - **Unnumbered functional follow-ups (not yet written; 010–013 are performance plans)** — replicate 009's pattern per vertical, each depending on 009 and following the pattern doc:
   - bets (`bets`/`bet_options`/`bet_entries`)
-  - suggestions (`game_suggestions`/`video_suggestions`/`creator_suggestions` + boosts) and `product_recommendations`
+  - suggestions (`game_suggestions`/`video_suggestions`/`creator_suggestions` + boosts); owner-managed `product_recommendations` are now tracked by 028
   - redemptions (`redemptions`) + bridge
   - economy is now tracked explicitly by **023** (`point_ledger`, and `viewer_balances` — needs composite PK `(creator_id, viewer_id)`, per the confirmed **per-creator balance** decision)
   - catalog (`catalog_items` — `slug` unique must become composite `(creator_id, slug)`)

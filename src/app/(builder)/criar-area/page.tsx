@@ -140,6 +140,7 @@ export default async function CreateCreatorAreaPage() {
                   <CreatorCurrencyForm creatorId={creator.id} />
                   <CreatorChatRewardsForm creatorId={creator.id} />
                   <Link href={`/c/${creator.slug}/quotes#gerenciar-frases`} className="mt-3 block font-bold underline">Gerenciar frases</Link>
+                  <Link href={`/c/${creator.slug}/produtinhos`} className="mt-3 block font-bold underline">Gerenciar produtos</Link>
                 </>}
                 </div>
               ))}
