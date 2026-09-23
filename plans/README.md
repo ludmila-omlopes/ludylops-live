@@ -38,7 +38,7 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 008  | Add `creator_id` to operational tables (schema + backfill, no behavior change) | P1 | M | 014 | [#172](https://github.com/ludmila-omlopes/ludylops-live/issues/172) | IN PROGRESS (implemented and verified on disposable PostgreSQL; awaiting integration after #190) |
 | 009  | Thread creator context + scope the quotes vertical (pilot + pattern doc) | P1 | L | 008, 017, 018 | [#173](https://github.com/ludmila-omlopes/ludylops-live/issues/173) | DONE (PR #197 merged/deployed; migration and compatibility-index cleanup completed 2026-09-22) |
 | 010  | Cut OBS overlay polling cost (intervals + live gating) | P1 | S | — | [#175](https://github.com/ludmila-omlopes/ludylops-live/issues/175) | DONE (PR #199 merged 2026-09-22; offline polling gates and quote interval) |
-| 011  | Short-TTL caching for viewer-facing reads | P2 | M | isolated public loaders | [#176](https://github.com/ludmila-omlopes/ludylops-live/issues/176) | BLOCKED (ranking, current game and live state remain global; bets are personalized) |
+| 011  | Short-TTL caching for viewer-facing reads | P2 | M | isolated public loaders | [#176](https://github.com/ludmila-omlopes/ludylops-live/issues/176) | BLOCKED (legacy readers remain global; new creator ranking in 025 is a bounded candidate for a separate follow-up) |
 | 012  | Bound hot queries + HLTB refresh off request path | P2 | M | — | [#177](https://github.com/ludmila-omlopes/ludylops-live/issues/177) | DONE (PR #200 merged 2026-09-22; bounded ranking and admin HLTB refresh) |
 | 013  | Measure overlay delivery cost before a realtime redesign | P3 | S | — | [#178](https://github.com/ludmila-omlopes/ludylops-live/issues/178) | DONE (PR #201 merged; inventory, local measurement and model; retain polling) |
 | 014  | Establish a safe Drizzle migration and data-seed baseline | P1 | M | — | [#180](https://github.com/ludmila-omlopes/ludylops-live/issues/180) | IN PROGRESS (implemented and validated: 351 tests, types, lint, build; awaiting integration; no shared DB changes) |
@@ -50,8 +50,9 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 020  | Define builder, shared engine and Ludylops instance boundaries | P1 | M design / L migration | none for design; reconcile 008–019 before migration | — | DONE (architecture direction recorded; migration remains staged in follow-ups) |
 | 021  | Separate builder, community, public creator and OBS layouts, preserving routes | P1 | M | direction in 020; no database migration | — | DONE (reviewed in isolated worktree plan-021; commits 8f24f46, 6b5042b; 21 pages / 78 APIs) |
 | 022  | Name each community's currency | P1 | M | existing creator/module authorization | [#202](https://github.com/ludmila-omlopes/ludylops-live/issues/202) | DONE (PR #204 merged; configuration only) |
-| 023  | Isolate balances, ledger and currency operations per creator | P1 | L | 009, 019; preserve 022 configuration | [#203](https://github.com/ludmila-omlopes/ludylops-live/issues/203) | IN PROGRESS (core PR #206 merged and schema applied; activation pending; chat earning delivered in 024) |
-| 024  | Automatic chat rewards per community | P1 | M | 023 currency core | [#207](https://github.com/ludmila-omlopes/ludylops-live/issues/207) | IN PROGRESS (implemented and validated; awaiting merge; no new schema migration) |
+| 023  | Isolate balances, ledger and currency operations per creator | P1 | L | 009, 019; preserve 022 configuration | [#203](https://github.com/ludmila-omlopes/ludylops-live/issues/203) | IN PROGRESS (core PR #206 and chat PR #208 merged; schema applied; activation pending; ranking in 025) |
+| 024  | Automatic chat rewards per community | P1 | M | 023 currency core | [#207](https://github.com/ludmila-omlopes/ludylops-live/issues/207) | DONE (PR #208 merged; no new schema migration) |
+| 025  | Public currency rankings per community | P1 | M | 023 currency core | [#209](https://github.com/ludmila-omlopes/ludylops-live/issues/209) | IN PROGRESS (implemented and validated; awaiting merge; no migration) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -76,7 +77,8 @@ The white-label foundation creates creator instances, but operational data is st
 - **009 (DONE)** — quote isolation pilot merged in PR #197; production migration and compatibility-index cleanup completed. See `docs/creator-scoping.md`.
 - **022 (DONE; PR #204 merged)** — currency naming during creation and owner-only editing, persisted per creator. Ludylops keeps pipetz.
 - **023 (IN PROGRESS; core delivery #205 merged in PR #206)** — additive balances/ledger, credits/debits/refunds, private history, owner adjustments and signed Streamer.bot commands. Schema applied; activation remains pending. See [Plan 023](023-creator-economy.md).
-- **024 (IN PROGRESS; #207 implemented)** — owner-configured chat earning rules, signed native-message ingestion and concurrency-safe cooldown/retry handling. No new schema migration. Presence, subscriptions and pricing remain follow-up. See [Plan 024](024-creator-chat-rewards.md).
+- **024 (DONE; PR #208 merged)** — owner-configured chat earning rules, signed native-message ingestion and concurrency-safe cooldown/retry handling. No new schema migration. Presence, subscriptions and pricing remain follow-up. See [Plan 024](024-creator-chat-rewards.md).
+- **025 (IN PROGRESS; #209 implemented)** — public positive-balance ranking per community, minimal public fields, preserved exclusions and module/lifecycle checks. No migration. See [Plan 025](025-creator-ranking.md).
 - **Unnumbered functional follow-ups (not yet written; 010–013 are performance plans)** — replicate 009's pattern per vertical, each depending on 009 and following the pattern doc:
   - bets (`bets`/`bet_options`/`bet_entries`)
   - suggestions (`game_suggestions`/`video_suggestions`/`creator_suggestions` + boosts) and `product_recommendations`

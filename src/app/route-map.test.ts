@@ -24,6 +24,7 @@ const expectedPageRoutes = new Set([
   "/c/[creatorSlug]",
   "/c/[creatorSlug]/quotes",
   "/c/[creatorSlug]/moeda",
+  "/c/[creatorSlug]/ranking",
   "/obs/bets",
   "/obs/likes",
   "/obs/quotes",
@@ -32,6 +33,7 @@ const expectedPageRoutes = new Set([
 ]);
 
 const expectedApiRoutes = new Set([
+  "/api/c/[creatorSlug]/ranking",
   "/api/admin/bets",
   "/api/admin/bets/[id]/cancel",
   "/api/admin/bets/[id]/lock",
