@@ -16,6 +16,11 @@ proposta abaixo foi substituída para preservar deploys antigos e os pipetz.
 Inventário, decisão de compatibilidade, sequência de migração/ativação e limites
 estão em [docs/creator-economy.md](../docs/creator-economy.md).
 
+Schema aplicado em produção em 2026-09-23 com autorização da usuária, backup
+restaurado e ensaio local. As três tabelas novas foram verificadas; saldos e
+histórico legados preservaram contagens, somas e checksums. Merge/deploy e
+ativação da economia nova continuam pendentes.
+
 A #203 permanece aberta para regras automáticas de ganho/preços por creator,
 convergência futura da economia legada e integração gradual das verticais ainda
 bloqueadas. O núcleo novo já oferece operações reais independentes; os módulos

@@ -75,8 +75,9 @@ novo protocolo de locks continua pendente; não contorne a verificação.
 
 ## Aplicação e ativação
 
-Nenhuma alteração em banco compartilhado ou variável de produção foi executada
-durante a implementação.
+O schema foi aplicado em produção em 2026-09-23, após autorização da usuária.
+O registro abaixo documenta a execução. A ativação por variável continua sendo
+uma etapa posterior ao deploy; nenhuma variável de produção foi alterada.
 
 1. Seguir [o procedimento de migração](database-migrations.md): confirmar alvo,
    backup/PITR, baseline e diferença de schema. `0026_creator_economy.sql` e o
@@ -100,6 +101,32 @@ durante a implementação.
 
 Demo sem banco habilita o recurso apenas em memória para teste local. A aplicação
 não aplica DDL automaticamente e falhas do banco não criam saldo demo.
+
+### Registro da migração — 2026-09-23
+
+- Revisão de schema: `c7692850c71a353211ace7b2a28fa4d7bfab2c3b` (PR #206).
+- Backup completo em formato custom do PostgreSQL, restaurado com sucesso em
+  banco local descartável antes do ensaio. Arquivo privado fora do repositório:
+  `%LOCALAPPDATA%/Codex/DatabaseBackups/ludylops-live/20260923-economy-0026/before-0026.dump`.
+  SHA-256: `e86e3fe3cb77cc141f6e41bb0b26633b488624707100a2c2955d6f3856343e74`.
+- O push completo foi cancelado no ensaio: além das tabelas novas, propunha
+  recriar a FK de `creator_suggestion_boosts` e as PKs de `obs_overlay_control`
+  e `quote_overlay_state`. Essas alterações não foram executadas.
+- Foi usado `drizzle-kit push --strict --verbose` com configuração temporária
+  restrita: módulo de schema reexportando somente `creatorBalances`,
+  `creatorLedger` e `economyViewerRedirects` do schema versionado, e
+  `tablesFilter` contendo somente os nomes das três tabelas correspondentes.
+  O SQL proposto foi revisado no ensaio e em produção: três CREATE TABLE, cinco
+  FKs e quatro índices adicionais, com PKs e CHECKs nos CREATE TABLE.
+- Aplicação concluída às 13:08 UTC. A introspecção confirmou 17 colunas,
+  11 constraints e sete índices, idênticos ao ensaio. As três tabelas ficaram
+  vazias. Uma segunda comparação com o mesmo escopo retornou `No changes detected`.
+- `db:baseline:check` retornou `ready: true` antes e depois. Os 221 registros
+  de `viewer_balances` e os 35.986 de `point_ledger` preservaram contagens, somas
+  e checksums integrais (JSON ordenado com collation C e timestamps em UTC).
+  Não houve backfill, alteração de seed nem escrita em histórico de migrações.
+- Merge/deploy e ativação continuam pendentes. Nenhuma ação, credencial ou
+  configuração do Streamer.bot foi modificada durante a migração.
 
 Para interromper acesso, desativar a variável e manter as tabelas e o código de
 identidade novo. Depois do primeiro saldo novo, **não voltar para código antigo**
