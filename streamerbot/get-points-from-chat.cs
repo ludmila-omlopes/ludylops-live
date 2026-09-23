@@ -55,11 +55,11 @@ public class CPHInline
         if (string.IsNullOrWhiteSpace(viewerExternalId))
         {
             CPH.LogError(string.Format(
-                "[Loja Neon] Nao consegui descobrir o id do viewer. Args testados: {0}. Args disponiveis: {1}.",
+                "[Loja Neon] Não consegui descobrir o ID do espectador. Args testados: {0}. Args disponíveis: {1}.",
                 string.Join(", ", ViewerIdArgCandidates),
                 ListAvailableArgs()
             ));
-            Reply("Nao consegui identificar seu canal do YouTube para consultar seus pipetz.", useBotAccount);
+            Reply("Não consegui identificar seu canal do YouTube para consultar seu saldo.", useBotAccount);
             return false;
         }
 
@@ -89,8 +89,8 @@ public class CPHInline
                     if (string.IsNullOrWhiteSpace(replyMessage))
                     {
                         replyMessage = response.IsSuccessStatusCode
-                            ? string.Format("{0}, nao consegui montar a resposta completa do saldo.", displayName ?? "Viewer")
-                            : "Nao consegui consultar seus pipetz agora.";
+                            ? string.Format("{0}, não consegui montar a resposta completa do saldo.", displayName ?? "Viewer")
+                            : "Não consegui consultar seu saldo agora.";
                     }
 
                     Reply(replyMessage, useBotAccount);
@@ -111,7 +111,7 @@ public class CPHInline
         catch (Exception ex)
         {
             CPH.LogError(string.Format("[Loja Neon] Erro ao chamar API de saldo: {0}", ex));
-            Reply("Nao consegui consultar seus pipetz agora.", useBotAccount);
+            Reply("Não consegui consultar seu saldo agora.", useBotAccount);
             return false;
         }
     }
@@ -252,7 +252,7 @@ public class CPHInline
         }
         catch (Exception ex)
         {
-            CPH.LogWarn(string.Format("[Loja Neon] Nao consegui ler a resposta do saldo: {0}", ex.Message));
+            CPH.LogWarn(string.Format("[Loja Neon] Não consegui ler a resposta do saldo: {0}", ex.Message));
         }
 
         return string.Empty;

@@ -123,6 +123,7 @@ export async function authenticateStreamerbotRequest(
 }
 
 export type StreamerbotOperation =
+  | "economy"
   | "events"
   | "link"
   | "points"
@@ -139,6 +140,9 @@ export async function authorizeStreamerbotOperation(
   context: AuthenticatedStreamerbot,
   operation: StreamerbotOperation,
 ): Promise<Response | null> {
+  if (operation === "economy") return guardVerifiedModules(context, ["points", "streamerbot"], "economy");
+  if (operation === "points" && context.creatorId !== DEFAULT_CREATOR_ID)
+    return guardVerifiedModules(context, ["points", "streamerbot"], "economy");
   if (operation === "quotes.create" || operation === "quotes.get")
     return guardVerifiedModules(
       context,

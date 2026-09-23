@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -10,6 +11,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 
@@ -177,6 +179,44 @@ export const viewerBalances = pgTable("viewer_balances", {
   lifetimeEarned: integer("lifetime_earned").default(0).notNull(),
   lifetimeSpent: integer("lifetime_spent").default(0).notNull(),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Additive storage: legacy deployments cannot read or mutate another creator's currency.
+export const creatorBalances = pgTable("creator_balances", {
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  viewerId: varchar("viewer_id", { length: 64 }).references(() => users.id).notNull(),
+  currentBalance: integer("current_balance").default(0).notNull(),
+  lifetimeEarned: integer("lifetime_earned").default(0).notNull(),
+  lifetimeSpent: integer("lifetime_spent").default(0).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.creatorId, table.viewerId] }),
+  viewerIdx: index("creator_balances_viewer_idx").on(table.viewerId),
+  nonnegative: check("creator_balances_nonnegative", sql`${table.currentBalance} >= 0 AND ${table.lifetimeEarned} >= 0 AND ${table.lifetimeSpent} >= 0`),
+  nonlegacy: check("creator_balances_nonlegacy", sql`${table.creatorId} <> 'creator_ludylops'`),
+}));
+
+export const creatorLedger = pgTable("creator_ledger", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  viewerId: varchar("viewer_id", { length: 64 }).references(() => users.id).notNull(),
+  operationKey: varchar("operation_key", { length: 128 }).notNull(),
+  kind: varchar("kind", { length: 16 }).notNull(),
+  amount: integer("amount").notNull(),
+  reason: varchar("reason", { length: 160 }).notNull(),
+  refundOf: varchar("refund_of", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  eventIdx: uniqueIndex("creator_ledger_operation_idx").on(table.creatorId, table.operationKey),
+  refundIdx: uniqueIndex("creator_ledger_refund_idx").on(table.creatorId, table.refundOf),
+  historyIdx: index("creator_ledger_history_idx").on(table.creatorId, table.viewerId, table.createdAt),
+  nonlegacy: check("creator_ledger_nonlegacy", sql`${table.creatorId} <> 'creator_ludylops'`),
+}));
+
+// Source IDs deliberately survive deletion of a merged identity.
+export const economyViewerRedirects = pgTable("economy_viewer_redirects", {
+  sourceViewerId: varchar("source_viewer_id", { length: 64 }).primaryKey(),
+  targetViewerId: varchar("target_viewer_id", { length: 64 }).references(() => users.id).notNull(),
 });
 
 export const viewerLinks = pgTable(

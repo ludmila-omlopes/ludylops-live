@@ -35,7 +35,7 @@ describe("streamerbot scripts catalog", () => {
     const body = '{"body":"Você chegou! 🌟"}';
     const secret = "test-vector-secret";
     const scripts = listStreamerbotScripts().filter((script) => script.source.includes("BuildSignature("));
-    expect(scripts).toHaveLength(11);
+    expect(scripts).toHaveLength(12);
     for (const script of scripts) {
       expect(script.source).toContain('"x-streamerbot-credential-id", credentialId');
       expect(script.source).toContain('"lojaneon.streamerbotCredentialId"');

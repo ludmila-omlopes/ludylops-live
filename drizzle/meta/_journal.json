@@ -183,6 +183,13 @@
       "when": 1790004139482,
       "tag": "0025_dazzling_sabretooth",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790125945590,
+      "tag": "0026_creator_economy",
+      "breakpoints": true
     }
   ]
 }

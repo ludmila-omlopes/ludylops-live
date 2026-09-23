@@ -1,4 +1,6 @@
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import { consolidateAccountEconomies, lockEconomyIdentity, mergeCreatorEconomies } from "@/lib/creators/economy-identity";
+import { consolidateDemoAccountEconomies, economyDemoStore, mergeDemoEconomies } from "@/lib/creators/economy-demo";
 import { type CreatorContext, requireCreatorContext, requireDefaultCreatorCapability } from "@/lib/creators/context";
 
 import { randomUUID } from "node:crypto";
@@ -19,6 +21,9 @@ import {
   bets,
   bridgeClients,
   catalogItems,
+  creatorBalances,
+  creatorLedger,
+  economyViewerRedirects,
   creatorSuggestionBoosts,
   creatorSuggestions,
   gameSuggestionBoosts,
@@ -1495,7 +1500,9 @@ function getDemoViewerActivity(store: DemoStore, viewerId: string) {
     currentBalance: balance.currentBalance,
     lifetimeEarned: balance.lifetimeEarned,
     lifetimeSpent: balance.lifetimeSpent,
-    hasLedger: store.ledger.some((entry) => entry.viewerId === viewerId),
+    hasLedger: store.ledger.some((entry) => entry.viewerId === viewerId)
+      || economyDemoStore().entries.some((entry) => entry.viewerId === viewerId)
+      || Object.values(economyDemoStore().redirects).includes(viewerId),
     hasRedemptions: store.redemptions.some((entry) => entry.viewerId === viewerId),
     hasBetEntries: store.betEntries.some((entry) => entry.viewerId === viewerId),
   };
@@ -1548,6 +1555,7 @@ function mergeDemoViewerIntoTarget(input: {
 
   const sourceBalance = getBalance(store, sourceViewerId);
   const targetBalance = getBalance(store, targetViewerId);
+  mergeDemoEconomies(sourceViewerId, targetViewerId);
   targetViewer.googleUserId ??= sourceViewer.googleUserId;
   targetViewer.email ??= sourceViewer.email;
   targetViewer.avatarUrl ??= sourceViewer.avatarUrl;
@@ -1634,6 +1642,7 @@ async function mergeViewerIntoTarget(input: {
   }
 
   return db.transaction(async (tx) => {
+    await lockEconomyIdentity(tx, true);
     const [sourceViewer, targetViewer, sourceBalance, targetBalance, sourceOwnerLink, targetOwnerLink] =
       await Promise.all([
         tx.select().from(users).where(eq(users.id, input.sourceViewerId)).limit(1),
@@ -1676,6 +1685,7 @@ async function mergeViewerIntoTarget(input: {
       return { merged: false, transferredOwnerLink: false };
     }
 
+    await mergeCreatorEconomies(tx, input.sourceViewerId, input.targetViewerId);
     await tx.update(pointLedger).set({ viewerId: input.targetViewerId }).where(eq(pointLedger.viewerId, input.sourceViewerId));
     await tx.update(redemptions).set({ viewerId: input.targetViewerId }).where(eq(redemptions.viewerId, input.sourceViewerId));
     await tx.update(betEntries).set({ viewerId: input.targetViewerId }).where(eq(betEntries.viewerId, input.sourceViewerId));
@@ -4605,6 +4615,7 @@ async function transferViewerBalanceToUnifiedViewer(input: {
     const store = getDemoStore();
     const sourceBalance = getBalance(store, input.sourceViewerId);
     const targetBalance = getBalance(store, input.targetViewerId);
+    mergeDemoEconomies(input.sourceViewerId, input.targetViewerId, true);
 
     targetBalance.currentBalance += sourceBalance.currentBalance;
     targetBalance.lifetimeEarned += sourceBalance.lifetimeEarned;
@@ -4628,6 +4639,7 @@ async function transferViewerBalanceToUnifiedViewer(input: {
   }
 
   await db.transaction(async (tx) => {
+    await mergeCreatorEconomies(tx, input.sourceViewerId, input.targetViewerId, true);
     const [sourceBalance, targetBalance] = await Promise.all([
       tx.select().from(viewerBalances).where(eq(viewerBalances.viewerId, input.sourceViewerId)).limit(1),
       tx.select().from(viewerBalances).where(eq(viewerBalances.viewerId, input.targetViewerId)).limit(1),
@@ -4718,6 +4730,14 @@ async function pruneSyntheticViewersForGoogleAccount(googleAccountId: string, pr
       continue;
     }
 
+    // New currency activity and redirect targets keep a global identity alive.
+    const [communityBalance, communityEntry, redirect] = await Promise.all([
+      db.select({ id: creatorBalances.viewerId }).from(creatorBalances).where(eq(creatorBalances.viewerId, viewer.id)).limit(1),
+      db.select({ id: creatorLedger.id }).from(creatorLedger).where(eq(creatorLedger.viewerId, viewer.id)).limit(1),
+      db.select({ id: economyViewerRedirects.sourceViewerId }).from(economyViewerRedirects).where(eq(economyViewerRedirects.targetViewerId, viewer.id)).limit(1),
+    ]);
+    if (communityBalance.length || communityEntry.length || redirect.length) continue;
+
     const [balance, ledger, redemption, betEntry] = await Promise.all([
       db.select().from(viewerBalances).where(eq(viewerBalances.viewerId, viewer.id)).limit(1),
       db.select({ id: pointLedger.id }).from(pointLedger).where(eq(pointLedger.viewerId, viewer.id)).limit(1),
@@ -4743,9 +4763,18 @@ async function pruneSyntheticViewersForGoogleAccount(googleAccountId: string, pr
   }
 
   for (const viewerId of removableViewerIds) {
-    await db.delete(googleAccountViewers).where(eq(googleAccountViewers.viewerId, viewerId));
-    await db.delete(viewerBalances).where(eq(viewerBalances.viewerId, viewerId));
-    await db.delete(users).where(eq(users.id, viewerId));
+    await db.transaction(async (tx) => {
+      await lockEconomyIdentity(tx, true);
+      const [balance, entry, redirect] = await Promise.all([
+        tx.select({ id: creatorBalances.viewerId }).from(creatorBalances).where(eq(creatorBalances.viewerId, viewerId)).limit(1),
+        tx.select({ id: creatorLedger.id }).from(creatorLedger).where(eq(creatorLedger.viewerId, viewerId)).limit(1),
+        tx.select({ id: economyViewerRedirects.sourceViewerId }).from(economyViewerRedirects).where(eq(economyViewerRedirects.targetViewerId, viewerId)).limit(1),
+      ]);
+      if (balance.length || entry.length || redirect.length) return;
+      await tx.delete(googleAccountViewers).where(eq(googleAccountViewers.viewerId, viewerId));
+      await tx.delete(viewerBalances).where(eq(viewerBalances.viewerId, viewerId));
+      await tx.delete(users).where(eq(users.id, viewerId));
+    });
   }
 }
 
@@ -4790,14 +4819,16 @@ export async function listViewerChannelsForGoogleAccount(googleAccountId: string
     })
     .from(googleAccountViewers)
     .innerJoin(users, eq(googleAccountViewers.viewerId, users.id))
-    .innerJoin(viewerBalances, eq(users.id, viewerBalances.viewerId))
+    .leftJoin(viewerBalances, eq(users.id, viewerBalances.viewerId))
     .where(eq(googleAccountViewers.googleAccountId, googleAccountId))
     .orderBy(desc(googleAccountViewers.createdAt));
 
   return sortChannels(
     await withUnifiedBalances(
       filterVisibleViewerChannels(
-        rows.map(({ viewer, balance }) => buildViewerChannelOption(serializeViewer(viewer), serializeViewerBalance(balance))),
+        rows.map(({ viewer, balance }) => buildViewerChannelOption(serializeViewer(viewer), balance ? serializeViewerBalance(balance) : {
+          viewerId: viewer.id, currentBalance: 0, lifetimeEarned: 0, lifetimeSpent: 0, lastSyncedAt: viewer.createdAt.toISOString(),
+        })),
       ),
     ),
   );
@@ -4816,16 +4847,15 @@ export async function setActiveViewerForGoogleAccount(googleAccountId: string, v
     if (!account) {
       return null;
     }
+    consolidateDemoAccountEconomies(googleAccountId, viewerId);
     account.activeViewerId = viewerId;
     return getDemoViewerById(store, viewerId);
   }
 
-  await db
-    .update(googleAccounts)
-    .set({
-      activeViewerId: viewerId,
-    })
-    .where(eq(googleAccounts.id, googleAccountId));
+  await db.transaction(async (tx) => {
+    await consolidateAccountEconomies(tx, googleAccountId, viewerId);
+    await tx.update(googleAccounts).set({ activeViewerId: viewerId }).where(eq(googleAccounts.id, googleAccountId));
+  });
 
   return withViewerById(viewerId);
 }
@@ -5380,6 +5410,7 @@ export async function ensureViewerFromSession(input: SessionBootstrapInput) {
     googleAccount.email = input.email;
     googleAccount.displayName = input.name;
     googleAccount.avatarUrl = input.image;
+    consolidateDemoAccountEconomies(googleAccount.id, preferredViewer.id);
     googleAccount.activeViewerId = preferredViewer.id;
 
     return preferredViewer;
@@ -5583,16 +5614,13 @@ export async function ensureViewerFromSession(input: SessionBootstrapInput) {
     });
   }
 
-  await db
-    .update(googleAccounts)
-    .set({
-      googleUserId: input.googleUserId,
-      email: input.email,
-      displayName: input.name,
-      avatarUrl: input.image,
-      activeViewerId: preferredViewer.id,
-    })
-    .where(eq(googleAccounts.id, googleAccount.id));
+  await db.transaction(async (tx) => {
+    await consolidateAccountEconomies(tx, googleAccount.id, preferredViewer.id);
+    await tx.update(googleAccounts).set({
+      googleUserId: input.googleUserId, email: input.email!, displayName: input.name,
+      avatarUrl: input.image, activeViewerId: preferredViewer.id,
+    }).where(eq(googleAccounts.id, googleAccount.id));
+  });
 
   return withViewerById(preferredViewer.id);
 }
@@ -6028,6 +6056,8 @@ export async function adminAttachYoutubeChannelToGoogleAccount(input: {
     });
     store.googleAccountViewers.push(link);
 
+    if (googleAccount.activeViewerId) consolidateDemoAccountEconomies(googleAccount.id, googleAccount.activeViewerId);
+
     viewer.googleUserId = googleAccount.googleUserId ?? viewer.googleUserId;
     viewer.email = googleAccount.email ?? viewer.email;
     viewer.avatarUrl = viewer.avatarUrl ?? googleAccount.avatarUrl ?? null;
@@ -6072,6 +6102,8 @@ export async function adminAttachYoutubeChannelToGoogleAccount(input: {
         viewerId: link.viewerId,
         createdAt: new Date(link.createdAt),
       });
+
+      if (googleAccountRow[0].activeViewerId) await consolidateAccountEconomies(tx, input.googleAccountId, googleAccountRow[0].activeViewerId);
 
       await tx
         .update(users)
@@ -7913,7 +7945,7 @@ export async function createBet(input: {
   return buildBetWithOptions({ bet, options, viewerEntry: null });
 }
 
-async function ensureViewerFromStreamerbotIdentity(input: {
+export async function ensureViewerFromStreamerbotIdentity(input: {
   viewerExternalId: string;
   youtubeDisplayName?: string | null;
   youtubeHandle?: string | null;

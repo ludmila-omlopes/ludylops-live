@@ -49,8 +49,8 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 019  | Enforce module authorization and dependency-safe transitions | P1 | L | 009; coordinate 018 | [#185](https://github.com/ludmila-omlopes/ludylops-live/issues/185) | DONE (PR #198 merged 2026-09-22; module policy, guards and dependency-safe transitions) |
 | 020  | Define builder, shared engine and Ludylops instance boundaries | P1 | M design / L migration | none for design; reconcile 008–019 before migration | — | DONE (architecture direction recorded; migration remains staged in follow-ups) |
 | 021  | Separate builder, community, public creator and OBS layouts, preserving routes | P1 | M | direction in 020; no database migration | — | DONE (reviewed in isolated worktree plan-021; commits 8f24f46, 6b5042b; 21 pages / 78 APIs) |
-| 022  | Name each community's currency | P1 | M | existing creator/module authorization | [#202](https://github.com/ludmila-omlopes/ludylops-live/issues/202) | IN PROGRESS (implemented and validated; awaiting review/merge; configuration only) |
-| 023  | Isolate balances, ledger and currency operations per creator | P1 | L | 009, 019; preserve 022 configuration | [#203](https://github.com/ludmila-omlopes/ludylops-live/issues/203) | TODO (next functional priority; coordinated schema/application rollout required) |
+| 022  | Name each community's currency | P1 | M | existing creator/module authorization | [#202](https://github.com/ludmila-omlopes/ludylops-live/issues/202) | DONE (PR #204 merged; configuration only) |
+| 023  | Isolate balances, ledger and currency operations per creator | P1 | L | 009, 019; preserve 022 configuration | [#203](https://github.com/ludmila-omlopes/ludylops-live/issues/203) | IN PROGRESS (additive currency core implemented; migration/activation pending; automated earning rules remain follow-up) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -73,8 +73,8 @@ The white-label foundation creates creator instances, but operational data is st
 
 - **008 (IN PROGRESS; implementation verified)** — schema groundwork: `creator_id` on the 16 surrogate-PK operational tables, backfilled to `creator_ludylops`. Disposable PostgreSQL checks and application checks passed. Awaiting integration after #190; apply schema before deploying the updated application. Queries remain unscoped.
 - **009 (DONE)** — quote isolation pilot merged in PR #197; production migration and compatibility-index cleanup completed. See `docs/creator-scoping.md`.
-- **022 (IN PROGRESS)** — currency naming during creation and owner-only editing, persisted per creator. Ludylops keeps pipetz. No balance migration or operational unlock.
-- **023 (TODO; next functional priority)** — independent balances, ledger and currency operations, including identity merges and legacy deployment compatibility. See [Plan 023](023-creator-economy.md).
+- **022 (DONE; PR #204 merged)** — currency naming during creation and owner-only editing, persisted per creator. Ludylops keeps pipetz.
+- **023 (IN PROGRESS; core delivery #205)** — additive balances/ledger, credits/debits/refunds, private history, owner adjustments and signed Streamer.bot commands implemented. Migration and activation are pending; automatic earning/pricing rules remain follow-up. See [Plan 023](023-creator-economy.md).
 - **Unnumbered functional follow-ups (not yet written; 010–013 are performance plans)** — replicate 009's pattern per vertical, each depending on 009 and following the pattern doc:
   - bets (`bets`/`bet_options`/`bet_entries`)
   - suggestions (`game_suggestions`/`video_suggestions`/`creator_suggestions` + boosts) and `product_recommendations`

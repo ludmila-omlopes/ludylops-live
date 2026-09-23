@@ -31,6 +31,7 @@ const envSchema = z.object({
   STREAMERBOT_SHARED_SECRET: z.string().optional(),
   STREAMERBOT_CREDENTIAL_ENCRYPTION_KEY: z.string().optional(),
   STREAMERBOT_LEGACY_AUTH_ENABLED: z.enum(["true", "false"]).optional(),
+  CREATOR_ECONOMY_ENABLED: z.enum(["true", "false"]).optional(),
   BRIDGE_SHARED_SECRET: z.string().optional(),
   PS_PLUS_SYNC_SECRET: z.string().optional(),
   STEAM_SYNC_SECRET: z.string().optional(),
