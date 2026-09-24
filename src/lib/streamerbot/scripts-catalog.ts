@@ -250,6 +250,16 @@ export const streamerbotScriptDefinitions: StreamerbotScriptDefinition[] = [
       "Este script não chama o app. Personalize as linhas com lojaneon.commandsListPublic1, lojaneon.commandsListPublic2 e lojaneon.commandsListMod se quiser textos diferentes.",
     sortOrder: 110,
   },
+  {
+    id: "periodic-chat-messages",
+    filename: "periodic-chat-messages.cs",
+    title: "Mensagens periódicas",
+    description: "Envia os lembretes ativos da comunidade ao chat da transmissão configurada.",
+    category: "chat",
+    trigger: "Core → Timed Actions, a cada 15 segundos",
+    setupInstructions: "Use um timer repetido com Lines = 0 e uma fila de ações bloqueante. Configure a credencial do streamer e lojaneon.periodicYoutubeChannelId com o ID UC do canal. O script só envia quando há exatamente uma transmissão desse canal monitorada com status live. Veja docs/periodic-chat-messages.md.",
+    sortOrder: 120,
+  },
 ];
 
 export function groupStreamerbotScripts(scripts: StreamerbotScriptRecord[]) {

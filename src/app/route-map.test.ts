@@ -34,6 +34,9 @@ const expectedPageRoutes = new Set([
 ]);
 
 const expectedApiRoutes = new Set([
+  "/api/admin/periodic-messages",
+  "/api/me/creator-area/[id]/periodic-messages",
+  "/api/internal/streamerbot/periodic-messages",
   "/api/admin/recommendations/image",
   "/api/me/creator-area/[id]/recommendations/image",
   "/api/me/creator-area/[id]/recommendations",
