@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementação da [#222](https://github.com/ludmila-omlopes/ludylops-live/issues/222), parte da #203. Pendente de migração e merge pela usuária.
+Implementação da [#222](https://github.com/ludmila-omlopes/ludylops-live/issues/222), parte da #203, no PR #223. Migrações aplicadas em 24/09/2026; pendente de merge pela usuária.
 
 ## Entrega
 
@@ -22,6 +22,6 @@ Implementação da [#222](https://github.com/ludmila-omlopes/ludylops-live/issue
 
 ## Rollout
 
-0027 ainda ausente no banco configurado na consulta somente de leitura de 24/09/2026. Aplicar 0027 e 0028 antes do deploy. Migrações reais, ativação da economia e configuração do Streamer.bot não foram executadas. [Procedimento e configuração](../docs/creator-redemptions.md).
+0027 e 0028 aplicadas no banco configurado em 24/09/2026, após autorização, backup completo e ensaio em cópia restaurada. Estrutura validada e dados existentes preservados. Ativação da economia e configuração do Streamer.bot continuam separadas. [Registro da aplicação e configuração](../docs/creator-redemptions.md).
 
 Presença, inscrições e demais regras automáticas da #203 permanecem fora desta entrega.

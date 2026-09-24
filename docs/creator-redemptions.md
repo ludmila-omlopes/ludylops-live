@@ -17,9 +17,9 @@ Entrega da #222, parte da #203. Cada nova comunidade usa `creator_catalog_items`
 
 ## Migração e ativação
 
-**Aplicar antes do deploy: `0027_redemption_execution_audit.sql` (se pendente) e `0028_creator_redemptions.sql`. Não usar `db:push`.**
+**0027 e 0028 aplicadas no banco configurado em 24/09/2026, após autorização da usuária.** Não reaplicar os arquivos nesse banco. Os passos abaixo documentam o procedimento para ambientes onde estejam pendentes.
 
-Consulta somente de leitura em 24/09/2026: as colunas `claimed_at` e `execution_note` ainda não existiam na tabela legada do banco configurado. O merge do PR #220 não aplica essa migração automaticamente.
+Na consulta anterior à aplicação, as colunas `claimed_at` e `execution_note` ainda não existiam na tabela legada. O merge do PR #220 não havia aplicado essa migração automaticamente.
 
 1. Confirmar o banco de destino, a existência de `creator_balances`/`creator_ledger` (0026) e o estado de 0027. Registrar contagens das tabelas legadas de catálogo, resgates, saldos e extrato.
 2. Antes de qualquer alteração real, produzir um backup `pg_dump --format=custom` em local privado fora do Git e conferir com `pg_restore --list`. Guardar também o estado de `drizzle.__drizzle_migrations`, se esse mecanismo já estiver sendo usado. Ensaiar a restauração em banco descartável.
@@ -30,6 +30,18 @@ Consulta somente de leitura em 24/09/2026: as colunas `claimed_at` e `execution_
 7. Para interromper compras/execuções, pausar o módulo ou o criador; para só suspender novas compras, pausar os itens. Para voltar o código, manter as tabelas e dados novos. Não apagar dados nem reaplicar backups sobre compras posteriores. Reativar antes de concluir/estornar operações pendentes, pois a política de lifecycle também protege callbacks.
 
 Nenhuma migração, sinalizador de produção ou configuração do Streamer.bot é alterada automaticamente pelo PR. A suite `redemptions.postgres.test.ts` aplica os SQLs 0026–0028 em schema descartável de PostgreSQL real.
+
+### Registro da aplicação — 24/09/2026
+
+- Autorização da usuária: “Execute as migrações”. SQL da revisão `cdef9120b800497bef5c27d0c343fa0cf6334335`.
+- Backup completo PostgreSQL custom, com índice conferido e restauração integral bem-sucedida em banco local isolado. Arquivo privado fora do Git: `%LOCALAPPDATA%/Codex/DatabaseBackups/ludylops-live/20260924-redemptions-0027-0028/before-0027-0028.dump`.
+- Backup: 3.564.002 bytes; SHA-256 `0f21de2e01877d929ea7568aa99a3ce715d4ce212b8dbef809f937c5ec03b8b6`.
+- Os dois arquivos SQL foram ensaiados na cópia restaurada e aplicados juntos em transação, com limite de espera por lock de 5 segundos e por comando de 30 segundos. Commit confirmado às **18:32:15 UTC**.
+- Uma conexão nova verificou as estruturas persistidas; o dump de schema das três tabelas afetadas coincidiu integralmente com o ensaio, desconsiderando apenas cabeçalhos gerados pelo `pg_dump`.
+- As duas colunas de auditoria foram adicionadas e as duas tabelas novas ficaram vazias. Não houve backfill nem escrita no histórico de migrações.
+- Contagens e checksums integrais preservados na transação para catálogo, resgates, saldos/extrato legados e novos, redirecionamentos de identidade, criadores, módulos e credenciais. Pipetz: **221 saldos e 35.986 lançamentos** preservados.
+- `creator-baseline.ts check`: `ready: true`, sem registros faltantes, antes e depois. Evidências e logs privados estão junto do backup.
+- Banco pronto para o merge/deploy do PR #223. Ativação da economia, credenciais e configuração do Streamer.bot continuam sendo etapas separadas.
 
 ## Configuração de cada streamer
 
