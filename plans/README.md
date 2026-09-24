@@ -88,7 +88,7 @@ The white-label foundation creates creator instances, but operational data is st
 - **028 (DONE; PR #216 merged)** — isolated product recommendations, owner creation/editing/publication and default-creator guards for legacy reads/writes. See [Plan 028](028-creator-recommendations.md).
 - **029 (IN PROGRESS; #22 implemented)** — optional product image lookup for community owners and legacy admins, with bounded requests and manual fallback. See [Plan 029](029-recommendation-image-lookup.md).
 - **033 (DONE; PR #223 merged)** — isolated catalog, atomic purchases, per-creator bridge execution/refunds and owner/viewer history. Migrations 0027 and 0028 applied and verified on 2026-09-24; merged on the same date. See [Plan 033](033-creator-redemptions.md).
-- **034 (IN PROGRESS; #224 implemented)** — owner-managed Streamer.bot credentials, transactional ownership checks and beta readiness estimate. See [Plan 034](034-owner-streamerbot-credentials.md).
+- **034 (DONE; PR #228 merged)** — owner-managed Streamer.bot credentials, transactional ownership checks and beta readiness estimate. See [Plan 034](034-owner-streamerbot-credentials.md).
 - **Unnumbered functional follow-ups (not yet written; 010–013 are performance plans)** — replicate 009's pattern per vertical, each depending on 009 and following the pattern doc:
   - bets (`bets`/`bet_options`/`bet_entries`)
   - suggestions (`game_suggestions`/`video_suggestions`/`creator_suggestions` + boosts); owner-managed `product_recommendations` are now tracked by 028
@@ -119,3 +119,5 @@ So nobody re-audits these:
 ## Issues
 
 Published via `gh` per `--issues` (URLs also recorded in each plan's Status block).
+
+- **035 (IN PROGRESS; #225 implemented)** — preparação da primeira live com fatos por comunidade e instruções dos recursos disponíveis. Veja [Plano 035](035-creator-setup.md).
