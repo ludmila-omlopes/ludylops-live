@@ -87,7 +87,8 @@ The white-label foundation creates creator instances, but operational data is st
 - **027 (DONE; PR #214 merged)** — owner-controlled name/colors and a public home with scoped links only for available features. See [Plan 027](027-creator-profile.md).
 - **028 (DONE; PR #216 merged)** — isolated product recommendations, owner creation/editing/publication and default-creator guards for legacy reads/writes. See [Plan 028](028-creator-recommendations.md).
 - **029 (IN PROGRESS; #22 implemented)** — optional product image lookup for community owners and legacy admins, with bounded requests and manual fallback. See [Plan 029](029-recommendation-image-lookup.md).
-- **033 (IN PROGRESS; #222 implemented in PR #223)** — isolated catalog, atomic purchases, per-creator bridge execution/refunds and owner/viewer history. Migrations 0027 and 0028 applied and verified on 2026-09-24; awaiting user merge. See [Plan 033](033-creator-redemptions.md).
+- **033 (DONE; PR #223 merged)** — isolated catalog, atomic purchases, per-creator bridge execution/refunds and owner/viewer history. Migrations 0027 and 0028 applied and verified on 2026-09-24; merged on the same date. See [Plan 033](033-creator-redemptions.md).
+- **034 (IN PROGRESS; #224 implemented)** — owner-managed Streamer.bot credentials, transactional ownership checks and beta readiness estimate. See [Plan 034](034-owner-streamerbot-credentials.md).
 - **Unnumbered functional follow-ups (not yet written; 010–013 are performance plans)** — replicate 009's pattern per vertical, each depending on 009 and following the pattern doc:
   - bets (`bets`/`bet_options`/`bet_entries`)
   - suggestions (`game_suggestions`/`video_suggestions`/`creator_suggestions` + boosts); owner-managed `product_recommendations` are now tracked by 028

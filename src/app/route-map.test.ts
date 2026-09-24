@@ -112,6 +112,7 @@ const expectedApiRoutes = new Set([
   "/api/me/creator-area/[id]/currency",
   "/api/me/creator-area/[id]/economy",
   "/api/me/creator-area/[id]/chat-rewards",
+  "/api/me/creator-area/[id]/streamerbot-credentials",
   "/api/me/creator-suggestions",
   "/api/me/creator-suggestions/[id]/boost",
   "/api/me/game-suggestions",

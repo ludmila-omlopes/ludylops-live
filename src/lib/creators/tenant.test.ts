@@ -365,6 +365,8 @@ describe("public creator lifecycle policy", () => {
       expect((await listPlatformCreatorInstances()).find((entry) => entry.creator.id === cozy.id)?.creator.status).toBe(status);
       expect((await resolveCreatorFromRequest({ slug: "cozy" })).creator.status).toBe(status);
       expect((await listCreatorAreasForOwner("owner_cozy")).length).toBe(status === "archived" ? 0 : 1);
+      expect((await listCreatorAreasForOwner("owner_cozy", { includeArchived: true })).map(area => area.id)).toEqual([cozy.id]);
+      expect(await listCreatorAreasForOwner("another_owner", { includeArchived: true })).toEqual([]);
       expect((await getCreatorAreaBySlug("cozy"))?.creator.id ?? null).toBe(status === "active" ? cozy.id : null);
       expect((await resolvePublicCreatorFromRequest({ hostname: "cozy.example.com" }))?.creator.id ?? null).toBe(status === "active" ? cozy.id : null);
     }

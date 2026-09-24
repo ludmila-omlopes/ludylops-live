@@ -45,7 +45,7 @@ Nenhuma migração, sinalizador de produção ou configuração do Streamer.bot 
 
 ## Configuração de cada streamer
 
-1. Solicitar à administradora da plataforma uma credencial própria de Streamer.bot, emitida em `/owner` para aquela comunidade, e guardar ID e segredo no PC do streamer. A emissão de credenciais ainda é uma operação da administradora. Uma credencial de outra comunidade não acessa sua fila. A credencial global antiga continua restrita à Ludylops.
+1. Entrar com a conta dona da comunidade em `/criar-area`, usar **Gerenciar credenciais → Criar credencial** e guardar ID e segredo no PC do streamer. A administradora mantém a recuperação em `/owner`. Veja [credenciais e configuração](streamerbot-credentials.md). Uma credencial de outra comunidade não acessa sua fila. A credencial global antiga continua restrita à Ludylops.
 2. No Streamer.bot do PC da live, abrir **Servers/Clients → HTTP Server**, manter host `127.0.0.1`, porta `7474` (ou a escolhida), iniciar o servidor e habilitar Auto Start se desejado. [Configuração oficial](https://docs.streamer.bot/api/http/guide/configuration).
 3. Criar/testar a ação no Streamer.bot. Usar preferencialmente o GUID da ação ao cadastrar o item, evitando nomes duplicados. Esta versão executa a ação sem argumentos personalizados de catálogo. [Contrato oficial de DoAction](https://docs.streamer.bot/api/http/requests/do-action): POST com `action.id` ou `action.name`; resposta 204.
 4. Em arquivo privado `bridge/.env` no PC do streamer, configurar:

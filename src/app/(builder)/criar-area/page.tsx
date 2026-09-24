@@ -8,6 +8,7 @@ import { CreatorCurrencyForm } from "@/components/creator-currency-form";
 import { CreatorProfileForm } from "@/components/creator-profile-form";
 import { CreatorChatRewardsForm } from "@/components/creator-chat-rewards-form";
 import { PeriodicMessagesManager } from "@/components/periodic-messages-manager";
+import { StreamerbotCredentials } from "@/components/streamerbot-credentials";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { CreatorLandingCta } from "@/components/creator-landing-cta";
 import { canCreateCreatorArea } from "@/lib/creators/access";
@@ -91,7 +92,7 @@ export default async function CreateCreatorAreaPage() {
   const landingState = resolveCreatorLandingState({ hasUsableSession, canCreateArea });
 
   const creatorAreas =
-    hasUsableSession ? await listCreatorAreasForOwner(session!.user!.activeViewerId) : [];
+    hasUsableSession ? await listCreatorAreasForOwner(session!.user!.activeViewerId, { includeArchived: true }) : [];
 
   return (
     <div className="surface-section flex w-full flex-col">
@@ -136,6 +137,7 @@ export default async function CreateCreatorAreaPage() {
                     →
                   </span>
                 </Link>
+                {creator.status !== "active" && creator.id !== DEFAULT_CREATOR_ID && <p className="mt-3 text-sm">Comunidade {creator.status === "archived" ? "arquivada" : "desativada"}. Você ainda pode revogar suas credenciais.</p>}
                 {creator.status === "active" && creator.id !== DEFAULT_CREATOR_ID && <>
                   <CreatorProfileForm creatorId={creator.id} />
                   <CreatorCurrencyForm creatorId={creator.id} />
@@ -144,6 +146,7 @@ export default async function CreateCreatorAreaPage() {
                   <Link href={`/c/${creator.slug}/quotes#gerenciar-frases`} className="mt-3 block font-bold underline">Gerenciar frases</Link>
                   <Link href={`/c/${creator.slug}/produtinhos`} className="mt-3 block font-bold underline">Gerenciar produtos</Link>
                 </>}
+                {creator.id !== DEFAULT_CREATOR_ID && <StreamerbotCredentials creatorId={creator.id} enabled={creator.status === "active"} mode="creator" />}
                 </div>
               ))}
             </div>

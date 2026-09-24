@@ -49,4 +49,37 @@ describe("credential management controls", () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toBe("Credenciais indisponíveis.");
     expect(Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Criar credencial")?.disabled).toBe(true);
   });
+  it("uses owner policy, clears secrets on refresh and allows revocation when issuance is disabled", async () => {
+    let canIssue = true;
+    let active = false;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("/api/me/creator-area/creator-a/streamerbot-credentials");
+      if (init?.method === "POST") {
+        active = JSON.parse(String(init.body)).action !== "revoke";
+        return Response.json({ ok: true, data: { id: "owned-id", secret: "owner-secret-once" } });
+      }
+      return Response.json({ ok: true, data: { canIssue, credentials: active ? [{ id: "owned-id", status: "active", retiringUntil: null, lastUsedAt: null }] : [] } });
+    });
+    await act(async () => root.render(createElement(StreamerbotCredentials, { creatorId: "creator-a", enabled: true, mode: "creator" })));
+    await click("Gerenciar credenciais"); await click("Criar credencial");
+    expect(container.querySelectorAll("input")).toHaveLength(2);
+    await click("Atualizar credenciais"); expect(container.querySelectorAll("input")).toHaveLength(0);
+    canIssue = false; await click("Atualizar credenciais");
+    const button = (label: string) => Array.from(container.querySelectorAll("button")).find(b => b.textContent === label)!;
+    expect(button("Substituir credencial").disabled).toBe(true);
+    expect(button("Revogar credencial").disabled).toBe(false);
+    await click("Revogar credencial"); expect(button("Criar credencial").disabled).toBe(true);
+    expect(container.textContent).toContain("não confirma conexão contínua");
+  });
+  it("discards stale controls on a failed refresh, including the visible secret", async () => {
+    fetchMock.mockResolvedValue(Response.json({ ok: true, data: { canIssue: true, credentials: [] } }));
+    await act(async () => root.render(createElement(StreamerbotCredentials, { creatorId: "creator-a", enabled: true, mode: "creator" })));
+    await click("Gerenciar credenciais");
+    fetchMock.mockResolvedValueOnce(Response.json({ ok: true, data: { id: "owned-id", secret: "secret-once" } }));
+    await click("Criar credencial"); expect(container.querySelectorAll("input")).toHaveLength(2);
+    fetchMock.mockResolvedValue(Response.json({ ok: false, error: "Credenciais indisponíveis." }, { status: 503 }));
+    await click("Atualizar credenciais");
+    expect(container.querySelectorAll("input")).toHaveLength(0);
+    expect(Array.from(container.querySelectorAll("button")).find(b => b.textContent === "Criar credencial")?.disabled).toBe(true);
+  });
 });
