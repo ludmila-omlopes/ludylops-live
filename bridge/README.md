@@ -1,5 +1,7 @@
 # Streamer.bot Bridge
 
+For a new creator's currency and catalog, use the [per-creator setup and recovery guide](../docs/creator-redemptions.md). The existing shared-secret configuration below continues to serve only Ludylops. Creator credentials use a separate signed endpoint and queue.
+
 Local bridge that runs on the streaming PC and connects:
 
 - the hosted Next.js API on Vercel

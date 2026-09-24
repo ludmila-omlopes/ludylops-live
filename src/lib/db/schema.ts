@@ -219,6 +219,52 @@ export const economyViewerRedirects = pgTable("economy_viewer_redirects", {
   targetViewerId: varchar("target_viewer_id", { length: 64 }).references(() => users.id).notNull(),
 });
 
+// New communities never enter the legacy catalog/bridge queue.
+export const creatorCatalogItems = pgTable("creator_catalog_items", {
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  id: varchar("id", { length: 64 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  description: varchar("description", { length: 1000 }).notNull(),
+  cost: integer("cost").notNull(),
+  stock: integer("stock"),
+  isActive: boolean("is_active").default(false).notNull(),
+  globalCooldownSeconds: integer("global_cooldown_seconds").default(0).notNull(),
+  viewerCooldownSeconds: integer("viewer_cooldown_seconds").default(0).notNull(),
+  streamerbotActionRef: varchar("streamerbot_action_ref", { length: 255 }).notNull(),
+  revision: integer("revision").default(1).notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.creatorId, t.id] }),
+  nonlegacy: check("creator_catalog_nonlegacy", sql`${t.creatorId} <> 'creator_ludylops'`),
+  values: check("creator_catalog_values", sql`${t.cost} > 0 AND (${t.stock} IS NULL OR ${t.stock} >= 0) AND ${t.globalCooldownSeconds} >= 0 AND ${t.viewerCooldownSeconds} >= 0`),
+}));
+
+export const creatorRedemptions = pgTable("creator_redemptions", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  viewerId: varchar("viewer_id", { length: 64 }).references(() => users.id).notNull(),
+  catalogItemId: varchar("catalog_item_id", { length: 64 }).notNull(),
+  itemName: varchar("item_name", { length: 120 }).notNull(),
+  actionRef: varchar("action_ref", { length: 255 }).notNull(),
+  status: varchar("status", { length: 32 }).default("queued").notNull(),
+  costAtPurchase: integer("cost_at_purchase").notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 128 }).notNull(),
+  debitId: varchar("debit_id", { length: 64 }).references(() => creatorLedger.id).notNull(),
+  bridgeAttemptCount: integer("bridge_attempt_count").default(0).notNull(),
+  claimedByBridgeId: varchar("claimed_by_bridge_id", { length: 64 }),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  executionNote: varchar("execution_note", { length: 255 }),
+  queuedAt: timestamp("queued_at", { withTimezone: true }).defaultNow().notNull(),
+  executedAt: timestamp("executed_at", { withTimezone: true }),
+  failedAt: timestamp("failed_at", { withTimezone: true }),
+  failureReason: varchar("failure_reason", { length: 255 }),
+}, (t) => ({
+  eventIdx: uniqueIndex("creator_redemptions_event_idx").on(t.creatorId, t.idempotencyKey),
+  queueIdx: index("creator_redemptions_queue_idx").on(t.creatorId, t.status, t.queuedAt),
+  historyIdx: index("creator_redemptions_history_idx").on(t.creatorId, t.viewerId, t.queuedAt),
+  itemIdx: index("creator_redemptions_item_idx").on(t.creatorId, t.catalogItemId, t.queuedAt),
+  nonlegacy: check("creator_redemptions_nonlegacy", sql`${t.creatorId} <> 'creator_ludylops'`),
+}));
+
 export const viewerLinks = pgTable(
   "viewer_links",
   {

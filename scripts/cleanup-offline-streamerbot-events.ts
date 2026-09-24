@@ -709,6 +709,9 @@ async function main() {
   }
 
   const sql = createSqlClient(databaseUrl);
+  if (options.apply && (await sql`SELECT to_regclass('public.creator_balances') AS storage`)[0]?.storage) {
+    throw new Error("This legacy cleanup cannot delete identities after the creator economy migration. Review each currency and redemption through the application before any cleanup.");
+  }
   const channelIds = await resolveTrackedYoutubeChannelIds(sql, options);
   const eventRange = await loadEventRange(sql, options);
 

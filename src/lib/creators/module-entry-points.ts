@@ -15,6 +15,7 @@ export const modulePages: Record<string, CreatorModuleKey[]> = {
   "/c/[creatorSlug]/quotes": ["quotes"],
   "/c/[creatorSlug]/moeda": ["points"],
   "/c/[creatorSlug]/ranking": ["ranking"],
+  "/c/[creatorSlug]/resgates": ["redemptions"],
   "/obs/quotes": ["quotes", "obs_overlays"],
   "/obs/bets": ["bets", "obs_overlays"],
   "/obs/likes": ["points", "obs_overlays"],
@@ -69,6 +70,7 @@ export const moduleApiGroups: Record<string, CreatorModuleKey[]> = {
 };
 
 export const sharedApiGroups = {
+  "/api/creators/[slug]/redeem": "Authenticated viewer purchase; hostname-resolved creator and transaction-locked module policy",
   "/api/auth": "Global authentication",
   "/api/owner":
     "Platform-owner recovery and configuration; existing role checks remain mandatory",
@@ -83,6 +85,7 @@ export const sharedApiGroups = {
 /** Verified integration adapters; these never take creator identity from URL/body hints. */
 export const integrationApiGroups: Record<string, CreatorModuleKey[]> = {
   "/api/internal/bridge": ["redemptions"],
+  "/api/internal/streamerbot/redemptions": ["redemptions"],
   "/api/internal/steam/sync": ["game_suggestions"],
   "/api/internal/streamerbot/events": ["points", "streamerbot"],
   "/api/internal/streamerbot/economy": ["points", "streamerbot"],

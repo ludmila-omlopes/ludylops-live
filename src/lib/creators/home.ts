@@ -10,6 +10,8 @@ export function creatorHomeLinks(tenant: CreatorTenantRecord) {
   const currency = getCurrencyLabel(tenant.modules.find((m) => m.moduleKey === "points")?.configJson);
   const economy = legacy || isDemoMode || env.CREATOR_ECONOMY_ENABLED === "true";
   const links: { href: string; label: string; description: string }[] = [];
+  if (economy && canUseModules(tenant, ["redemptions"], "redemptions"))
+    links.push({ href: `${prefix}/resgates`, label: "Resgatar na live", description: `Troque seus ${currency} por momentos na live.` });
   if (economy && canUseModules(tenant, ["points"], legacy ? "legacy" : "economy"))
     links.push({ href: legacy ? "/me" : `${prefix}/moeda`, label: "Consultar minha moeda", description: `Seu saldo e suas movimentações em ${currency}.` });
   if (economy && canUseModules(tenant, ["ranking"], legacy ? "legacy" : "ranking.read"))

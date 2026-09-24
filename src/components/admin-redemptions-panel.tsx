@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { formatDateTime, formatPipetz } from "@/lib/utils";
 import { redemptionStatusLabels, redemptionTimeline, type AdminRedemption } from "@/lib/redemptions/history";
 
-export function AdminRedemptionsPanel({ entries }: { entries: AdminRedemption[] }) {
+export function AdminRedemptionsPanel({ entries, currencyLabel = "pipetz" }: { entries: AdminRedemption[]; currencyLabel?: string }) {
   const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
   const [pending, refresh] = useTransition();
@@ -34,7 +34,7 @@ export function AdminRedemptionsPanel({ entries }: { entries: AdminRedemption[] 
       {visible.map((entry) => <details key={entry.id} className="card-brutal-static min-w-0 p-4">
         <summary className="cursor-pointer break-words font-bold">
           {entry.itemName} · {entry.viewerName} — {redemptionStatusLabels[entry.status]}
-          <span className="mt-1 block text-sm font-normal">{formatPipetz(entry.costAtPurchase)} pipetz · {formatDateTime(entry.queuedAt)}</span>
+          <span className="mt-1 block text-sm font-normal">{formatPipetz(entry.costAtPurchase)} {currencyLabel} · {formatDateTime(entry.queuedAt)}</span>
         </summary>
         <div className="mt-4 grid gap-3 text-sm">
           <p className="break-all">ID: {entry.id}</p>
