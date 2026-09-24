@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RecommendationImageLookup } from "@/components/recommendation-image-lookup";
 import { creatorRecommendationSchema, emptyRecommendation, recommendationInput,
   type CreatorRecommendation, type CreatorRecommendationInput, type CreatorRecommendationPage } from "@/lib/creators/recommendations";
 
@@ -67,6 +68,10 @@ export function CreatorRecommendationManager({ creatorId }: { creatorId: string 
               <option value="external">Externo</option><option value="affiliate">Afiliado</option>
             </select>
           </label>
+          <div className="min-w-0 sm:col-span-2">
+            <RecommendationImageLookup endpoint={`${endpoint}/image`} href={draft.href} imageUrl={draft.imageUrl}
+              scopeKey={editing?.id ?? "new"} disabled={busy || !loaded} onImage={(url) => change("imageUrl", url)} />
+          </div>
           <div className="grid gap-2 sm:col-span-2">
             <label htmlFor={`${creatorId}-recommendation-context`} className="text-sm font-bold">Por que você indica?</label>
             <textarea id={`${creatorId}-recommendation-context`} className="min-h-28 w-full min-w-0 border-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-3" value={draft.context} minLength={8} maxLength={500} required onChange={(e) => change("context", e.target.value)} />

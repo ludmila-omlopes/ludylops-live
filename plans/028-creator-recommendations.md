@@ -1,7 +1,7 @@
 # Plan 028: Produtos indicados por streamer
 
 Issue: [#215](https://github.com/ludmila-omlopes/ludylops-live/issues/215).
-Estado: IMPLEMENTED, aguardando merge. Base: `5011aee`, após o PR #214.
+Estado: DONE, PR #216 integrado. Base: `5011aee`, após o PR #214.
 
 ## Entrega
 

@@ -3,6 +3,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { RecommendationImageLookup } from "@/components/recommendation-image-lookup";
 
 import {
   flattenProductRecommendationSchemaErrors,
@@ -445,6 +446,9 @@ export function AdminRecommendationsPanel({
                 {renderFieldError("storeLabel")}
               </label>
             </div>
+
+            <RecommendationImageLookup endpoint="/api/admin/recommendations/image" href={href} imageUrl={imageUrl}
+              disabled={isPending} onImage={(url) => { setImageUrl(url); clearFieldError("imageUrl"); }} />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2">
