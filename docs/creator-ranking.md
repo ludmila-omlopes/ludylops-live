@@ -55,5 +55,7 @@ em desktop e a 390 px: vazio, leitura anônima, duas moedas, renomeação, links
 nome longo e saldo de 1.000.000, sem erro JavaScript ou rolagem horizontal.
 A UI usa fixtures demo descartáveis; os testes de identidade usam PostgreSQL.
 
-O cache da #176 continua separado. Esta entrega não altera os leitores globais
-de jogo atual/status da live nem o conteúdo personalizado de apostas.
+O [cache público da #176](public-creator-cache.md) agora atende somente a leitura
+da página de ranking de cada nova comunidade, com revalidação de 15 segundos e
+autorização antes de cada acesso. A API continua sem cache. Os leitores globais
+de jogo atual/status da live e o conteúdo personalizado de apostas não mudam.
