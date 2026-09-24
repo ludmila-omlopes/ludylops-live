@@ -1,6 +1,6 @@
 # Integração e resolução de resgates
 
-Entrega #226. **A migração 0029 ainda não foi aplicada em produção. Aplicar antes de integrar/implantar esta entrega.**
+Entrega #226. **A migração 0029 foi aplicada e verificada em produção em 2026-09-24. A entrega pode seguir para merge e implantação.**
 
 ## Conferir a integração
 
@@ -42,6 +42,18 @@ Não altera tabelas existentes, não transfere saldos e não faz backfill. O sch
 **Ordem:** migração aprovada → verificação do schema e preservação dos dados → merge/deploy → teste de heartbeat e recuperação com duas comunidades. Sem as tabelas, as operações novas retornam indisponibilidade; não criam armazenamento demo nem aplicam DDL automaticamente. Não publicar antes da migração: os novos heartbeats precisariam da tabela.
 
 Rollback de código não exige apagar as tabelas aditivas. Não remova histórico/resoluções ou reverta saldos para desfazer o deploy; resultados já registrados permanecem terminais.
+
+### Aplicação em produção em 2026-09-24
+
+Aplicação autorizada e confirmada às **20:27:21 UTC**, após inventário, backup novo e restauração completa em novo banco local. A comparação do Drizzle foi limitada às duas tabelas desta entrega: seis instruções, sem aviso de perda de dados. O mesmo plano foi ensaiado na cópia e aplicado em produção numa transação, sem reproduzir migrações históricas.
+
+- Backup `before-0029.dump`: 3.571.451 bytes; SHA-256 `5ee633c797d4f068fd06eecf7c935a36d522f1483141b6a74aee2b0a815884fd`.
+- Contagens e fingerprints integrais das **40 tabelas públicas preexistentes** permaneceram iguais antes/depois dentro da transação. Nenhuma alteração no histórico de migrações.
+- As duas tabelas novas ficaram vazias, com nove colunas, oito restrições e três índices. O schema exportado de produção corresponde integralmente ao do ensaio.
+- `db:baseline:check` retornou `ready: true` antes e depois da aplicação.
+- A comparação final pelo Drizzle encerrou durante a introspecção, sem relatório. A verificação final foi feita diretamente nos catálogos do PostgreSQL e pela comparação dos dumps de schema; não foi necessário reaplicar a mudança.
+
+Evidências e backup privados em `%LOCALAPPDATA%/Codex/DatabaseBackups/ludylops-live/20260924-operations-0029-apply/`. O cluster local foi encerrado. Nenhuma alteração em saldos, credenciais, configuração do Streamer.bot ou ativação da economia. Depois do merge/deploy, resta validar heartbeat e recuperação no piloto #227.
 
 ### Ensaio local em 2026-09-24
 
