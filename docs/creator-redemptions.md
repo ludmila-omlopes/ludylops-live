@@ -66,11 +66,13 @@ Com Node.js 20.8+ e dependências instaladas, executar na raiz do checkout:
 node --env-file=bridge/.env --import tsx bridge/src/index.ts
 ```
 
-Cada instância usa uma credencial e o Streamer.bot local correspondente. O protocolo usa `POST /api/internal/streamerbot/redemptions`, com as operações `heartbeat`, `pull`, `claim`, `complete` e `fail`. A assinatura v2 inclui método, caminho, corpo e ID da credencial. O heartbeat verifica acesso; nesta versão não é um indicador persistente de presença da nova bridge.
+Cada instância usa uma credencial e o Streamer.bot local correspondente. O protocolo usa `POST /api/internal/streamerbot/redemptions`, com as operações `heartbeat`, `pull`, `claim`, `complete` e `fail`. A assinatura v2 inclui método, caminho, corpo e ID da credencial. Após a migração 0029 e a implantação da #226, o heartbeat também registra a última atividade por comunidade/bridge. Ele não comprova conexão contínua nem execução de actions. Veja [diagnóstico e resolução manual](creator-integration-operations.md).
 
 ### Recuperação sem executar de novo
 
 A bridge tenta novamente confirmações que falharam na rede enquanto o processo estiver vivo. Reiniciar o processo perde essas confirmações locais, mas não libera outro claim: o resgate permanece em execução. Um timeout ao chamar Streamer.bot também permanece em execução, pois a ação pode ter sido aceita.
+
+Após a #226, o dono também pode registrar a resolução observada em **Integração e resgates pendentes**, seguindo [o procedimento de parada e verificação](creator-integration-operations.md#resolver-resultado-incerto). O CLI abaixo continua disponível.
 
 Depois de conferir o resultado no Streamer.bot, usar o mesmo `BRIDGE_MACHINE_KEY` que aparece no histórico e uma credencial válida da mesma comunidade:
 

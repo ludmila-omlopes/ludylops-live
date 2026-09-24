@@ -41,6 +41,7 @@ const expectedApiRoutes = new Set([
   "/api/internal/streamerbot/redemptions",
   "/api/creators/[slug]/redeem",
   "/api/me/creator-area/[id]/catalog",
+  "/api/me/creator-area/[id]/integration-operations",
   "/api/admin/recommendations/image",
   "/api/me/creator-area/[id]/recommendations/image",
   "/api/me/creator-area/[id]/recommendations",
