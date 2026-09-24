@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { formatDateTime } from "@/lib/utils";
 
 type Credential = { id: string; status: string; retiringUntil: string | null; lastUsedAt: string | null };
 type Issued = { id: string; secret: string };
@@ -69,8 +70,8 @@ export function StreamerbotCredentials({ creatorId, enabled }: { creatorId: stri
       {credentials?.map((item) => <div key={item.id} className="grid gap-2 border-2 border-[var(--color-ink)] p-3">
         <code className="break-all">{item.id}</code>
         <p>{item.status === "active" ? "Ativa" : item.status === "retiring" ? "Em substituição" : "Revogada"}
-          {item.retiringUntil && ` · Validade da transição: ${new Date(item.retiringUntil).toLocaleString("pt-BR")}`}</p>
-        <p>Última autenticação: {item.lastUsedAt ? new Date(item.lastUsedAt).toLocaleString("pt-BR") : "Ainda não registrada"}</p>
+          {item.retiringUntil && ` · Validade da transição: ${formatDateTime(item.retiringUntil)}`}</p>
+        <p>Última autenticação: {item.lastUsedAt ? formatDateTime(item.lastUsedAt) : "Ainda não registrada"}</p>
         <div className="flex flex-wrap gap-2">
           {item.status === "active" && <Button type="button" variant="neutral" disabled={busy || !enabled || issued !== null} onClick={() => void mutate("rotate", item.id)}>Substituir credencial</Button>}
           {item.status !== "revoked" && <Button type="button" variant="danger" disabled={busy} onClick={() => void mutate("revoke", item.id)}>Revogar credencial</Button>}

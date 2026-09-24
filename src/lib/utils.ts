@@ -12,6 +12,9 @@ export function formatPipetz(value: number) {
 /** @deprecated Use formatPipetz */
 export const formatPoints = formatPipetz;
 
+// Match the existing live/bet and daily-counter convention on both server and browser.
+export const APP_TIME_ZONE = "America/Sao_Paulo";
+
 export function formatDateTime(value: Date | string | null | undefined) {
   if (!value) {
     return "agora";
@@ -19,6 +22,7 @@ export function formatDateTime(value: Date | string | null | undefined) {
 
   const date = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: APP_TIME_ZONE,
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
