@@ -197,7 +197,7 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
   }
 }
 
-export async function listCreatorAreasForOwner(ownerUserId: string | null | undefined): Promise<CreatorAreaSummary[]> {
+export async function listCreatorAreasForOwner(ownerUserId: string | null | undefined, options: { includeArchived?: boolean } = {}): Promise<CreatorAreaSummary[]> {
   if (!ownerUserId) {
     return [];
   }
@@ -205,7 +205,7 @@ export async function listCreatorAreasForOwner(ownerUserId: string | null | unde
   const db = getDb();
   if (!db) {
     return findDemoCreatorTenantsByOwner(ownerUserId)
-      .filter((tenant) => tenant.creator.status !== "archived")
+      .filter((tenant) => options.includeArchived || tenant.creator.status !== "archived")
       .map((tenant) => toAreaSummary(tenant.creator));
   }
 
@@ -223,7 +223,7 @@ export async function listCreatorAreasForOwner(ownerUserId: string | null | unde
     throw error;
   }
 
-  return rows.filter((row) => row.status !== "archived").map((row) => toAreaSummary(serializeCreator(row)));
+  return rows.filter((row) => options.includeArchived || row.status !== "archived").map((row) => toAreaSummary(serializeCreator(row)));
 }
 
 export async function getCreatorAreaBySlug(

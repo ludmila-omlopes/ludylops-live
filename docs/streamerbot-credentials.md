@@ -1,6 +1,8 @@
 # Credenciais do Streamer.bot por streamer
 
-Cada credencial identifica exatamente um streamer. Só a operadora da plataforma pode emitir, substituir ou revogar credenciais em `/owner`, usando a autorização existente de `PLATFORM_OWNER_EMAILS`. Ser dono de uma comunidade não concede acesso global. O segredo aparece apenas na resposta da emissão; listagem e revogação nunca o devolvem.
+Cada credencial identifica exatamente um streamer. O dono gerencia as credenciais da própria comunidade em `/criar-area`. A operadora mantém a recuperação administrativa em `/owner`, usando `PLATFORM_OWNER_EMAILS`; a integração legada da Ludylops continua sendo gerenciada por esse caminho. Ser dono de uma comunidade não concede acesso global. O segredo aparece apenas na resposta da emissão; listagem e revogação nunca o devolvem.
+
+A gestão pelo dono (#224) reutiliza a tabela e a chave de criptografia existentes: não exige migração, não emite credenciais automaticamente e não modifica o Streamer.bot instalado. Consultas e mutações revalidam o proprietário dentro da transação. Criar/substituir exige comunidade ativa e integração instalada; consultar/revogar continua permitido ao dono de uma comunidade desativada ou arquivada, mesmo sem chave de criptografia disponível.
 
 ## Preparar a aplicação
 
@@ -13,16 +15,16 @@ Sem chave de criptografia válida, a emissão falha antes de escrever e a autent
 
 ## Emitir e configurar
 
-1. Em `/owner`, localize o streamer ativo com Streamer.bot habilitado. Abra **Gerenciar credenciais** e use **Criar credencial**. Há uma credencial ativa por streamer; use substituição para trocar uma já emitida.
-2. Guarde o ID público e o segredo exibidos. Ao ocultar ou fechar, o segredo não pode ser recuperado. Se perder a resposta da emissão, substitua a credencial ativa; não existe endpoint de recuperação do segredo.
+1. Entre com a conta dona da comunidade, abra `/criar-area` e use **Gerenciar credenciais → Criar credencial**. A comunidade precisa estar ativa e ter Streamer.bot habilitado pela administradora. A administradora também pode executar essas operações em `/owner`. Há uma credencial ativa por streamer; use substituição para trocar uma já emitida.
+2. Guarde o ID público e o segredo exibidos. Ao ocultar, fechar ou atualizar, o segredo não pode ser recuperado. Se perder a resposta da emissão, substitua a credencial ativa; não existe endpoint de recuperação do segredo.
 3. No Streamer.bot, configure três variáveis globais **persistidas**, do tipo texto: `lojaneon.appBaseUrl` (origem HTTPS sem caminho, query ou barra final), `lojaneon.streamerbotCredentialId` e `lojaneon.streamerbotCredentialSecret`.
-4. Atualize o código das actions a partir de `streamerbot/` ou do catálogo de scripts. Todos os dez scripts que enviam comandos agora exigem o ID e o segredo novos. O script local de lista de comandos não usa autenticação HTTP.
-5. Adicione uma action manual com `check-credential.cs` em **Core > C# > Execute C# Code** e execute. O log deve mostrar status 200 e o `creatorId` esperado. Esse teste não altera saldo, apostas, quotes, contadores ou fila; registra somente a autenticação e a data de último uso da credencial.
+4. Use os scripts de [`streamerbot/`](../streamerbot), habilitando somente os recursos disponíveis para sua comunidade. Os scripts de operações antigas ainda não isoladas não são liberados pela emissão de uma credencial. Para resgates, siga também [as instruções do bridge](creator-redemptions.md).
+5. Adicione uma action manual com [`check-credential.cs`](../streamerbot/check-credential.cs) em **Core > C# > Execute C# Code** e execute. O log deve mostrar status 200 e o `creatorId` esperado. Esse teste não altera saldo, apostas, quotes, contadores ou fila; registra somente a autenticação e a data de último uso da credencial. Use **Atualizar credenciais** para conferir a última autenticação: ela não demonstra conexão contínua nem execução de resgates.
 6. Na Ludylops, teste um comando sem alteração de saldo, como a consulta de pontos, antes dos eventos automáticos. A instalação real do Streamer.bot e a comunicação com serviços externos exigem esse teste operacional; o teste local de assinatura não os substitui.
 
 Não exporte variáveis com segredos nem as mostre em capturas ou chat. Os scripts não embutem credenciais e enviam cabeçalhos por requisição usando `HttpRequestMessage`/`HttpClient`, sem modificar cabeçalhos compartilhados do cliente.
 
-As instruções foram conferidas em 2026-09-20 na documentação oficial: [GetGlobalVar](https://docs.streamer.bot/api/csharp/methods/core/globals/get-global-var), [SetGlobalVar](https://docs.streamer.bot/api/csharp/methods/core/globals/set-global-var), [Execute C# Code](https://docs.streamer.bot/api/sub-actions/core/csharp/execute-csharp-code/) e [requisições HTTP em C#](https://docs.streamer.bot/examples/http-post). `GetGlobalVar<string>(nome, true)` lê variáveis persistidas; o exemplo oficial de HTTP usa conteúdo UTF-8 e cabeçalhos por requisição.
+As instruções foram conferidas em 2026-09-24 na documentação oficial: [GetGlobalVar](https://docs.streamer.bot/api/csharp/methods/core/globals/get-global-var), [SetGlobalVar](https://docs.streamer.bot/api/csharp/methods/core/globals/set-global-var), [Execute C# Code](https://docs.streamer.bot/api/sub-actions/core/csharp/execute-csharp-code/) e [requisições HTTP em C#](https://docs.streamer.bot/examples/http-post). `GetGlobalVar<string>(nome, true)` lê variáveis persistidas; o exemplo oficial de HTTP usa conteúdo UTF-8 e cabeçalhos por requisição.
 
 ## Substituir, testar e revogar
 
@@ -42,9 +44,9 @@ Primeira revisão de remoção: **2026-10-04 ou 14 dias completos após a troca 
 
 ## Limites de autorização
 
-Eventos, vínculo, pontos, apostas, contadores, mortes e roleta continuam indisponíveis para streamers diferentes da Ludylops. Em quotes, o piloto #173 permite apenas `create` e `get` com credencial própria, criador ativo e módulos `streamerbot` e `quotes` instalados. A numeração pertence à comunidade autenticada. `show` continua respondendo 403 `operation_not_isolated` antes de consultar saldo, preço ou live globais.
+A emissão não habilita módulos, não ativa a economia e não concede acesso às operações legadas. As permissões são verificadas em cada endpoint. Quotes, vínculo, consulta de saldo, ganhos por chat e resgates possuem operações próprias isoladas; algumas exigem também `CREATOR_ECONOMY_ENABLED` e seus módulos. Apostas, sugestões e contadores/overlays legados continuam indisponíveis para novos streamers.
 
-O teste de conexão mantém `operationalAccess: false` para outros streamers (acesso operacional completo indisponível), mas agora informa `quoteActions: ["create", "get"]` quando essas ações estão habilitadas. Isso não libera OBS nem a economia. O protocolo e os scripts existentes não mudam nesta entrega. Veja o [contrato de isolamento e as dependências restantes](creator-scoping.md). O plano 019 adicionará a política completa de dependências dos módulos. Bridge e seus segredos/filas continuam em entrega separada.
+O teste de credencial mantém `operationalAccess: false` para outros streamers: esse campo representa acesso operacional legado completo, não um erro de autenticação. Consulte as capacidades específicas no resultado e as instruções de cada recurso. Veja o [contrato de isolamento](creator-scoping.md) e [resgates e bridge por comunidade](creator-redemptions.md).
 
 ## Protocolo e armazenamento
 
