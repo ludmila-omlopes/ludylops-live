@@ -190,6 +190,13 @@
       "when": 1790125945590,
       "tag": "0026_creator_economy",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790246381539,
+      "tag": "0027_redemption_execution_audit",
+      "breakpoints": true
     }
   ]
 }

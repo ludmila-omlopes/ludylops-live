@@ -5802,6 +5802,7 @@ export async function getViewerDashboard(viewerId: string) {
     ...entry,
     status: entry.status as RedemptionRecord["status"],
     claimedByBridgeId: entry.claimedByBridgeId,
+    claimedAt: entry.claimedAt?.toISOString() ?? null,
     queuedAt: entry.queuedAt.toISOString(),
     executedAt: entry.executedAt?.toISOString() ?? null,
     failedAt: entry.failedAt?.toISOString() ?? null,
@@ -9532,6 +9533,7 @@ export async function redeemItem({
       ...entry,
       status: entry.status as RedemptionRecord["status"],
       claimedByBridgeId: entry.claimedByBridgeId,
+      claimedAt: entry.claimedAt?.toISOString() ?? null,
       queuedAt: entry.queuedAt.toISOString(),
       executedAt: entry.executedAt?.toISOString() ?? null,
       failedAt: entry.failedAt?.toISOString() ?? null,
@@ -9540,6 +9542,7 @@ export async function redeemItem({
     ...entry,
     status: entry.status as RedemptionRecord["status"],
     claimedByBridgeId: entry.claimedByBridgeId,
+    claimedAt: entry.claimedAt?.toISOString() ?? null,
     queuedAt: entry.queuedAt.toISOString(),
     executedAt: entry.executedAt?.toISOString() ?? null,
     failedAt: entry.failedAt?.toISOString() ?? null,
@@ -9967,14 +9970,27 @@ export async function deleteProductRecommendation(recommendationId: string) {
 export async function listAdminRedemptions() {
   const db = getDb();
   if (isDemoMode || !db) {
-    return getDemoStore().redemptions;
+    const store = getDemoStore();
+    return [...store.redemptions].sort((a, b) => +new Date(b.queuedAt) - +new Date(a.queuedAt)).slice(0, 100).map((entry) => ({
+      ...entry,
+      itemName: store.catalog.find((item) => item.id === entry.catalogItemId)?.name ?? entry.catalogItemId,
+      viewerName: store.viewers.find((viewer) => viewer.id === entry.viewerId)?.youtubeDisplayName ?? entry.viewerId,
+    }));
   }
 
-  const rows = await db.select().from(redemptions).orderBy(desc(redemptions.queuedAt));
-  return rows.map((entry) => ({
+  const rows = await db.select({ redemption: redemptions, itemName: catalogItems.name, viewerName: users.youtubeDisplayName })
+    .from(redemptions)
+    .leftJoin(catalogItems, eq(catalogItems.id, redemptions.catalogItemId))
+    .leftJoin(users, eq(users.id, redemptions.viewerId))
+    .where(eq(redemptions.creatorId, DEFAULT_CREATOR_ID))
+    .orderBy(desc(redemptions.queuedAt), desc(redemptions.id)).limit(100);
+  return rows.map(({ redemption: entry, itemName, viewerName }) => ({
     ...entry,
+    itemName: itemName ?? entry.catalogItemId,
+    viewerName: viewerName ?? entry.viewerId,
     status: entry.status as RedemptionRecord["status"],
     claimedByBridgeId: entry.claimedByBridgeId,
+    claimedAt: entry.claimedAt?.toISOString() ?? null,
     queuedAt: entry.queuedAt.toISOString(),
     executedAt: entry.executedAt?.toISOString() ?? null,
     failedAt: entry.failedAt?.toISOString() ?? null,
@@ -10947,6 +10963,7 @@ export async function bridgeClaim(redemptionId: string, bridgeId: string) {
     }
     redemption.status = "executing";
     redemption.claimedByBridgeId = bridgeId;
+    redemption.claimedAt = new Date().toISOString();
     redemption.bridgeAttemptCount += 1;
     return redemption;
   }
@@ -10956,15 +10973,16 @@ export async function bridgeClaim(redemptionId: string, bridgeId: string) {
     .set({
       status: "executing",
       claimedByBridgeId: bridgeId,
+      claimedAt: new Date(),
       bridgeAttemptCount: sql`${redemptions.bridgeAttemptCount} + 1`,
     })
-    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.status, "queued")))
+    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.creatorId, DEFAULT_CREATOR_ID), eq(redemptions.status, "queued")))
     .returning();
 
   return claimed ?? null;
 }
 
-export async function bridgeComplete(redemptionId: string) {
+export async function bridgeComplete(redemptionId: string, executionNote?: string) {
   const db = getDb();
   if (isDemoMode || !db) {
     const store = getDemoStore();
@@ -10980,6 +10998,7 @@ export async function bridgeComplete(redemptionId: string) {
     }
     redemption.status = "completed";
     redemption.executedAt = new Date().toISOString();
+    redemption.executionNote = executionNote ?? null;
     return redemption;
   }
 
@@ -10988,14 +11007,15 @@ export async function bridgeComplete(redemptionId: string) {
     .set({
       status: "completed",
       executedAt: new Date(),
+      executionNote: executionNote ?? null,
     })
-    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.status, "executing")))
+    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.creatorId, DEFAULT_CREATOR_ID), eq(redemptions.status, "executing")))
     .returning();
 
   if (completed) {
     return completed;
   }
-  const [redemption] = await db.select().from(redemptions).where(eq(redemptions.id, redemptionId)).limit(1);
+  const [redemption] = await db.select().from(redemptions).where(and(eq(redemptions.id, redemptionId), eq(redemptions.creatorId, DEFAULT_CREATOR_ID))).limit(1);
   return redemption?.status === "completed" ? redemption : null;
 }
 
@@ -11032,7 +11052,7 @@ export async function bridgeFail(redemptionId: string, failureReason: string) {
     return redemption;
   }
 
-  const [redemption] = await db.select().from(redemptions).where(eq(redemptions.id, redemptionId)).limit(1);
+  const [redemption] = await db.select().from(redemptions).where(and(eq(redemptions.id, redemptionId), eq(redemptions.creatorId, DEFAULT_CREATOR_ID))).limit(1);
   if (!redemption) {
     return null;
   }
@@ -11048,6 +11068,7 @@ export async function bridgeFail(redemptionId: string, failureReason: string) {
       .where(
         and(
           eq(redemptions.id, redemptionId),
+          eq(redemptions.creatorId, DEFAULT_CREATOR_ID),
           inArray(redemptions.status, ["queued", "executing"]),
         ),
       )
@@ -11076,6 +11097,6 @@ export async function bridgeFail(redemptionId: string, failureReason: string) {
     });
   });
 
-  const [updated] = await db.select().from(redemptions).where(eq(redemptions.id, redemptionId)).limit(1);
+  const [updated] = await db.select().from(redemptions).where(and(eq(redemptions.id, redemptionId), eq(redemptions.creatorId, DEFAULT_CREATOR_ID))).limit(1);
   return updated ?? null;
 }

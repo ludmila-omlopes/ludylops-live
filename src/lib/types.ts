@@ -310,6 +310,8 @@ export interface RedemptionRecord {
   idempotencyKey: string;
   bridgeAttemptCount: number;
   claimedByBridgeId: string | null;
+  claimedAt?: string | null;
+  executionNote?: string | null;
   queuedAt: string;
   executedAt: string | null;
   failedAt: string | null;
