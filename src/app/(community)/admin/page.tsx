@@ -16,6 +16,7 @@ import { AdminViewerLinksPanel } from "@/components/admin-viewer-links-panel";
 import { AdminCreatorAreaAccessPanel } from "@/components/admin-creator-area-access-panel";
 import { AdminCreatorSuggestionsPanel } from "@/components/admin-creator-suggestions-panel";
 import { AdminDeathCountersPanel } from "@/components/admin-death-counters-panel";
+import { AdminRedemptionsPanel } from "@/components/admin-redemptions-panel";
 import { RedemptionGrid } from "@/components/redemption-grid";
 import { LeaderboardTable } from "@/components/leaderboard-table";
 import { LiveStatusPanel } from "@/components/live-status-panel";
@@ -41,16 +42,7 @@ import {
 import { getStreamerbotLivestreamStatus } from "@/lib/streamerbot/live-status";
 import { listStreamerbotScripts } from "@/lib/streamerbot/scripts.server";
 import { getCurrentGame } from "@/lib/current-game";
-import { formatDateTime, formatPipetz } from "@/lib/utils";
 import { getWheelConfig } from "@/lib/wheel";
-
-const statusColorMap: Record<string, string> = {
-  queued: "var(--color-lavender)",
-  claimed: "var(--color-sky)",
-  completed: "var(--color-mint)",
-  failed: "var(--color-rose)",
-  cancelled: "var(--color-periwinkle)",
-};
 
 export default async function AdminPage() {
   await requireAdminSession();
@@ -261,44 +253,7 @@ export default async function AdminPage() {
                 label: "Fila de resgates",
                 description: "Últimos resgates e status.",
                 badge: `${queuedRedemptionCount}/${redemptions.length}`,
-                content: (
-                  <div className="panel surface-section p-6">
-                    <h2
-                      className="text-3xl uppercase"
-                      style={{ fontFamily: "var(--font-display)" }}
-                    >
-                      Fila de resgates
-                    </h2>
-                    <div className="mt-6 grid gap-3">
-                      {redemptions.length === 0 ? (
-                        <div className="card-brutal-static p-4 text-sm font-bold text-[var(--color-ink-soft)]">
-                          Nenhum resgate recente.
-                        </div>
-                      ) : null}
-                      {redemptions.slice(0, 10).map((entry) => {
-                        const statusBg = statusColorMap[entry.status] ?? "var(--color-paper)";
-                        return (
-                          <div key={entry.id} className="card-brutal-static p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <span
-                                className="badge-brutal px-2 py-1 text-[10px] text-[var(--color-ink)]"
-                                style={{ backgroundColor: statusBg }}
-                              >
-                                {entry.status}
-                              </span>
-                              <span className="mono text-xs font-bold uppercase tracking-[0.18em]">
-                                {formatPipetz(entry.costAtPurchase)} pipetz
-                              </span>
-                            </div>
-                            <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
-                              {formatDateTime(entry.queuedAt)}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ),
+                content: <AdminRedemptionsPanel entries={redemptions} />,
               }] : []),
               ...(can("ranking") ? [{
                 id: "ranking",

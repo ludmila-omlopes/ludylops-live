@@ -656,6 +656,8 @@ export const redemptions = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 128 }).notNull(),
     bridgeAttemptCount: integer("bridge_attempt_count").default(0).notNull(),
     claimedByBridgeId: varchar("claimed_by_bridge_id", { length: 64 }),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    executionNote: varchar("execution_note", { length: 255 }),
     queuedAt: timestamp("queued_at", { withTimezone: true }).defaultNow().notNull(),
     executedAt: timestamp("executed_at", { withTimezone: true }),
     failedAt: timestamp("failed_at", { withTimezone: true }),

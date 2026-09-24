@@ -22,7 +22,7 @@ export async function POST(
   }
   const moduleDenial = await guardVerifiedModules(defaultCreatorContext, ["redemptions"]);
   if (moduleDenial) return moduleDenial;
-  await bridgeCompleteSchema.parse(JSON.parse(raw));
+  const payload = bridgeCompleteSchema.parse(JSON.parse(raw));
   const { redemptionId } = await params;
-  return ok(await bridgeComplete(redemptionId));
+  return ok(await bridgeComplete(redemptionId, payload.executionNote));
 }
