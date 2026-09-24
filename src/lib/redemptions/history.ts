@@ -15,11 +15,11 @@ export function redemptionTimeline(entry: RedemptionRecord) {
       detail: entry.claimedByBridgeId ? `Bridge: ${entry.claimedByBridgeId}` : "Identificação da bridge não registrada." });
   }
   if (entry.status === "completed" || entry.executedAt) events.push({
-    label: "Conclusão informada pela bridge", at: entry.executedAt,
+    label: "Conclusão registrada", at: entry.executedAt,
     detail: entry.executionNote || "Sem observação de execução.",
   });
   if (entry.status === "failed" || entry.failedAt) events.push({
-    label: "Falha informada pela bridge", at: entry.failedAt,
+    label: "Falha registrada", at: entry.failedAt,
     detail: entry.failureReason || "Motivo não registrado.",
   });
   if (entry.status === "cancelled") events.push({ label: "Cancelado", at: null, detail: "Data e motivo do cancelamento não registrados." });

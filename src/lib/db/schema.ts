@@ -265,6 +265,29 @@ export const creatorRedemptions = pgTable("creator_redemptions", {
   nonlegacy: check("creator_redemptions_nonlegacy", sql`${t.creatorId} <> 'creator_ludylops'`),
 }));
 
+export const creatorBridgeStatus = pgTable("creator_bridge_status", {
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  bridgeId: varchar("bridge_id", { length: 64 }).notNull(),
+  lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => ({
+  pk: primaryKey({ columns: [t.creatorId, t.bridgeId] }),
+  nonlegacy: check("creator_bridge_status_nonlegacy", sql`${t.creatorId} <> 'creator_ludylops'`),
+}));
+
+export const creatorRedemptionResolutions = pgTable("creator_redemption_resolutions", {
+  redemptionId: varchar("redemption_id", { length: 64 }).primaryKey().references(() => creatorRedemptions.id),
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  // Historical actor, intentionally not an FK: account consolidation must not rewrite the audit.
+  ownerViewerId: varchar("owner_viewer_id", { length: 64 }).notNull(),
+  outcome: varchar("outcome", { length: 16 }).notNull(),
+  note: varchar("note", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => ({
+  creatorIdx: index("creator_resolutions_creator_idx").on(t.creatorId, t.createdAt),
+  nonlegacy: check("creator_resolutions_nonlegacy", sql`${t.creatorId} <> 'creator_ludylops'`),
+  validOutcome: check("creator_resolutions_outcome", sql`${t.outcome} in ('completed', 'failed')`),
+}));
+
 export const viewerLinks = pgTable(
   "viewer_links",
   {

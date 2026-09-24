@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({ db: vi.fn(), env: { CREATOR_ECONOMY_ENABLED: "
 vi.mock("@/lib/db/client", () => ({ getDb: state.db }));
 vi.mock("@/lib/env", () => ({ isDemoMode: false, env: state.env }));
 import * as schema from "@/lib/db/schema";
-import { listCreatorCatalog, listCreatorRedemptions, saveCreatorCatalog, purchaseCreatorItem, dispatchCreatorRedemptions } from "./redemptions.server";
+import { listCreatorCatalog, listCreatorRedemptions, saveCreatorCatalog, purchaseCreatorItem, dispatchCreatorRedemptions, getCreatorOperations, recoverCreatorRedemption } from "./redemptions.server";
 import { mutateCreatorEconomy, readCreatorEconomy } from "./economy";
 import { mergeCreatorEconomies } from "./economy-identity";
 import { bridgePull, bridgeClaim, bridgeComplete, bridgeFail, getCatalog, listAdminRedemptions } from "@/lib/db/repository";
@@ -49,18 +49,79 @@ describe.skipIf(!url)("creator redemptions on PostgreSQL", () => {
       CREATE TABLE catalog_items (id varchar(64) PRIMARY KEY, slug varchar(128), name varchar(255), description text, type varchar(64), cost integer, is_active boolean, global_cooldown_seconds integer, viewer_cooldown_seconds integer, stock integer, preview_image_url text, accent_color varchar(16), is_featured boolean, streamerbot_action_ref varchar(255), streamerbot_args_template jsonb);
       CREATE TABLE redemptions (id varchar(64) PRIMARY KEY, creator_id varchar(64), viewer_id varchar(64), catalog_item_id varchar(64), status varchar(32), cost_at_purchase integer, request_source varchar(32), idempotency_key varchar(128), bridge_attempt_count integer, claimed_by_bridge_id varchar(64), queued_at timestamptz, executed_at timestamptz, failed_at timestamptz, failure_reason text);
     `);
-    for (const migration of ["0026_creator_economy", "0027_redemption_execution_audit", "0028_creator_redemptions"]) await pool.query(readFileSync(`drizzle/${migration}.sql`, "utf8").replaceAll('"public".', `"${namespace}".`));
+    for (const migration of ["0026_creator_economy", "0027_redemption_execution_audit", "0028_creator_redemptions", "0029_creator_integration_operations"]) await pool.query(readFileSync(`drizzle/${migration}.sql`, "utf8").replaceAll('"public".', `"${namespace}".`));
     db = drizzle({ client: pool, schema }); state.db.mockReturnValue(db);
   });
   beforeEach(async () => {
     state.env.CREATOR_ECONOMY_ENABLED = "true";
-    await pool.query("TRUNCATE creator_redemptions, creator_catalog_items, creator_ledger, creator_balances, economy_viewer_redirects, google_accounts, google_account_viewers; UPDATE creators SET status='active'; UPDATE creator_modules SET status='installed';");
+    await pool.query("TRUNCATE creator_redemption_resolutions, creator_bridge_status, creator_redemptions, creator_catalog_items, creator_ledger, creator_balances, economy_viewer_redirects, google_accounts, google_account_viewers; UPDATE creators SET status='active'; UPDATE creator_modules SET status='installed';");
     for (const creatorId of ["a", "b"]) {
       await saveCreatorCatalog(creatorId, `owner-${creatorId}`, { ...item, cost: creatorId === "a" ? 30 : 7 });
       await mutateCreatorEconomy({ creatorId }, { kind: "owner", viewerId: `owner-${creatorId}` }, { kind: "credit", viewerId: "viewer", amount: 100, operationKey: "seed", reason: "Teste" });
     }
   });
   afterAll(async () => { if (pool) await pool.end(); if (admin) { await admin.query(`DROP SCHEMA ${namespace} CASCADE`); await admin.end(); } });
+  const recovery = (redemptionId: string, outcome = "failed") => ({ redemptionId, outcome, expectedStatus: "executing", note: "Conferi a transmissão e a action local.", bridgeStopped: true, resultChecked: true });
+  it("persists heartbeats separately per community and expires recent activity after 90 seconds", async () => {
+    for (const creatorId of ["a", "b"]) await dispatchCreatorRedemptions(creatorId, { operation: "heartbeat", bridgeId: "same-worker" });
+    await pool.query("UPDATE creator_bridge_status SET last_heartbeat_at=now()-interval '91 seconds' WHERE creator_id='a'");
+    expect((await getCreatorOperations("a", "owner-a")).bridges).toMatchObject([{ bridgeId: "same-worker", recent: false }]);
+    expect((await getCreatorOperations("b", "owner-b")).bridges[0].recent).toBe(true);
+    await dispatchCreatorRedemptions("a", { operation: "heartbeat", bridgeId: "same-worker" });
+    expect((await getCreatorOperations("a", "owner-a")).bridges).toHaveLength(1);
+    expect((await getCreatorOperations("a", "owner-a")).bridges[0].recent).toBe(true);
+    await expect(getCreatorOperations("a", "owner-b")).rejects.toThrow();
+    await expect(getCreatorOperations("creator_ludylops", "lud")).rejects.toThrow();
+  });
+  it("serializes owner retries into one refund and one immutable audit entry", async () => {
+    const { id } = await buy(); await dispatch("claim", id);
+    await Promise.all(Array.from({ length: 5 }, () => recoverCreatorRedemption("a", "owner-a", recovery(id))));
+    expect((await balance()).currentBalance).toBe(100);
+    const data = await getCreatorOperations("a", "owner-a"); expect(data.pending).toEqual([]);
+    expect(data.resolutions).toHaveLength(1); expect(data.resolutions[0]).toMatchObject({ redemptionId: id, ownerViewerId: "owner-a", outcome: "failed" });
+    expect((await pool.query("SELECT * FROM creator_ledger WHERE kind='refund'")).rows).toHaveLength(1);
+    expect((await listCreatorCatalog("a", { kind: "public" })).items[0].stock).toBe(2);
+    await expect(recoverCreatorRedemption("a", "owner-a", { ...recovery(id), note: "Tentativa de alterar o registro" })).rejects.toThrow("diferente");
+    expect((await getCreatorOperations("b", "owner-b")).resolutions).toEqual([]);
+  });
+  it("records observed completion without re-execution or refund, then accepts a matching delayed bridge receipt", async () => {
+    const { id } = await buy(); await dispatch("claim", id);
+    await recoverCreatorRedemption("a", "owner-a", recovery(id, "completed"));
+    await dispatch("complete", id); expect((await balance()).currentBalance).toBe(70);
+    expect((await listCreatorRedemptions("a", { kind: "owner", viewerId: "owner-a" }))[0]).toMatchObject({ status: "completed", bridgeAttemptCount: 1, executionNote: recovery(id).note });
+    expect(await dispatch("claim", id)).toBeNull();
+    await expect(dispatch("fail", id)).rejects.toThrow("finalizado");
+  });
+  it("resolves concurrent bridge completion versus owner failure without contradictory terminal states", async () => {
+    const { id } = await buy(); await dispatch("claim", id);
+    const outcomes = await Promise.allSettled([dispatch("complete", id), recoverCreatorRedemption("a", "owner-a", recovery(id))]);
+    expect(outcomes.filter(r => r.status === "fulfilled")).toHaveLength(1);
+    const row = (await listCreatorRedemptions("a", { kind: "owner", viewerId: "owner-a" }))[0];
+    expect((await balance()).currentBalance).toBe(row.status === "failed" ? 100 : 70);
+    expect((await getCreatorOperations("a", "owner-a")).resolutions).toHaveLength(row.status === "failed" ? 1 : 0);
+  });
+  it("rolls back both audit and refund on persistence failure", async () => {
+    const { id } = await buy(); await dispatch("claim", id);
+    await pool.query("ALTER TABLE creator_ledger ADD CONSTRAINT block_manual_refund CHECK (kind <> 'refund')");
+    try { await expect(recoverCreatorRedemption("a", "owner-a", recovery(id))).rejects.toThrow(); }
+    finally { await pool.query("ALTER TABLE creator_ledger DROP CONSTRAINT block_manual_refund"); }
+    const data = await getCreatorOperations("a", "owner-a"); expect(data.resolutions).toEqual([]); expect(data.pending[0].status).toBe("executing");
+    expect((await balance()).currentBalance).toBe(70);
+  });
+  it("rejects cross-owner/creator recovery, queued items, forged identity and missing acknowledgements", async () => {
+    const { id } = await buy();
+    await expect(recoverCreatorRedemption("a", "owner-a", recovery(id))).rejects.toThrow("estado");
+    await dispatch("claim", id);
+    await expect(recoverCreatorRedemption("a", "owner-b", recovery(id))).rejects.toThrow();
+    await expect(recoverCreatorRedemption("b", "owner-b", recovery(id))).rejects.toThrow();
+    await expect(recoverCreatorRedemption("a", "owner-a", { ...recovery(id), creatorId: "b" })).rejects.toThrow();
+    await expect(recoverCreatorRedemption("a", "owner-a", { ...recovery(id), bridgeStopped: false })).rejects.toThrow();
+    await pool.query("UPDATE creator_modules SET status='disabled' WHERE id='a-bot'");
+    await expect(recoverCreatorRedemption("a", "owner-a", recovery(id))).rejects.toThrow();
+    await pool.query("UPDATE creator_modules SET status='installed'; UPDATE creators SET status='disabled' WHERE id='a'");
+    await expect(recoverCreatorRedemption("a", "owner-a", recovery(id))).rejects.toThrow();
+    expect((await pool.query("SELECT * FROM creator_redemption_resolutions")).rows).toEqual([]);
+  });
   it("serializes stock and balance, deduplicates concurrent retries and isolates the same item/key", async () => {
     const key = randomUUID();
     const repeated = await Promise.all(Array.from({ length: 6 }, () => buy("a", key)));

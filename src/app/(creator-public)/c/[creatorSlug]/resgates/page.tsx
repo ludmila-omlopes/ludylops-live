@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { CreatorCatalog, CreatorCatalogManager } from "@/components/creator-catalog";
+import { CreatorIntegrationOperations } from "@/components/creator-integration-operations";
 import { AdminRedemptionsPanel } from "@/components/admin-redemptions-panel";
 import { getCreatorAreaBySlug } from "@/lib/creators/service";
 import { canUseModules } from "@/lib/creators/module-access";
@@ -27,6 +28,7 @@ export default async function CreatorRedemptionsPage({ params }: { params: Promi
       {balance && <p className="text-xl font-bold">Seu saldo: {balance.balance.currentBalance.toLocaleString("pt-BR")} {catalog.currencyLabel}</p>}
       <CreatorCatalog items={catalog.items.filter((i) => i.isActive).map(publicCatalogItem)} slug={creatorSlug} currencyLabel={catalog.currencyLabel} signedIn={Boolean(viewerId)} />
       {owner && <CreatorCatalogManager items={catalog.items} creatorId={tenant.creator.id} currencyLabel={catalog.currencyLabel} />}
+      {owner && <CreatorIntegrationOperations creatorId={tenant.creator.id} />}
       {entries && <AdminRedemptionsPanel entries={entries} currencyLabel={catalog.currencyLabel} viewerMode={!owner} />}
     </>; })() : <p role="alert">Os resgates estão indisponíveis no momento. Tente novamente mais tarde.</p>;
   return <div className="mx-auto grid w-full max-w-5xl gap-8 px-4 py-10 sm:px-6">

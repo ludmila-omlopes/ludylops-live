@@ -15,7 +15,7 @@ describe("redemption history", () => {
   it("preserves recorded order and shows the bridge execution note", () => {
     const timeline = redemptionTimeline({ ...base, status: "completed", claimedAt: "2026-09-24T10:00:10Z", claimedByBridgeId: "bridge-a",
       bridgeAttemptCount: 1, executedAt: "2026-09-24T10:00:20Z", executionNote: "Ação recebida" });
-    expect(timeline.map((event) => event.label)).toEqual(["Entrou na fila", "Assumido pela bridge", "Conclusão informada pela bridge"]);
+    expect(timeline.map((event) => event.label)).toEqual(["Entrou na fila", "Assumido pela bridge", "Conclusão registrada"]);
     expect(timeline[1].detail).toContain("bridge-a"); expect(timeline[2].detail).toBe("Ação recebida");
   });
   it("keeps unknown legacy timestamps unknown instead of borrowing queue time", () => {

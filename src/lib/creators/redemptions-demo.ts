@@ -7,10 +7,13 @@ import { canUseModules } from "./module-access";
 import { getCurrencyLabel } from "./currency";
 import { creditedDemoEconomyViewer, demoEconomyBalance, economyDemoStore } from "./economy-demo";
 import { checkPurchase, RedemptionAccessError, RedemptionConflictError, type CreatorCatalogItem, type purchaseSchema, type redemptionDispatchSchema } from "./redemptions";
+import { BRIDGE_RECENT_MS, type IntegrationOperations, type RecoveryInput } from "./integration-operations";
 
 type Entry = AdminRedemption & { creatorId: string; actionRef: string; debitId: string };
 declare global { var __creatorRedemptionsDemo: { items: (CreatorCatalogItem & { creatorId: string })[]; entries: Entry[] } | undefined; }
 const store = () => globalThis.__creatorRedemptionsDemo ??= { items: [], entries: [] };
+declare global { var __creatorOperationsDemo: { bridges: (IntegrationOperations["bridges"][number] & { creatorId: string })[]; resolutions: (IntegrationOperations["resolutions"][number] & { creatorId: string })[] } | undefined; }
+const operations = () => globalThis.__creatorOperationsDemo ??= { bridges: [], resolutions: [] };
 function authorize(creatorId: string, actor: RedemptionActor) {
   const tenant = listDemoCreatorTenants().find((t) => t.creator.id === creatorId);
   if (!tenant || !canUseModules(tenant, ["redemptions"], "redemptions") || (actor.kind === "owner" && tenant.creator.ownerUserId !== actor.viewerId)) throw new RedemptionAccessError();
@@ -67,7 +70,13 @@ export function demoPurchase(creatorId: string, authenticatedId: string, input: 
 }
 export function demoDispatch(creatorId: string, input: z.infer<typeof redemptionDispatchSchema>) {
   authorize(creatorId, { kind: "integration" });
-  if (input.operation === "heartbeat") return { id: input.bridgeId, lastSeenAt: new Date().toISOString() };
+  if (input.operation === "heartbeat") {
+    const lastSeenAt = new Date().toISOString(), data = operations();
+    const bridge = data.bridges.find(b => b.creatorId === creatorId && b.bridgeId === input.bridgeId);
+    if (bridge) bridge.lastHeartbeatAt = lastSeenAt;
+    else data.bridges.push({ creatorId, bridgeId: input.bridgeId, lastHeartbeatAt: lastSeenAt, recent: true });
+    return { id: input.bridgeId, lastSeenAt };
+  }
   if (input.operation === "pull") return store().entries.filter((e) => e.creatorId === creatorId && e.status === "queued").slice(-10).reverse()
     .map((e) => ({ id: e.id, catalogItemId: e.catalogItemId, viewerId: e.viewerId, costAtPurchase: e.costAtPurchase,
       viewer: { youtubeDisplayName: e.viewerName }, item: { slug: e.catalogItemId, streamerbotActionRef: e.actionRef, streamerbotArgsTemplate: {} } }));
@@ -91,4 +100,28 @@ export function demoDispatch(creatorId: string, input: z.infer<typeof redemption
     Object.assign(row, { status: terminal, failedAt: new Date().toISOString(), failureReason: input.failureReason });
   }
   return { id: row.id, status: terminal };
+}
+
+export function demoOperations(creatorId: string, viewerId: string): IntegrationOperations {
+  const currencyLabel = authorize(creatorId, { kind: "owner", viewerId }), data = operations();
+  const checkedAt = new Date();
+  return { currencyLabel, checkedAt: checkedAt.toISOString(),
+    bridges: data.bridges.filter(b => b.creatorId === creatorId).sort((a,b) => b.lastHeartbeatAt.localeCompare(a.lastHeartbeatAt)).slice(0,20).map(b => ({ bridgeId: b.bridgeId, lastHeartbeatAt: b.lastHeartbeatAt, recent: checkedAt.getTime() - new Date(b.lastHeartbeatAt).getTime() <= BRIDGE_RECENT_MS })),
+    pending: store().entries.filter(r => r.creatorId === creatorId && ["queued", "executing"].includes(r.status)).sort((a,b) => a.queuedAt.localeCompare(b.queuedAt)).slice(0,100).map(r => ({ id: r.id, itemName: r.itemName, status: r.status as "queued" | "executing", cost: r.costAtPurchase, queuedAt: r.queuedAt, claimedAt: r.claimedAt ?? null, bridgeId: r.claimedByBridgeId })),
+    resolutions: data.resolutions.filter(r => r.creatorId === creatorId).slice(0,50).map(({ redemptionId, ownerViewerId, outcome, note, createdAt }) => ({ redemptionId, ownerViewerId, outcome, note, createdAt })),
+  };
+}
+export function demoRecovery(creatorId: string, viewerId: string, input: RecoveryInput) {
+  authorize(creatorId, { kind: "owner", viewerId });
+  const row = store().entries.find(r => r.creatorId === creatorId && r.id === input.redemptionId);
+  if (!row) throw new RedemptionAccessError();
+  const prior = operations().resolutions.find(r => r.creatorId === creatorId && r.redemptionId === row.id);
+  if (prior) {
+    if (prior.outcome !== input.outcome || prior.note !== input.note) throw new RedemptionConflictError("Este resgate já teve uma resolução diferente. Atualize os registros.");
+    return { id: row.id, status: row.status };
+  }
+  if (row.status !== input.expectedStatus || !row.claimedByBridgeId) throw new RedemptionConflictError("O estado do resgate mudou. Atualize antes de resolver.");
+  const result = demoDispatch(creatorId, { redemptionId: row.id, bridgeId: row.claimedByBridgeId, ...(input.outcome === "completed" ? { operation: "complete", executionNote: input.note } : { operation: "fail", failureReason: input.note }) });
+  operations().resolutions.unshift({ creatorId, redemptionId: row.id, ownerViewerId: viewerId, outcome: input.outcome, note: input.note, createdAt: new Date().toISOString() });
+  return result;
 }

@@ -15,13 +15,14 @@ import { canUseModules } from "./module-access";
 import { getViewerDashboard } from "@/lib/db/repository";
 import { mutateCreatorEconomy } from "./economy";
 import { economyMutationSchema } from "./economy-input";
-import { listCreatorCatalog, purchaseCreatorItem, saveCreatorCatalog, listCreatorRedemptions } from "./redemptions.server";
+import { listCreatorCatalog, purchaseCreatorItem, saveCreatorCatalog, listCreatorRedemptions, dispatchCreatorRedemptions, getCreatorOperations, recoverCreatorRedemption } from "./redemptions.server";
 import { creatorRedemptionRequest } from "./redemptions-api";
 import { POST as integration } from "@/app/api/internal/streamerbot/redemptions/route";
 let id: string;
 const item = { id: "local", revision: 0, name: "Ação da live", description: "Um som", cost: 10, stock: 2, isActive: true, globalCooldownSeconds: 0, viewerCooldownSeconds: 0, streamerbotActionRef: "Action" };
 beforeEach(async () => {
   globalThis.__creatorTenantStore = []; globalThis.__creatorEconomyDemo = undefined; globalThis.__creatorRedemptionsDemo = undefined; globalThis.__lojaDemoStore = undefined;
+  globalThis.__creatorOperationsDemo = undefined;
   state.trusted = true; state.viewerId = "owner"; state.authenticated = true;
   id = (await createCreatorArea("owner", { displayName: "Canal Cristal", currencyLabel: "cristais" })).creator.id; state.creatorId = id;
   await getViewerDashboard("nonexistent"); // Initialize the shared demo identities.
@@ -31,6 +32,18 @@ beforeEach(async () => {
 });
 const request = (body: unknown) => new Request("https://example.test/api/creators/canal-cristal/redeem", { method: "POST", body: JSON.stringify(body) });
 describe("creator redemption adapters", () => {
+  it("keeps demo diagnostics and manual recovery scoped and repeatable", async () => {
+    await dispatchCreatorRedemptions(id, { operation: "heartbeat", bridgeId: "worker" });
+    const { id: redemptionId } = await purchaseCreatorItem(id, state.viewerId, { itemId: "local", operationKey: randomUUID() });
+    await dispatchCreatorRedemptions(id, { operation: "claim", bridgeId: "worker", redemptionId });
+    const body = { redemptionId, outcome: "failed", expectedStatus: "executing", note: "Nenhum efeito observado.", bridgeStopped: true, resultChecked: true };
+    expect((await getCreatorOperations(id, "owner")).bridges[0].recent).toBe(true);
+    await expect(getCreatorOperations(id, state.viewerId)).rejects.toThrow();
+    await recoverCreatorRedemption(id, "owner", body); await recoverCreatorRedemption(id, "owner", body);
+    const after = await getCreatorOperations(id, "owner"); expect(after.pending).toEqual([]); expect(after.resolutions).toHaveLength(1);
+    expect((await listCreatorCatalog(id, { kind: "owner", viewerId: "owner" })).items[0].stock).toBe(1);
+    await expect(recoverCreatorRedemption(id, "owner", { ...body, outcome: "completed" })).rejects.toThrow("diferente");
+  });
   it("reserves receipt keys against generic integration/owner adjustments", () => {
     for (const prefix of ["redemption:", "redemption-refund:"]) expect(economyMutationSchema.safeParse({
       kind: "credit", viewerId: state.viewerId, operationKey: `${prefix}known-id`, amount: 100, reason: "Teste",
