@@ -2,6 +2,7 @@ import { resolveLegacyModulePage } from "@/lib/creators/module-page-access";
 import { defaultCreatorContext } from "@/lib/creators/context";
 import { AdminObsOverlaysPanel } from "@/components/admin-obs-overlays-panel";
 import { AdminStreamerbotScriptsPanel } from "@/components/admin-streamerbot-scripts-panel";
+import { PeriodicMessagesManager } from "@/components/periodic-messages-manager";
 import { AdminCurrentGamePanel } from "@/components/admin-current-game-panel";
 import { AdminDashboardTabs } from "@/components/admin-dashboard-tabs";
 import { AdminBetsPanel } from "@/components/admin-bets-panel";
@@ -134,7 +135,7 @@ export default async function AdminPage() {
                 label: "Streamer.bot",
                 description: "Scripts C#, triggers e globals da integração.",
                 badge: `${streamerbotScripts.length}`,
-                content: <AdminStreamerbotScriptsPanel scripts={streamerbotScripts} />,
+                content: <><PeriodicMessagesManager /><AdminStreamerbotScriptsPanel scripts={streamerbotScripts} /></>,
               }] : []),
               ...(can("obs_overlays") ? [{
                 id: "roleta",

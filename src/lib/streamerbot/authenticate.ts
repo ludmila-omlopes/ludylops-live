@@ -123,6 +123,7 @@ export async function authenticateStreamerbotRequest(
 }
 
 export type StreamerbotOperation =
+  | "periodic-messages"
   | "economy"
   | "events"
   | "link"
@@ -140,6 +141,7 @@ export async function authorizeStreamerbotOperation(
   context: AuthenticatedStreamerbot,
   operation: StreamerbotOperation,
 ): Promise<Response | null> {
+  if (operation === "periodic-messages") return guardVerifiedModules(context, ["streamerbot"], "periodic-messages");
   if (operation === "economy") return guardVerifiedModules(context, ["points", "streamerbot"], "economy");
   if (operation === "points" && context.creatorId !== DEFAULT_CREATOR_ID)
     return guardVerifiedModules(context, ["points", "streamerbot"], "economy");

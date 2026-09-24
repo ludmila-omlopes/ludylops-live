@@ -18,6 +18,14 @@ const tenant = (id = DEFAULT_CREATOR_ID) => ({
   modules: structuredClone(DEFAULT_CREATOR_MODULES),
 });
 describe("server module authorization", () => {
+  it("allows only the isolated Streamer.bot operation for periodic messages", () => {
+    const other = tenant("another");
+    expect(canUseModules(other, ["streamerbot"], "periodic-messages")).toBe(true);
+    expect(canUseModules(other, ["points"], "periodic-messages")).toBe(false);
+    expect(canUseModules(other, ["streamerbot", "redemptions"], "periodic-messages")).toBe(false);
+    other.modules.find((entry) => entry.moduleKey === "streamerbot")!.status = "disabled";
+    expect(canUseModules(other, ["streamerbot"], "periodic-messages")).toBe(false);
+  });
   beforeEach(() => {
     storage.resolve.mockReset().mockResolvedValue(tenant());
     storage.db.mockReset().mockReturnValue(null);
