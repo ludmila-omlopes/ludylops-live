@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const operationKey = z.string().min(1).max(128).refine((key) => !key.startsWith("chat:"), "Chave de operação reservada.");
+const operationKey = z.string().min(1).max(128).refine((key) => !["chat:", "redemption:", "redemption-refund:"].some((prefix) => key.startsWith(prefix)), "Chave de operação reservada.");
 
 export const economyMutationSchema = z.discriminatedUnion("kind", [
   z.object({

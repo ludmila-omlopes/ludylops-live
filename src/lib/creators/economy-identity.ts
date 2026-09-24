@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { creatorBalances, creatorLedger, economyViewerRedirects, googleAccounts, googleAccountViewers } from "@/lib/db/schema";
+import { creatorBalances, creatorLedger, creatorRedemptions, economyViewerRedirects, googleAccounts, googleAccountViewers } from "@/lib/db/schema";
 
 export type EconomyTx = Parameters<Parameters<NonNullable<ReturnType<typeof getDb>>["transaction"]>[0]>[0];
 
@@ -51,6 +51,9 @@ export async function mergeCreatorEconomies(tx: EconomyTx, sourceId: string, tar
   }
   await tx.delete(creatorBalances).where(eq(creatorBalances.viewerId, source));
   await tx.update(creatorLedger).set({ viewerId: target }).where(eq(creatorLedger.viewerId, source));
+  // Additive rollout: identity linking also works before migration 0028 is installed.
+  const { rows: [storage] } = await tx.execute<{ present: boolean }>(sql`select to_regclass('creator_redemptions') is not null as present`);
+  if (storage.present) await tx.update(creatorRedemptions).set({ viewerId: target }).where(eq(creatorRedemptions.viewerId, source));
   await tx.update(economyViewerRedirects).set({ targetViewerId: target }).where(eq(economyViewerRedirects.targetViewerId, source));
   await tx.insert(economyViewerRedirects).values({ sourceViewerId: source, targetViewerId: target })
     .onConflictDoUpdate({ target: economyViewerRedirects.sourceViewerId, set: { targetViewerId: target } });

@@ -87,12 +87,13 @@ The white-label foundation creates creator instances, but operational data is st
 - **027 (DONE; PR #214 merged)** — owner-controlled name/colors and a public home with scoped links only for available features. See [Plan 027](027-creator-profile.md).
 - **028 (DONE; PR #216 merged)** — isolated product recommendations, owner creation/editing/publication and default-creator guards for legacy reads/writes. See [Plan 028](028-creator-recommendations.md).
 - **029 (IN PROGRESS; #22 implemented)** — optional product image lookup for community owners and legacy admins, with bounded requests and manual fallback. See [Plan 029](029-recommendation-image-lookup.md).
+- **033 (IN PROGRESS; #222 implemented in PR #223)** — isolated catalog, atomic purchases, per-creator bridge execution/refunds and owner/viewer history. Migrations 0027 and 0028 applied and verified on 2026-09-24; awaiting user merge. See [Plan 033](033-creator-redemptions.md).
 - **Unnumbered functional follow-ups (not yet written; 010–013 are performance plans)** — replicate 009's pattern per vertical, each depending on 009 and following the pattern doc:
   - bets (`bets`/`bet_options`/`bet_entries`)
   - suggestions (`game_suggestions`/`video_suggestions`/`creator_suggestions` + boosts); owner-managed `product_recommendations` are now tracked by 028
-  - redemptions (`redemptions`) + bridge
+  - redemptions and bridge are now tracked by **033**, in additive storage separate from the legacy queue
   - economy is now tracked explicitly by **023** (`point_ledger`, and `viewer_balances` — needs composite PK `(creator_id, viewer_id)`, per the confirmed **per-creator balance** decision)
-  - catalog (`catalog_items` — `slug` unique must become composite `(creator_id, slug)`)
+  - catalog is now tracked by **033**, using composite `(creator_id, id)` in `creator_catalog_items`; the Ludylops catalog remains unchanged
   - counters/overlays (`streamerbot_counters` — key-based **and** dual-used by creator-area-access settings in `src/lib/creators/access.ts`; handle carefully)
   - Identity stays global (not scoped): `users`, `google_accounts`, `google_account_viewers`, `viewer_links`; shared reference/infra stays global: `ps_plus_catalog_*`, `google_risc_deliveries`.
 - **Cleanup (deferred)** — once all inserts pass `creator_id` explicitly, drop the temporary column defaults so a missing `creator_id` fails loudly instead of silently defaulting to the Ludylops tenant.

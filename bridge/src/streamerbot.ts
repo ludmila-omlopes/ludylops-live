@@ -2,6 +2,8 @@ import type { BridgeConfig } from "./config";
 import type { BridgeLogger } from "./logger";
 import type { Json, RedemptionPayload, StreamerbotActionRef } from "./types";
 
+export class ActionRejectedError extends Error {}
+
 type DoActionRequest = {
   action: StreamerbotActionRef;
   args?: Record<string, Json>;
@@ -41,7 +43,7 @@ export class StreamerbotClient {
   async executeRedemption(redemption: RedemptionPayload) {
     const actionRef = redemption.item?.streamerbotActionRef;
     if (!actionRef) {
-      throw new Error("Missing Streamer.bot action mapping.");
+      throw new ActionRejectedError("Missing Streamer.bot action mapping.");
     }
 
     const body: DoActionRequest = {
@@ -70,7 +72,7 @@ export class StreamerbotClient {
 
       if (!response.ok && response.status !== 204) {
         const text = await response.text();
-        throw new Error(
+        throw new ActionRejectedError(
           `Streamer.bot DoAction failed with ${response.status}: ${text || "empty body"}`,
         );
       }
@@ -80,6 +82,6 @@ export class StreamerbotClient {
   }
 
   private resolveAction(actionRef: string): StreamerbotActionRef {
-    return actionRef.includes("-") ? { id: actionRef } : { name: actionRef };
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(actionRef) ? { id: actionRef } : { name: actionRef };
   }
 }

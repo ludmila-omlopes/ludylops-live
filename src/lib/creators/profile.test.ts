@@ -56,7 +56,7 @@ describe("owner profile", () => {
 describe("usable community home links", () => {
   it("uses only isolated routes and the configured currency", () => {
     const links = creatorHomeLinks(globalThis.__creatorTenantStore![0]);
-    expect(links.map((l) => l.href)).toEqual(["/c/canal-cristal/moeda", "/c/canal-cristal/ranking", "/c/canal-cristal/quotes", "/c/canal-cristal/produtinhos"]);
+    expect(links.map((l) => l.href)).toEqual(["/c/canal-cristal/resgates", "/c/canal-cristal/moeda", "/c/canal-cristal/ranking", "/c/canal-cristal/quotes", "/c/canal-cristal/produtinhos"]);
     expect(links[0].description).toContain("cristais");
   });
   it("hides economy links while production activation is off", () => {

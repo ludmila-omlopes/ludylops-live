@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { formatDateTime, formatPipetz } from "@/lib/utils";
 import { redemptionStatusLabels, redemptionTimeline, type AdminRedemption } from "@/lib/redemptions/history";
 
-export function AdminRedemptionsPanel({ entries }: { entries: AdminRedemption[] }) {
+export function AdminRedemptionsPanel({ entries, currencyLabel = "pipetz", viewerMode = false }: { entries: AdminRedemption[]; currencyLabel?: string; viewerMode?: boolean }) {
   const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
   const [pending, refresh] = useTransition();
@@ -16,7 +16,7 @@ export function AdminRedemptionsPanel({ entries }: { entries: AdminRedemption[] 
     (!search || [entry.id, entry.itemName, entry.viewerName].some((value) => value.toLocaleLowerCase("pt-BR").includes(search))));
   return <section className="panel surface-section min-w-0 p-4 sm:p-6">
     <h2 className="text-3xl uppercase" style={{ fontFamily: "var(--font-display)" }}>Histórico de resgates</h2>
-    <p className="mt-2 text-sm">Até 100 resgates mais recentes. A conclusão registra a confirmação da bridge.</p>
+    <p className="mt-2 text-sm">{viewerMode ? "Acompanhe seus últimos 100 resgates." : "Até 100 resgates mais recentes. A conclusão registra a confirmação da bridge."}</p>
     <div className="mt-5 flex flex-wrap items-end gap-3">
       <label className="grid min-w-0 flex-1 gap-1 text-sm font-bold">Buscar resgate
         <input className="min-w-0 border-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-2" placeholder="Pessoa, item ou ID" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -34,10 +34,15 @@ export function AdminRedemptionsPanel({ entries }: { entries: AdminRedemption[] 
       {visible.map((entry) => <details key={entry.id} className="card-brutal-static min-w-0 p-4">
         <summary className="cursor-pointer break-words font-bold">
           {entry.itemName} · {entry.viewerName} — {redemptionStatusLabels[entry.status]}
-          <span className="mt-1 block text-sm font-normal">{formatPipetz(entry.costAtPurchase)} pipetz · {formatDateTime(entry.queuedAt)}</span>
+          <span className="mt-1 block text-sm font-normal">{formatPipetz(entry.costAtPurchase)} {currencyLabel} · {formatDateTime(entry.queuedAt)}</span>
         </summary>
         <div className="mt-4 grid gap-3 text-sm">
           <p className="break-all">ID: {entry.id}</p>
+          {viewerMode ? <>
+            {entry.claimedAt && <p>Recebido para execução: {formatDateTime(entry.claimedAt)}</p>}
+            {entry.executedAt && <p>Enviado para a live: {formatDateTime(entry.executedAt)}</p>}
+            {entry.status === "failed" && <p>O resgate falhou. Seus {currencyLabel} foram devolvidos.</p>}
+          </> : <>
           <p>Execuções assumidas pela bridge: {entry.bridgeAttemptCount}</p>
           <ol className="grid gap-4 border-l-2 border-[var(--color-ink)] pl-4">
             {redemptionTimeline(entry).map((event) => <li key={event.label} className="break-words">
@@ -46,6 +51,7 @@ export function AdminRedemptionsPanel({ entries }: { entries: AdminRedemption[] 
               <p className="whitespace-pre-wrap">{event.detail}</p>
             </li>)}
           </ol>
+          </>}
         </div>
       </details>)}
     </div>
