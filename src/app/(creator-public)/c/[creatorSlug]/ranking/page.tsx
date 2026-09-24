@@ -5,7 +5,8 @@ import { CreatorLeaderboard } from "@/components/creator-leaderboard";
 import { getCreatorAreaBySlug } from "@/lib/creators/service";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { canUseModules } from "@/lib/creators/module-access";
-import { canReadCreatorRanking, CreatorRankingUnavailableError, readCreatorRanking } from "@/lib/creators/ranking";
+import { canReadCreatorRanking, CreatorRankingUnavailableError } from "@/lib/creators/ranking";
+import { readPublicCreatorRanking } from "@/lib/creators/ranking-cache";
 
 export default async function CreatorRankingPage({ params }: { params: Promise<{ creatorSlug: string }> }) {
   const { creatorSlug } = await params;
@@ -17,8 +18,8 @@ export default async function CreatorRankingPage({ params }: { params: Promise<{
     redirect("/ranking");
   }
   if (!canReadCreatorRanking(tenant)) notFound();
-  let data: Awaited<ReturnType<typeof readCreatorRanking>> | null = null;
-  try { data = await readCreatorRanking({ creatorId: tenant.creator.id }); }
+  let data: Awaited<ReturnType<typeof readPublicCreatorRanking>> | null = null;
+  try { data = await readPublicCreatorRanking({ creatorId: tenant.creator.id }); }
   catch (error) { if (error instanceof CreatorRankingUnavailableError) notFound(); }
   return <div className="mx-auto grid w-full max-w-4xl gap-6 px-4 py-10 sm:px-6">
     <Link href={`/c/${tenant.creator.slug}`} className="font-bold underline">{tenant.creator.displayName}</Link>

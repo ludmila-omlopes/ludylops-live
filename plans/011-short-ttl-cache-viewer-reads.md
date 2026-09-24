@@ -1,157 +1,163 @@
-# Plan 011: Short-TTL caching for viewer-facing reads
+# Plan 011: Cache only isolated, shared reads with required creator keys
 
-> **Executor instructions**: Follow this plan step by step. Run every
-> verification command and confirm the expected result before moving to the
-> next step. If anything in the "STOP conditions" section occurs, stop and
-> report — do not improvise. When done, update the status row for this plan
-> in `plans/README.md` — unless a reviewer dispatched you and told you they
-> maintain the index.
+> **Executor instructions**: Cache identity is a data-isolation boundary.
+> Read installed Next.js cache documentation before selecting an API. Never
+> cache session-derived results, personal bets/balances, or mutating OBS GETs.
 >
-> **Read the installed Next.js docs BEFORE writing any code** (this Next 16
-> differs from training data): `node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md`,
-> `09-revalidating.md`, `02-guides/caching-without-cache-components.md`, and the
-> API references for `use cache`, `cacheLife`, and `unstable_cache`.
->
-> **Drift check (run first)**:
-> `git diff --stat f245ee1..HEAD -- src/app/page.tsx "src/app/(public)/ranking/page.tsx" src/lib/db/repository.ts next.config.ts`
-> On drift, re-verify the "Current state" excerpts; mismatch = STOP.
+> **Drift check**: `git diff --stat ec19f8f..HEAD -- "src/app/(community)/page.tsx" "src/app/(community)/ranking/page.tsx" src/lib/db/repository.ts src/lib/current-game.ts src/lib/streamerbot/live-status.ts next.config.ts`
 
 ## Status
 
-- **Priority**: P1
+- **Priority**: P2; supporting work after the isolation pilot.
 - **Effort**: M
-- **Risk**: MED (caching bugs show up as stale data during a live; TTLs are deliberately tiny)
-- **Depends on**: none (010 is complementary, not required)
+- **Risk**: HIGH if a key or loader mixes creators; MED for stale public data.
+- **Depends on**: plan 009 / #173 for the context contract and plan 025 / #209
+  for the isolated public ranking, delivered in PR #210.
 - **Category**: perf
-- **Planned at**: commit `f245ee1` (origin/master), 2026-07-07
+- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15; same file tree as master `f353ce2`.
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/176
+- **State**: IN PROGRESS — implemented and verified on `85da513`, awaiting merge.
+- **Reconciled**: 2026-09-23 against the updated issue and the ranking delivery.
+
+## Delivery evidence
+
+- The only adopted call site is `/c/[creatorSlug]/ranking`, backed by
+  `readCreatorRanking`: required creator context, scoped SQL, bounded public
+  projection and existing isolation tests. The legacy ranking remains global
+  and uncached. This replaces the original July proposal to cache global reads.
+- `readPublicCreatorRanking` checks current lifecycle, modules and economy
+  activation before every cache lookup. The underlying loader repeats policy
+  checks within its transaction when loading data.
+- `unstable_cache` is the installed, documented compatibility API for apps
+  without Cache Components. No global rendering configuration changes.
+- Creator ID, resource, revalidation interval and query arguments identify the
+  cached result; creator ID also scopes tags and loader input. Demo bypasses it.
+- 954 tests passed, including 8 new cache tests; 41 optional PostgreSQL tests
+  were skipped. Types, lint and production build passed without real credentials.
+- `node scripts/verify-public-cache-runtime.mjs` passed with a disposable Next
+  production build: repeated-request hit, A/B and limit separation, denial before
+  a warm cache, revalidation after 15 seconds and demo bypass. No database used.
+- The 15-second interval triggers background revalidation, not hard expiry.
+  The first expired request served version 1; subsequent requests served version 2.
+  See [eligibility, mechanism and freshness limits](../docs/public-creator-cache.md).
+- No migration, production activation or Streamer.bot configuration is required.
 
 ## Why this matters
 
-Every viewer page render is a fresh serverless invocation running live Neon queries — there is **zero caching anywhere**: pages read session/cookies (dynamic), and API handlers set `no-store`. N concurrent viewers = N × (render + queries), so audience size converts 1:1 into Neon load and Vercel invocations. During a live, the underlying data (leaderboard, open bets, current game) changes every few seconds at most; recomputing it hundreds of times per second for hundreds of viewers is pure waste. A 5–15s server-side data cache collapses that to ~1 query per TTL window regardless of audience size — the single cheapest capacity multiplier available before the white-label rollout multiplies traffic per creator.
+Repeated public reads can share short-lived results within the same community.
+A cache must not share records between communities, even when resource names
+and local ids match. Adding creatorId only to the cache key cannot repair a
+loader that still reads global rows.
+
+This reduces repeated computation/queries on hits. It does not by itself remove
+serverless page invocations or guarantee a particular deployment-wide hit rate.
 
 ## Current state
 
-- No cache usage anywhere: `grep -rn "unstable_cache\|use cache\|cacheLife" src/` → 0 matches. `next.config.ts` has no `cacheComponents` flag (it sets only `reactCompiler: true` and `images`).
-- The home page `src/app/page.tsx` is a server component that reads the session (`auth()` at `:16` import) — the **page** cannot be statically cached, but its shared data can. Its data calls (all uncached, every view):
-  - `listBets()` from `@/lib/db/repository` (imported at `:27`)
-  - `getCurrentGame()` from `@/lib/current-game` (`:26`)
-  - `isStreamerbotLivestreamActive()` from `@/lib/streamerbot/live-status` (`:29`)
-- `/ranking` (`src/app/(public)/ranking/page.tsx`) reads **no session** — it calls `getLeaderboard()` and renders. Excerpt:
-  ```tsx
-  import { getLeaderboard } from "@/lib/db/repository";
-  export default async function RankingPage() {
-    const leaderboard = await getLeaderboard();
-  ```
-  (`getLeaderboard` is currently unbounded — plan 012 bounds it; independent of this plan.)
-- `/apostas` reads `auth()` server-side, and `/jogos`/`/videos` pass a session `viewerId` into `listGameSuggestions(viewerId)`/`listVideoSuggestions(viewerId)` — per-viewer data mixed with shared data. Caching those is the **stretch goal only** (Step 5); the safe core is home + ranking.
-- Demo mode (`isDemoMode`, no `DATABASE_URL`): repository functions read a mutable in-memory store; several tests rely on calling repository functions directly and seeing fresh state. **Therefore: do not add caching inside `repository.ts`.** Cache at the page/call-site layer via a wrapper, so tests and demo flows are untouched.
-
-## Commands you will need
-
-| Purpose   | Command            | Expected on success |
-|-----------|--------------------|---------------------|
-| Install   | `npm install`      | exit 0              |
-| Lint      | `npm run lint`     | exit 0              |
-| Typecheck | `npx tsc --noEmit` | exit 0              |
-| Tests     | `npm test`         | all pass (300 baseline + new cache tests) |
-| Build     | `npm run build`    | exit 0 (dummy `NEXTAUTH_SECRET`) |
+- The new creator ranking in `src/lib/creators/ranking.ts` qualifies. Its page
+  uses the cache adapter; its public API stays uncached with `no-store`.
+- src/app/(community)/page.tsx calls listBets(activeViewerId), not an anonymous
+  list. Treat that existing result as personalized and leave it uncached.
+- src/app/(community)/ranking/page.tsx calls getLeaderboard() with no creator;
+  src/lib/db/repository.ts joins all user balances without a creator filter.
+- getCurrentGame in src/lib/current-game.ts and live-status helpers in
+  src/lib/streamerbot/live-status.ts also need creator-specific configuration/state
+  before they are candidates for a multi-creator cache.
+- Existing repository tests use mutable demo state; cache outside repository.ts
+  and bypass caching in demo mode.
+- The existing OBS quotes GET processes a queue and is out of scope.
 
 ## Scope
 
-**In scope**:
-- `src/lib/cache.ts` (create) — the small TTL-cache helper
-- `src/lib/cache.test.ts` (create)
-- `src/app/page.tsx` — wrap the three shared data calls
-- `src/app/(public)/ranking/page.tsx` — wrap `getLeaderboard()`
-- (stretch, Step 5 only if trivial) anonymous-branch caching in `/jogos`, `/videos`, `/apostas` pages
-- `next.config.ts` — ONLY if the chosen mechanism requires a flag, per the installed docs
+**In scope**: new src/lib/cache.ts and its tests, the creator-ranking cache
+adapter and its tests, the public creator ranking page, a reproducible isolated
+Next runtime probe and documentation. The originally listed community home and
+legacy ranking do not pass the eligibility gate. No next.config.ts change.
 
-**Out of scope** (do NOT touch):
-- `src/lib/db/repository.ts` — no caching inside the data layer (demo store + tests depend on direct calls)
-- `/api/obs/*` — the quotes endpoint is a mutating GET; overlay costs are plans 010/013
-- Any admin page or API — admins must always see fresh data
-- Auth/session code; per-viewer data (balances, `/me`) — never cache user-specific reads
-- `Cache-Control` headers on API routes (viewer pages don't fetch through them server-side)
-
-## Git workflow
-
-- Update local `master`, branch `codex/011-viewer-read-cache`. Short imperative commits. No push/PR unless instructed.
+**Out of scope**: repository isolation implementation, personal/session reads,
+anonymous suggestion-list stretch goals, admin caching, API response caching,
+OBS endpoints, a global caching-framework migration, production changes.
 
 ## Steps
 
-### Step 1: Choose the caching mechanism from the installed docs
+### 1. Verify eligibility and select the documented mechanism
 
-Read the four docs listed at the top. Decide between:
-- **(a) `unstable_cache(fn, keyParts, { revalidate: seconds })`** — no config change; wrap at call sites. Works without `cacheComponents`.
-- **(b) `use cache` + `cacheLife`** — the newer model; check `caching-without-cache-components.md` whether it requires enabling `cacheComponents` in `next.config.ts` on this version, and what that flag changes globally.
+Read:
+- node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md
+- node_modules/next/dist/docs/01-app/01-getting-started/09-revalidating.md
+- node_modules/next/dist/docs/01-app/02-guides/caching-without-cache-components.md
+- node_modules/next/dist/docs/01-app/03-api-reference/04-functions/unstable_cache.md
+- node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md
 
-Recommendation: **(a)** unless the docs mark it deprecated/removed in this version — it is the minimal, local change; (b) flips a global behavior switch this plan doesn't need. If the docs contradict both options (API absent/renamed), STOP and report what the docs actually offer.
+Inventory each candidate's actual arguments, data returned and isolation tests.
+Only accept a loader that requires creator context and restricts its reads to
+that creator. Verify public lifecycle/module authorization before cache lookup,
+so disabling a creator does not continue serving cached content.
+If no candidate qualifies, report the unmet prerequisite without shipping an
+unused helper or applying a global-data cache.
 
-**Verify**: state the choice + the doc line supporting it in your report.
+**Verify**: a per-call-site eligibility table records shared versus personalized,
+creator restriction evidence and TTL. The mechanism choice cites installed docs.
 
-### Step 2: Build `src/lib/cache.ts`
+### 2. Require a creator in the cache contract
 
-A thin wrapper so call sites stay readable and the mechanism is swappable:
+Define a typed wrapper with required creatorId, resource key and TTL. Pass that
+creator into the loader itself; use creatorId in the cache key and any invalidation
+tags. Include other public query dimensions such as page/limit when applicable.
+Never substitute DEFAULT_CREATOR_ID for a missing argument or capture another
+creator in an unkeyed closure.
 
-```ts
-// Server-side TTL cache for shared (non-per-user) reads. Wrap ONLY data that
-// is identical for every viewer. Never wrap session-derived or per-viewer reads.
-export function cachedShared<T>(key: string, ttlSeconds: number, fn: () => Promise<T>): () => Promise<T>
-```
+Resolve session/request authorization outside the cached function. Bypass cache
+entirely in demo mode. Proposed TTLs are tuning starting points: ranking 15s,
+public current-game 30s, public live state 10s, public anonymous bets 5s only
+if a genuinely separate anonymous loader exists after the relevant follow-up.
 
-Implemented with the Step 1 mechanism. In demo mode (`isDemoMode` from `@/lib/env`), **bypass the cache entirely** (return `fn` uncached) so local dev and demo flows always see fresh in-memory state.
+**Verify**: typecheck passes; wrapper tests reject missing creator input and
+prove the requested creator is passed to the loader and key/tag construction.
 
-**Verify**: `npx tsc --noEmit` → exit 0.
+### 3. Adopt only eligible call sites
 
-### Step 3: Wrap the call sites
+Wrap eligible public ranking/current-game/live-state reads. Leave
+listBets(activeViewerId) and all logged-in viewer data untouched.
+Do not change a personalized call to anonymous merely to make caching possible.
+Do not invent a fixed number of wrapped sites as a completion criterion:
+document which qualified and why others were deferred.
 
-- `src/app/page.tsx`: `listBets()` → TTL 5s (key `home:bets`); `getCurrentGame()` → TTL 30s; `isStreamerbotLivestreamActive()` → TTL 10s. Session-dependent parts of the page are untouched.
-- `src/app/(public)/ranking/page.tsx`: `getLeaderboard()` → TTL 15s (key `ranking:leaderboard`).
+**Verify**: review call sites and test two creators with overlapping ids/resource
+keys; creator A's cache hit cannot return creator B's data or bypass access checks.
 
-Bets nuance: `listBets()` on the home page is called without a viewer (shared). If inspection shows it takes a `viewerId` and the home page passes one, cache **only** the no-viewer variant; if the home page passes a viewer id, STOP and report rather than caching per-user data.
+### 4. Test behavior and framework limits
 
-**Verify**: `npm run lint` → exit 0; `npm test` → all pass.
+Use Vitest conventions for deterministic wrapper/key/loader tests. Prove
+separation of creator keys and tags, demo bypass, personalized-path exclusion,
+and creator/module denial before cached reads. Exercise actual repeated requests
+and expiry in a test-environment Next build where the cache runtime is available.
+A mocked cache function does not prove real cache hits or TTL expiration.
 
-### Step 4: Test the helper
-
-`src/lib/cache.test.ts` (Vitest, model on existing `src/lib/**` tests): with a counting stub fn, two calls within TTL execute the fn once; demo mode bypass executes it twice. If the Step 1 mechanism can't be exercised in Vitest (framework-bound), test the demo bypass + wrapper shape and note the limitation in your report.
-
-**Verify**: `npm test -- cache` → new tests pass.
-
-### Step 5 (stretch — skip if any friction): anonymous suggestion lists
-
-In `/jogos` and `/videos` pages only, when there is no session viewer, serve `listGameSuggestions(null)` / `listVideoSuggestions(null)` through `cachedShared` (TTL 15s). Logged-in viewers keep the uncached per-viewer path. Skip entirely if the pages' data flow makes the split non-obvious — note it as deferred.
-
-### Step 6: Full gate + staleness sanity
-
-`npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build`. Then `npm run dev` **with** a real `DATABASE_URL` if available (otherwise note demo bypass makes local staleness invisible) and confirm `/ranking` renders.
-
-**Verify**: all exit 0.
-
-## Test plan
-
-- New `src/lib/cache.test.ts` (Step 4): TTL dedupe + demo bypass.
-- Existing 300 tests must pass unchanged — if any repository test starts failing, you cached inside the wrong layer (STOP condition).
+**Verify**: npm test -- cache, npm run typecheck, npm run lint, npm test,
+and npm run build pass. Use only test/demo credentials. Record runtime cache-hit
+and expiry evidence, or explicitly report an unverified runtime gate.
 
 ## Done criteria
 
-- [ ] `src/lib/cache.ts` + tests exist; `npm test` all pass
-- [ ] Home page's three shared calls and ranking's leaderboard go through `cachedShared` (grep `cachedShared` → ≥4 call sites)
-- [ ] `src/lib/db/repository.ts` unmodified (`git diff --stat`)
-- [ ] No admin or per-viewer read is wrapped (reviewer greps call sites)
-- [ ] `npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build` all exit 0
-- [ ] `plans/README.md` status row updated; report names the mechanism chosen and why
+- [x] At least one adopted loader was already demonstrably isolated by creator.
+- [x] The helper requires creatorId and keys/tags/loaders consistently use it.
+- [x] A/B separation, denial checks and demo bypass are tested.
+- [x] No personal/session result or mutating GET is cached.
+- [x] Runtime hit/revalidation behavior has been verified in a test environment.
+- [x] Gates pass; the report names adopted and deferred call sites.
 
 ## STOP conditions
 
-- The installed docs show neither `unstable_cache` nor a no-flag `use cache` path works on this version/config — report the actual options.
-- Wrapping requires passing session/viewer data into the key — that read is per-user; don't cache it, report it.
-- Any existing test fails after wrapping (cache leaked into the data layer).
-- The mechanism requires `cacheComponents: true` AND enabling it changes behavior of unrelated pages in `npm run build` output — report before flipping a global flag.
+- The intended loader still reads global operational data.
+- A cache hit could bypass lifecycle/module checks.
+- A call contains viewer-specific fields, including listBets(activeViewerId).
+- The installed cache mechanism requires broad out-of-scope app changes.
+- Demo/unit mocks are the only evidence offered for runtime TTL behavior.
 
-## Maintenance notes
+## Git workflow and maintenance
 
-- TTLs are deliberately tiny (5–30s); tune upward only with evidence. During-live freshness beats cache hit rate here.
-- White-label: once pages become per-creator (plans 008/009+), cache keys must include the creator id — `cachedShared`'s key parameter is where that lands. Flag this in `docs/creator-scoping.md` when 009 executes.
-- Reviewer focus: nothing session-derived inside a wrapped fn; demo bypass works; keys are distinct per call site.
+Update the remote base, then use codex/011-viewer-read-cache in an isolated
+worktree. Keep repository services uncached. Include Closes #176 if opening an
+issue PR. Re-evaluate TTLs using observed freshness and costs; do not promise a
+fixed capacity multiplier. Per-creator keys are mandatory now, not future work.
