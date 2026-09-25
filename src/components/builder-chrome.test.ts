@@ -22,6 +22,7 @@ import { BuilderChrome } from "@/components/builder-chrome";
 const BuilderChromeForTest = BuilderChrome as React.ComponentType<{
   children?: React.ReactNode;
   isPlatformOwner?: boolean;
+  isSignedIn?: boolean;
 }>;
 
 describe("BuilderChrome", () => {
@@ -39,6 +40,31 @@ describe("BuilderChrome", () => {
     expect(markup).toContain("Creator Hub");
     expect(markup).not.toContain("Ludylops");
     expect(markup).not.toContain('href="/owner"');
+  });
+
+  it("points signed-in viewers to their communities instead of the landing", () => {
+    mocks.pathname = "/comunidades/canal-da-mari";
+    const markup = renderToStaticMarkup(
+      React.createElement(BuilderChromeForTest, { isPlatformOwner: false, isSignedIn: true }, "child"),
+    );
+
+    expect(markup).toContain('href="/comunidades"');
+    expect(markup).toContain("Minhas comunidades");
+    expect(markup).toContain('href="/comunidades/nova"');
+    expect(markup).toContain("Nova comunidade");
+    expect(markup).not.toContain("Criar área");
+    expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(markup).toMatch(/aria-current="page"[^>]*href="\/comunidades"|href="\/comunidades"[^>]*aria-current="page"/);
+  });
+
+  it("marks only the new community link as current on the creation page", () => {
+    mocks.pathname = "/comunidades/nova";
+    const markup = renderToStaticMarkup(
+      React.createElement(BuilderChromeForTest, { isPlatformOwner: false, isSignedIn: true }, "child"),
+    );
+
+    expect(markup).toMatch(/href="\/comunidades\/nova"[^>]*aria-current="page"|aria-current="page"[^>]*href="\/comunidades\/nova"/);
+    expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
   });
 
   it("shows community administration only for platform owners", () => {

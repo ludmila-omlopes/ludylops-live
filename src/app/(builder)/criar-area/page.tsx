@@ -1,19 +1,13 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Coins, Palette, Sparkles, MessageSquare, type LucideIcon } from "lucide-react";
 
 import { auth } from "@/auth";
 import { CreatorAreaCreateForm } from "@/components/creator-area-create-form";
-import { CreatorCurrencyForm } from "@/components/creator-currency-form";
-import { CreatorProfileForm } from "@/components/creator-profile-form";
-import { CreatorChatRewardsForm } from "@/components/creator-chat-rewards-form";
-import { PeriodicMessagesManager } from "@/components/periodic-messages-manager";
-import { StreamerbotCredentials } from "@/components/streamerbot-credentials";
-import { CreatorSetup } from "@/components/creator-setup";
-import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { CreatorLandingCta } from "@/components/creator-landing-cta";
 import { canCreateCreatorArea } from "@/lib/creators/access";
-import { resolveCreatorLandingState } from "@/lib/creators/platform";
+import { COMMUNITIES_PATH } from "@/lib/creators/owner-dashboard";
+import { getPlatformOrigin, resolveCreatorLandingState } from "@/lib/creators/platform";
 import { listCreatorAreasForOwner } from "@/lib/creators/service";
 
 export const metadata: Metadata = {
@@ -95,8 +89,13 @@ export default async function CreateCreatorAreaPage() {
   const creatorAreas =
     hasUsableSession ? await listCreatorAreasForOwner(session!.user!.activeViewerId, { includeArchived: true }) : [];
 
+  // Owners manage their communities elsewhere; this route stays the entry for newcomers.
+  if (creatorAreas.length > 0) {
+    redirect(COMMUNITIES_PATH);
+  }
+
   return (
-    <div className="surface-section flex w-full flex-col">
+    <div className="surface-section flex w-full flex-1 flex-col">
       <section className="mx-auto grid w-full max-w-[1200px] gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-10">
         <div>
           <h1
@@ -111,48 +110,6 @@ export default async function CreateCreatorAreaPage() {
           </p>
 
           <CommunitySection />
-
-          {creatorAreas.length > 0 ? (
-            <div className="mt-8 grid gap-3">
-              <h2
-                className="text-2xl uppercase text-[var(--color-ink)]"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Suas áreas
-              </h2>
-              {creatorAreas.map((creator) => (
-                <div key={creator.id}>
-                <Link
-                  href={creator.publicUrl}
-                  className="group flex items-center justify-between gap-3 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-4 shadow-[4px_4px_0_var(--shadow-color)] transition-transform hover:-translate-y-0.5"
-                >
-                  <span className="min-w-0">
-                    <span className="block break-words text-lg font-black uppercase leading-tight text-[var(--color-ink)]">
-                      {creator.displayName}
-                    </span>
-                    <span className="mt-1 block break-all text-sm font-bold text-[var(--color-ink-soft)]">
-                      {creator.publicUrl}
-                    </span>
-                  </span>
-                  <span aria-hidden="true" className="text-xl font-black">
-                    →
-                  </span>
-                </Link>
-                {creator.status !== "active" && creator.id !== DEFAULT_CREATOR_ID && <p className="mt-3 text-sm">Comunidade {creator.status === "archived" ? "arquivada" : "desativada"}. Você ainda pode revogar suas credenciais.</p>}
-                {creator.id !== DEFAULT_CREATOR_ID && <CreatorSetup creatorId={creator.id} />}
-                {creator.status === "active" && creator.id !== DEFAULT_CREATOR_ID && <>
-                  <div id={`perfil-${creator.id}`} className="scroll-mt-24"><CreatorProfileForm creatorId={creator.id} /></div>
-                  <CreatorCurrencyForm creatorId={creator.id} />
-                  <div id={`ganhos-${creator.id}`} className="scroll-mt-24"><CreatorChatRewardsForm creatorId={creator.id} /></div>
-                  <PeriodicMessagesManager creatorId={creator.id} />
-                  <Link href={`/c/${creator.slug}/quotes#gerenciar-frases`} className="mt-3 block font-bold underline">Gerenciar frases</Link>
-                  <Link href={`/c/${creator.slug}/produtinhos`} className="mt-3 block font-bold underline">Gerenciar produtos</Link>
-                </>}
-                {creator.id !== DEFAULT_CREATOR_ID && <div id={`integracao-${creator.id}`} className="scroll-mt-24"><StreamerbotCredentials creatorId={creator.id} enabled={creator.status === "active"} mode="creator" /></div>}
-                </div>
-              ))}
-            </div>
-          ) : null}
         </div>
 
         <div className="border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5 shadow-[6px_6px_0_var(--shadow-color)] sm:p-6">
@@ -189,7 +146,7 @@ export default async function CreateCreatorAreaPage() {
             </div>
           ) : null}
 
-          {landingState === "approved" ? <CreatorAreaCreateForm /> : null}
+          {landingState === "approved" ? <CreatorAreaCreateForm addressPrefix={`${getPlatformOrigin()}/c/`} /> : null}
         </div>
       </section>
     </div>

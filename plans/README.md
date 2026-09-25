@@ -73,6 +73,7 @@ Verification baseline at `06f0792`: `npm run lint`, `npx tsc --noEmit`, `npm tes
 | 027  | Owner name/colors and usable community home | P1 | M | 025, 026 | [#213](https://github.com/ludmila-omlopes/ludylops-live/issues/213) | DONE (PR #214 merged; no migration) |
 | 028  | Isolated owner-managed product recommendations | P1 | M | 008, 019, 027 | [#215](https://github.com/ludmila-omlopes/ludylops-live/issues/215) | DONE (PR #216 merged; no migration) |
 | 029  | Product image lookup for admins and community owners | P2 | M | 028 | [#22](https://github.com/ludmila-omlopes/ludylops-live/issues/22) | IN PROGRESS (implemented and validated; awaiting merge; no migration) |
+| 039  | Separar a vitrine do Creator Hub da gestão das comunidades (`/comunidades`) | P1 | L | 038 (PR #234, no master); coordena 035/036 | — | IN PROGRESS (039a implementado; 039b/039c pendentes; ver [Plano 039](039-creator-hub-dashboard.md)) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 

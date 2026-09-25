@@ -109,6 +109,10 @@ export const aggregatePages = {
 
 export const sharedPages = {
   "/criar-area": "Creator provisioning",
+  "/comunidades": "Owner-scoped community list; setup summaries reuse owner-verified loaders",
+  "/comunidades/nova": "Creator provisioning for approved beta accounts",
+  "/comunidades/[slug]":
+    "Owner-resolved community management; each control keeps its own owner and module checks",
   "/owner": "Platform-owner configuration and recovery",
   "/c/[creatorSlug]":
     "Creator identity, branding and availability; no unscoped operational data",
