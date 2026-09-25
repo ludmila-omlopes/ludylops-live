@@ -1,10 +1,12 @@
 import { inArray } from "drizzle-orm";
+import { cache } from "react";
 
 import { isMissingCreatorSchemaError } from "@/lib/creators/area-errors.server";
 import { DEFAULT_CREATOR_BRANDING, DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { listDemoCreatorTenants } from "@/lib/creators/demo-store";
 import { normalizeCreatorSlug } from "@/lib/creators/identity";
 import { listCreatorAreasForOwner } from "@/lib/creators/service";
+import { loadModuleTenant } from "@/lib/creators/module-access";
 import { getOwnedCreatorSetup } from "@/lib/creators/setup.server";
 import { getDb } from "@/lib/db/client";
 import { creatorBranding } from "@/lib/db/schema";
@@ -120,3 +122,29 @@ export async function listOwnedCommunityCards(viewerId: string | null | undefine
     }),
   );
 }
+
+export type OwnedCommunityTenant = NonNullable<Awaited<ReturnType<typeof loadModuleTenant>>>;
+
+export type OwnedCommunityWorkspace = {
+  community: OwnedCommunity;
+  tenant: OwnedCommunityTenant;
+};
+
+/**
+ * Owner-verified community plus its module state, memoized per request so the
+ * layout and the section page share one lookup.
+ */
+export const getOwnedCommunityWorkspace = cache(
+  async (viewerId: string | null | undefined, slug: string): Promise<OwnedCommunityWorkspace | null> => {
+    const community = await getOwnedCommunityBySlug(viewerId, slug);
+    if (!community) {
+      return null;
+    }
+
+    const tenant = community.isLegacy ? null : await loadModuleTenant({ creatorId: community.id });
+    return {
+      community,
+      tenant: tenant ?? { creator: { id: community.id, status: community.status }, modules: [] },
+    };
+  },
+);

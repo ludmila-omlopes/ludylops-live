@@ -11,6 +11,14 @@ describe("creator setup evidence", () => {
     expect(steps.bridge.state).toBe("verify"); expect(steps.test.state).toBe("verify");
     expect(steps.chat.detail).toContain("7 cristais");
   });
+  it("links each step to the owner section that configures it", () => {
+    const steps = Object.fromEntries(buildCreatorSetup(facts).steps.map(s => [s.id, s]));
+    expect(steps.profile.href).toBe("/comunidades/canal-a/identidade");
+    expect(steps.economy.href).toBe("/comunidades/canal-a/economia");
+    expect(steps.credential.href).toBe("/comunidades/canal-a/integracao");
+    expect(steps.chat.href).toBe("/comunidades/canal-a/economia");
+    expect(steps.catalog.href).toBe("/comunidades/canal-a/resgates");
+  });
   it("keeps economy and dependent routes unavailable until actually enabled", () => {
     const steps = buildCreatorSetup({ ...facts, economyEnabled: false }).steps;
     for (const id of ["economy", "chat", "catalog"]) expect(steps.find(s => s.id === id)?.state).toBe("blocked");

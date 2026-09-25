@@ -1,11 +1,11 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
 import type { PeriodicMessage, PeriodicSettingsView } from "@/lib/creators/periodic-messages";
 
-export function PeriodicMessagesManager({ creatorId }: { creatorId?: string }) {
-  const [open, setOpen] = useState(false), [busy, setBusy] = useState(false);
+export function PeriodicMessagesManager({ creatorId, defaultOpen = false }: { creatorId?: string; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen), [busy, setBusy] = useState(false);
   const [data, setData] = useState<PeriodicSettingsView | null>(null);
   const [error, setError] = useState<string | null>(null), [feedback, setFeedback] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -31,10 +31,15 @@ export function PeriodicMessagesManager({ creatorId }: { creatorId?: string }) {
     if (await request({ action: "update", id: item.id, expectedRevision: data!.revision,
       message: { text: item.text, intervalSeconds: item.intervalSeconds, enabled: !item.enabled } })) { reset(); setFeedback(item.enabled ? "Mensagem pausada." : "Mensagem ativada."); }
   }
+  useEffect(() => {
+    // Sections opened directly load their data once, like opening the toggle.
+    if (defaultOpen) void request();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return <section className="mt-5 min-w-0 border-t-2 border-[var(--color-ink)] pt-4">
     <h3 className="text-xl font-bold">Mensagens periódicas</h3>
     <p className="mt-2 text-sm">Lembretes para o chat durante a live. Cada mensagem tem seu próprio intervalo.</p>
-    <Button type="button" variant="neutral" disabled={busy} className="mt-3" onClick={() => { setOpen(!open); if (!open) void request(); }}>{open ? "Fechar mensagens" : "Gerenciar mensagens periódicas"}</Button>
+    {!defaultOpen && <Button type="button" variant="neutral" disabled={busy} className="mt-3" onClick={() => { setOpen(!open); if (!open) void request(); }}>{open ? "Fechar mensagens" : "Gerenciar mensagens periódicas"}</Button>}
     {open && <div className="mt-4 grid min-w-0 gap-4">
       {error && <p role="alert">{error}</p>}{feedback && <p role="status">{feedback}</p>}
       <Button type="button" variant="neutral" disabled={busy} onClick={async () => { if (await request()) reset(); }}>Atualizar mensagens</Button>

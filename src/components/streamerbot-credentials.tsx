@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
 
@@ -13,8 +13,8 @@ async function readResult<T>(response: Response): Promise<T> {
   return result.data as T;
 }
 
-export function StreamerbotCredentials({ creatorId, enabled, mode = "platform" }: { creatorId: string; enabled: boolean; mode?: "platform" | "creator" }) {
-  const [open, setOpen] = useState(false);
+export function StreamerbotCredentials({ creatorId, enabled, mode = "platform", defaultOpen = false }: { creatorId: string; enabled: boolean; mode?: "platform" | "creator"; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [credentials, setCredentials] = useState<Credential[] | null>(null);
   const [issued, setIssued] = useState<Issued | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,12 +58,17 @@ export function StreamerbotCredentials({ creatorId, enabled, mode = "platform" }
     finally { setBusy(false); }
   }
 
+  useEffect(() => {
+    // Sections opened directly load their data once, like opening the toggle.
+    if (defaultOpen) void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return <section className="mt-5 border-t-2 border-[var(--color-ink)] pt-4">
-    <h4 className="text-lg font-bold">Credenciais do Streamer.bot</h4>
-    <Button className="mt-3" type="button" variant="neutral" disabled={busy} onClick={() => {
+    {defaultOpen ? <h2 className="text-2xl font-bold">Credenciais do Streamer.bot</h2> : <h4 className="text-lg font-bold">Credenciais do Streamer.bot</h4>}
+    {!defaultOpen && <Button className="mt-3" type="button" variant="neutral" disabled={busy} onClick={() => {
       if (open) { setOpen(false); setIssued(null); }
       else { setOpen(true); void refresh(); }
-    }}>{open ? "Fechar credenciais" : "Gerenciar credenciais"}</Button>
+    }}>{open ? "Fechar credenciais" : "Gerenciar credenciais"}</Button>}
     {open && <div className="mt-4 grid gap-3 text-sm">
       <p>Use uma credencial exclusiva deste streamer. Ao substituir, a anterior funciona por mais 24 horas. A revogação bloqueia novas autenticações imediatamente.</p>
       {!canIssue && credentials !== null && <p>Ative o streamer e a integração com Streamer.bot para emitir uma credencial. Você ainda pode revogar credenciais existentes.</p>}

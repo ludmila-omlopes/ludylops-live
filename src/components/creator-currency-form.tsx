@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { currencySettingsSchema } from "@/lib/creators/currency";
 
-export function CreatorCurrencyForm({ creatorId }: { creatorId: string }) {
+export function CreatorCurrencyForm({ creatorId, initial }: { creatorId: string; initial?: string }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [currencyLabel, setCurrencyLabel] = useState("");
-  const [loaded, setLoaded] = useState(false);
+  const embedded = initial !== undefined;
+  const [open, setOpen] = useState(embedded);
+  const [currencyLabel, setCurrencyLabel] = useState(initial ?? "");
+  const [loaded, setLoaded] = useState(embedded);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -47,10 +48,11 @@ export function CreatorCurrencyForm({ creatorId }: { creatorId: string }) {
   }
 
   return <div className="mt-3">
-    <Button type="button" variant="neutral" disabled={busy} onClick={() => {
+    {!embedded && <Button type="button" variant="neutral" disabled={busy} onClick={() => {
       if (open) setOpen(false); else void load();
-    }}>{open ? "Fechar edição da moeda" : "Editar nome da moeda"}</Button>
+    }}>{open ? "Fechar edição da moeda" : "Editar nome da moeda"}</Button>}
     {open && <form onSubmit={save} className="mt-3 grid gap-3 border-2 border-[var(--color-ink)] p-4">
+      {embedded && <h2 className="text-xl font-bold">Moeda da comunidade</h2>}
       <label className="grid gap-2 text-sm font-bold">
         Nome da moeda
         <Input value={currencyLabel} maxLength={32} disabled={busy || !loaded} onChange={(event) => {

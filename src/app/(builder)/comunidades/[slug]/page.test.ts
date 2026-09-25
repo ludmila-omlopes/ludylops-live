@@ -1,15 +1,17 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ requireSession: vi.fn(), getOwned: vi.fn() }));
-vi.mock("next/navigation", () => ({
-  notFound: () => { throw new Error("NEXT_HTTP_ERROR_FALLBACK;404"); },
-  redirect: (url: string) => { throw new Error(`NEXT_REDIRECT;${url}`); },
-}));
-vi.mock("@/lib/auth/session", () => ({ requireSession: mocks.requireSession }));
-vi.mock("@/lib/creators/owner-dashboard.server", () => ({ getOwnedCommunityBySlug: mocks.getOwned }));
+const mocks = vi.hoisted(() => ({ load: vi.fn(), setup: vi.fn(), chat: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("@/lib/creators/community-workspace.server", () => ({ loadCommunitySection: mocks.load }));
+vi.mock("@/lib/creators/setup.server", () => ({ getOwnedCreatorSetup: mocks.setup }));
+vi.mock("@/lib/creators/chat-rewards-settings.server", () => ({ getOwnedChatRewards: mocks.chat }));
 
-import CommunityDashboardPage from "./page";
+import CommunityOverviewPage from "./page";
+import { buildCreatorSetup } from "@/lib/creators/setup";
+import { creatorModuleCatalog } from "@/lib/creators/modules";
 
+const modules = creatorModuleCatalog.map((module) => ({ moduleKey: module.key, status: "installed", configJson: {} }));
 const community = {
   id: "creator_1",
   slug: "canal-da-mari",
@@ -21,29 +23,42 @@ const community = {
   accentColor: "#ffcc00",
 };
 
-describe("community dashboard page", () => {
+describe("community overview", () => {
   beforeEach(() => {
-    mocks.requireSession.mockResolvedValue({ user: { email: "mari@example.com", activeViewerId: "viewer_1" } });
-    mocks.getOwned.mockReset();
+    mocks.load.mockResolvedValue({ community, tenant: { creator: { id: community.id, status: "active" }, modules }, viewerId: "viewer_1" });
+    mocks.setup.mockReset();
+    mocks.chat.mockReset();
   });
 
-  it("resolves the slug with the session viewer and renders the community", async () => {
-    mocks.getOwned.mockResolvedValue(community);
-    expect(await CommunityDashboardPage({ params: Promise.resolve({ slug: "canal-da-mari" }) })).toBeTruthy();
-    expect(mocks.getOwned).toHaveBeenCalledWith("viewer_1", "canal-da-mari");
-  });
-
-  it("answers 404 for a slug the viewer does not own", async () => {
-    mocks.getOwned.mockResolvedValue(null);
-    await expect(CommunityDashboardPage({ params: Promise.resolve({ slug: "outra" }) })).rejects.toThrow(
-      "NEXT_HTTP_ERROR_FALLBACK;404",
+  it("renders the first-live checklist without waiting for a click, linking to sections", async () => {
+    mocks.setup.mockResolvedValue(
+      buildCreatorSetup({
+        creator: { id: community.id, slug: community.slug, displayName: community.displayName, status: "active" },
+        modules,
+        economyEnabled: true,
+        credentials: { usable: 0, lastUsedAt: null },
+        catalog: { total: 0, available: 0, completed: 0 },
+      }),
     );
+    mocks.chat.mockResolvedValue({ enabled: true, amount: 5, cooldownSeconds: 60 });
+
+    const markup = renderToStaticMarkup(await CommunityOverviewPage({ params: Promise.resolve({ slug: community.slug }) }));
+
+    expect(mocks.setup).toHaveBeenCalledWith("viewer_1", community.id);
+    expect(markup).toContain("Antes da primeira live");
+    expect(markup).toContain("etapas registradas");
+    expect(markup).toContain('href="/comunidades/canal-da-mari/identidade"');
+    expect(markup).toContain('href="/comunidades/canal-da-mari/integracao"');
+    expect(markup).toContain("5 pontos a cada 60 s");
+    expect(markup).not.toContain("#perfil-");
   });
 
-  it("sends the Ludylops owner to its live administration", async () => {
-    mocks.getOwned.mockResolvedValue({ ...community, id: "creator_ludylops", slug: "ludylops", isLegacy: true });
-    await expect(CommunityDashboardPage({ params: Promise.resolve({ slug: "ludylops" }) })).rejects.toThrow(
-      "NEXT_REDIRECT;https://ludylops.live/admin",
-    );
+  it("explains when the checklist cannot be verified", async () => {
+    mocks.setup.mockRejectedValue(new Error("setup_unavailable"));
+    mocks.chat.mockRejectedValue(new Error("unavailable"));
+
+    const markup = renderToStaticMarkup(await CommunityOverviewPage({ params: Promise.resolve({ slug: community.slug }) }));
+
+    expect(markup).toContain("Não foi possível verificar a configuração agora.");
   });
 });

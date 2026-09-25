@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,9 @@ import { RecommendationImageLookup } from "@/components/recommendation-image-loo
 import { creatorRecommendationSchema, emptyRecommendation, recommendationInput,
   type CreatorRecommendation, type CreatorRecommendationInput, type CreatorRecommendationPage } from "@/lib/creators/recommendations";
 
-export function CreatorRecommendationManager({ creatorId }: { creatorId: string }) {
+export function CreatorRecommendationManager({ creatorId, defaultOpen = false }: { creatorId: string; defaultOpen?: boolean }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false), [loaded, setLoaded] = useState(false), [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(defaultOpen), [loaded, setLoaded] = useState(false), [busy, setBusy] = useState(false);
   const [items, setItems] = useState<CreatorRecommendation[]>([]), [cursor, setCursor] = useState<string | null>(null);
   const [editing, setEditing] = useState<CreatorRecommendation | null>(null);
   const [draft, setDraft] = useState<CreatorRecommendationInput>({ ...emptyRecommendation });
@@ -52,8 +52,13 @@ export function CreatorRecommendationManager({ creatorId }: { creatorId: string 
     } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível salvar o produto."); }
     finally { setBusy(false); }
   }
+  useEffect(() => {
+    // Sections opened directly load their data once, like opening the toggle.
+    if (defaultOpen) void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return <section className="my-6">
-    <Button type="button" variant="neutral" disabled={busy} aria-expanded={open} onClick={() => open ? setOpen(false) : void load()}>Gerenciar produtos</Button>
+    {!defaultOpen && <Button type="button" variant="neutral" disabled={busy} aria-expanded={open} onClick={() => open ? setOpen(false) : void load()}>Gerenciar produtos</Button>}
     {open && <div className="mt-4 grid gap-5 border-[3px] border-[var(--color-ink)] p-4 sm:p-6">
       <h2 className="text-2xl font-black">Produtos que você indica</h2>
       <form onSubmit={save} className="grid gap-4">

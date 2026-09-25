@@ -6,7 +6,7 @@
 
 ## Status
 
-- **Estado**: IN PROGRESS (2026-09-25): 039a implementado na branch `codex/039-creator-hub-dashboard` — `/comunidades`, `/comunidades/nova`, `/comunidades/[slug]` (gestores atuais, uma comunidade por vez), redirecionamento de `/criar-area` para donos, criação levando à comunidade, endereço correto da plataforma no formulário e navegação nova. Validação: testes completos, tipos, lint e build (demo); navegador em 1280 px e 390 px com duas comunidades, sem overflow; slug de outro dono retorna 404. 039b e 039c pendentes.
+- **Estado**: IN PROGRESS (2026-09-25): 039a integrado (PR #236). 039b implementado na branch `codex/039b-community-sections` — layout por comunidade com navegação por seções (lateral no desktop, rolável no mobile), filtradas por módulo e lifecycle; visão geral com checklist renderizado no servidor e resumos; seções Identidade, Economia, Resgates, Frases, Produtos, Mensagens no chat e Integração com formulários já abertos e preenchidos; links do checklist apontando para as seções. O passo `profile` continua `configured` para comunidades ativas, porque nome, cores e moeda são obrigatórios na criação. Validação: testes completos, tipos, lint e build (demo); navegador em 1280 px e 390 px sem overflow. 039c pendente.
 - **Prioridade**: P1 — bloqueia o piloto com dois streamers (037): hoje o dono de duas comunidades gerencia tudo numa página única e empilhada.
 - **Esforço**: L, dividido em três PRs (039a, 039b, 039c).
 - **Risco**: MÉDIO — muda rotas do builder e move gestores que hoje vivem nas páginas públicas; não muda dados, APIs nem autorização.

@@ -30,6 +30,32 @@ export function communityDashboardPath(slug: string) {
   return `${COMMUNITIES_PATH}/${encodeURIComponent(slug)}`;
 }
 
+export type CommunitySectionKey =
+  | "overview"
+  | "identidade"
+  | "economia"
+  | "resgates"
+  | "frases"
+  | "produtos"
+  | "mensagens"
+  | "integracao";
+
+export const communitySectionLabels: Record<CommunitySectionKey, string> = {
+  overview: "Visão geral",
+  identidade: "Identidade",
+  economia: "Economia",
+  resgates: "Resgates",
+  frases: "Frases",
+  produtos: "Produtos",
+  mensagens: "Mensagens no chat",
+  integracao: "Integração",
+};
+
+export function communitySectionPath(slug: string, section: CommunitySectionKey) {
+  const base = communityDashboardPath(slug);
+  return section === "overview" ? base : `${base}/${section}`;
+}
+
 export const creatorStatusLabels: Record<CreatorStatus, string> = {
   active: "Ativa",
   disabled: "Desativada",

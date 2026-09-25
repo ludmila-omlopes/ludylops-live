@@ -3,15 +3,16 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { chatRewardSettingsSchema, defaultChatRewards } from "@/lib/creators/chat-rewards";
+import { chatRewardSettingsSchema, defaultChatRewards, type ChatRewardSettings } from "@/lib/creators/chat-rewards";
 
-export function CreatorChatRewardsForm({ creatorId }: { creatorId: string }) {
-  const [open, setOpen] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+export function CreatorChatRewardsForm({ creatorId, initial }: { creatorId: string; initial?: ChatRewardSettings }) {
+  const embedded = Boolean(initial);
+  const [open, setOpen] = useState(embedded);
+  const [loaded, setLoaded] = useState(embedded);
   const [busy, setBusy] = useState(false);
-  const [enabled, setEnabled] = useState(false);
-  const [amount, setAmount] = useState(String(defaultChatRewards.amount));
-  const [cooldown, setCooldown] = useState(String(defaultChatRewards.cooldownSeconds));
+  const [enabled, setEnabled] = useState(initial?.enabled ?? false);
+  const [amount, setAmount] = useState(String(initial?.amount ?? defaultChatRewards.amount));
+  const [cooldown, setCooldown] = useState(String(initial?.cooldownSeconds ?? defaultChatRewards.cooldownSeconds));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const endpoint = `/api/me/creator-area/${encodeURIComponent(creatorId)}/chat-rewards`;
@@ -38,10 +39,10 @@ export function CreatorChatRewardsForm({ creatorId }: { creatorId: string }) {
     } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível salvar os ganhos."); }
     finally { setBusy(false); }
   }
-  return <div className="mt-3">
-    <Button type="button" variant="neutral" disabled={busy} aria-expanded={open} onClick={() => open ? setOpen(false) : void load()}>
+  return <div className={embedded ? "" : "mt-3"}>
+    {!embedded && <Button type="button" variant="neutral" disabled={busy} aria-expanded={open} onClick={() => open ? setOpen(false) : void load()}>
       {open ? "Fechar ganhos no chat" : "Configurar ganhos no chat"}
-    </Button>
+    </Button>}
     {open && <form onSubmit={save} className="mt-3 grid gap-4 border-2 border-[var(--color-ink)] p-4">
       <h2 className="text-xl font-bold">Ganhos por mensagem</h2>
       <p className="text-sm">Cada espectador ganha sua moeda ao conversar no chat do YouTube, respeitando o intervalo entre ganhos. Canais vinculados à mesma conta compartilham esse intervalo.</p>
