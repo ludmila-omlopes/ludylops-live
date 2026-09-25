@@ -10,6 +10,9 @@ import {
   flattenCreatorAreaSchemaErrors,
   formatCreateCreatorAreaError,
 } from "@/lib/creators/area-form";
+import { creatorSlugFromInput } from "@/lib/creators/identity";
+import { communityDashboardPath } from "@/lib/creators/owner-dashboard";
+import { creatorColorInk, safeCreatorColor } from "@/lib/creators/profile";
 
 type FieldErrors = Partial<Record<"displayName" | "slug" | "currencyLabel" | "primaryColor" | "accentColor", string>>;
 
@@ -23,7 +26,7 @@ type CreatorAreaResponse = {
   };
 };
 
-export function CreatorAreaCreateForm() {
+export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string }) {
   const [displayName, setDisplayName] = useState("");
   const [slug, setSlug] = useState("");
   const [currencyLabel, setCurrencyLabel] = useState("pontos");
@@ -32,6 +35,9 @@ export function CreatorAreaCreateForm() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isPending, startTransition] = useTransition();
+  const previewSlug = creatorSlugFromInput({ slug, displayName }) ?? "";
+  const previewPrimary = safeCreatorColor(primaryColor, "#c7a2e9");
+  const previewAccent = safeCreatorColor(accentColor, "#40a9ff");
 
   function clearFieldError(field: keyof FieldErrors) {
     setFieldErrors((current) => {
@@ -86,7 +92,7 @@ export function CreatorAreaCreateForm() {
 
       const createdSlug = payload.data?.creator?.slug;
       if (createdSlug) {
-        window.location.assign(`/c/${createdSlug}`);
+        window.location.assign(communityDashboardPath(createdSlug));
         return;
       }
 
@@ -112,18 +118,22 @@ export function CreatorAreaCreateForm() {
 
       <label className="grid gap-2">
         <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">Endereço</span>
-        <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div className="grid gap-2">
           <Input
             value={slug}
             onChange={(event) => {
               setSlug(event.target.value);
               clearFieldError("slug");
             }}
-            placeholder="canal-da-mari"
+            placeholder={previewSlug || "canal-da-mari"}
             aria-invalid={Boolean(fieldErrors.slug)}
+            aria-describedby="creator-address-preview"
           />
-          <span className="text-sm font-black text-[var(--color-ink-soft)]">.ludylops.live</span>
         </div>
+        <span id="creator-address-preview" className="break-all text-sm font-bold text-[var(--color-ink-soft)]">
+          {addressPrefix}
+          <span className="text-[var(--color-ink)]">{previewSlug || "seu-endereco"}</span>
+        </span>
         {renderFieldError("slug")}
       </label>
 
@@ -169,10 +179,20 @@ export function CreatorAreaCreateForm() {
         </label>
       </div>
 
+      <div className="overflow-hidden border-[3px] border-[var(--color-ink)]" aria-label="Amostra das cores">
+        <div
+          className="break-words p-5 text-2xl font-black uppercase"
+          style={{ backgroundColor: previewPrimary, color: creatorColorInk(previewPrimary), fontFamily: "var(--font-display)" }}
+        >
+          {displayName.trim() || "Sua comunidade"}
+        </div>
+        <div className="h-3" style={{ backgroundColor: previewAccent }} />
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={isPending} variant="accent">
           <Plus className="size-4" aria-hidden="true" />
-          {isPending ? "Criando..." : "Criar área"}
+          {isPending ? "Criando..." : "Criar comunidade"}
         </Button>
         {feedback ? (
           <span className="inline-flex items-center gap-2 text-sm font-bold text-[var(--color-ink-soft)]">

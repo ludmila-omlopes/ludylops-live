@@ -29,7 +29,11 @@ export default async function BuilderLayout({
 
   return (
     <Providers>
-      <BuilderChrome initialTheme={initialTheme} isPlatformOwner={isPlatformOwner}>
+      <BuilderChrome
+        initialTheme={initialTheme}
+        isPlatformOwner={isPlatformOwner}
+        isSignedIn={Boolean(session?.user?.email && session.user.activeViewerId)}
+      >
         {children}
       </BuilderChrome>
     </Providers>

@@ -3,6 +3,7 @@ import { PlatformOwnerCreatorList } from "@/components/platform-owner-creator-li
 import { requirePlatformOwnerSession } from "@/lib/auth/session";
 import { canCreateCreatorArea } from "@/lib/creators/access";
 import { listPlatformCreatorInstances } from "@/lib/creators/instances";
+import { getPlatformOrigin } from "@/lib/creators/platform";
 
 export default async function OwnerPage() {
   const session = await requirePlatformOwnerSession();
@@ -39,7 +40,7 @@ export default async function OwnerPage() {
               </p>
             </div>
             <div className="border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5 shadow-[6px_6px_0_var(--shadow-color)] sm:p-6">
-              <CreatorAreaCreateForm />
+              <CreatorAreaCreateForm addressPrefix={`${getPlatformOrigin()}/c/`} />
             </div>
           </div>
         </section>
