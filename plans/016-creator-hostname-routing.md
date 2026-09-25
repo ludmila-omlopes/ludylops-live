@@ -5,16 +5,18 @@
 > editing `proxy.ts`. Preserve Auth.js protection for existing admin, owner, and
 > viewer routes.
 >
-> **Drift check (run first)**: `git diff --stat 2565323..HEAD -- proxy.ts src/lib/creators/identity.ts src/lib/creators/tenant.ts src/app/c README.md`
+> **Drift check (run first)**: `git diff --stat ec19f8f..HEAD -- proxy.ts src/lib/creators/identity.ts src/lib/creators/tenant.ts "src/app/(creator-public)/c" README.md`
 
 ## Status
+
+- **Reconciliation**: planning update only; implementation remains pending. Issue #182 is synchronized from this file.
 
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED
 - **Depends on**: plan 017
 - **Category**: bug / tech-debt
-- **Planned at**: commit `2565323`, 2026-07-13
+- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15 (same file tree as remote master `f353ce2`).
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/182
 
 ## Why this matters
@@ -32,7 +34,7 @@ requesting a creator subdomain at `/` serves the ordinary root route instead of
   private and the resolver is not wired into Next routing.
 - `proxy.ts` returns nothing from the Auth.js callback and its matcher excludes
   public `/` requests.
-- `src/app/c/[creatorSlug]/page.tsx` is the existing creator landing surface.
+- `src/app/(creator-public)/c/[creatorSlug]/page.tsx` is the existing creator landing surface.
 
 ## Commands you will need
 
@@ -44,6 +46,14 @@ requesting a creator subdomain at `/` serves the ordinary root route instead of
 | Build | `$env:NEXTAUTH_SECRET='ci-build-only-dummy-secret'; npm run build` | exit 0 |
 
 ## Scope
+
+This delivery only routes the wildcard root to the existing creator reservation
+page. It does not make module URLs, API fetches, login callbacks or creator
+administration tenant-aware. A controlled /c/{slug} pilot may precede this work,
+provided its own module requests carry verified context. Do not present a root
+rewrite as full product readiness. Future links must retain the selected
+creator; that navigation/configuration delivery remains unnumbered.
+
 
 **In scope**: a pure tested hostname-routing helper under `src/lib/creators/`,
 `proxy.ts`, focused tests, and a deployment runbook for wildcard DNS, Vercel

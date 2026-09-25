@@ -8,25 +8,27 @@
 > maintain the index.
 >
 > **Drift check (run first)**:
-> `git diff --stat f245ee1..HEAD -- src/components/obs-quote-overlay.tsx src/components/obs-bet-overlay.tsx src/components/obs-like-goal-overlay.tsx src/components/obs-subscriber-overlay.tsx src/components/obs-wheel-overlay.tsx`
+> `git diff --stat ec19f8f..HEAD -- src/components/obs-quote-overlay.tsx src/components/obs-bet-overlay.tsx src/components/obs-like-goal-overlay.tsx src/components/obs-subscriber-overlay.tsx src/components/obs-wheel-overlay.tsx`
 > On any change, compare the "Current state" excerpts against the live code;
 > on a mismatch, treat it as a STOP condition.
 
 ## Status
 
-- **Priority**: P1
+- **Reconciliation**: planning update only; implementation remains pending. Issue #175 is synchronized from this file.
+
+- **Priority**: P2
 - **Effort**: S
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: perf
-- **Planned at**: commit `f245ee1` (origin/master), 2026-07-07
+- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15 (same file tree as remote master `f353ce2`).
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/175
 
 ## Why this matters
 
-The OBS overlays are Vercel serverless invocations + Neon queries on every poll, with no cache. Today: the quote overlay polls its endpoint every **200ms while live** (5 req/s ≈ 18k invocations per hour of stream, from one browser source), and the bet, like-goal, subscriber, and wheel overlays each poll every **1s unconditionally — even when the stream is offline** (4 req/s ≈ 345k invocations/day if OBS stays open). This is the single largest self-inflicted invocation cost in the app, it multiplies per creator once white-label instances go live, and none of it is needed for perceived quality: quotes display for ~12s, so a 1s pickup delay is invisible.
+The OBS overlays are Vercel serverless invocations + Neon queries on every poll, with no cache. Today: the quote overlay polls its endpoint every **200ms while live** (5 req/s ≈ 18k invocations per hour of stream, from one browser source), and the bet, like-goal, subscriber, and wheel overlays each poll every **1s unconditionally — even when the stream is offline** (4 req/s ≈ 345k invocations/day if OBS stays open). This is the single largest self-inflicted invocation cost in the app, it multiplies per creator once white-label instances go live, A 1s interval trades up to roughly one second of pickup latency for fewer requests; verify that tradeoff during the local overlay check.
 
-Target after this plan, per OBS instance: ~5 req/s → ~5 req/s **only while live** drops to ~1–2 req/s while live and ~0.3 req/s while offline.
+Configured steady-state upper rates for five open sources: about 9.2 requests/s today while live (5 quotes + 4 other data + 0.2 status), versus 5.47 after this plan (5 data + 0.2 quote status + 4/15 other status). Offline: about 4.2 before versus 0.47 after. Excludes initial requests/retries; self-rescheduling loops slow with request latency. These are request forecasts, not measured billing or query counts.
 
 ## Current state
 
@@ -58,12 +60,18 @@ All five overlay components are `"use client"` and poll `force-dynamic`, `no-sto
 |-----------|--------------------|---------------------|
 | Install   | `npm install`      | exit 0              |
 | Lint      | `npm run lint`     | exit 0              |
-| Typecheck | `npx tsc --noEmit` | exit 0              |
-| Tests     | `npm test`         | all pass (300 baseline) |
+| Typecheck | `npm run typecheck` | exit 0              |
+| Tests     | `npm test`         | all pass (current suite plus relevant new tests) |
 | Build     | `npm run build`    | exit 0 (set a dummy `NEXTAUTH_SECRET`) |
 | Manual    | `npm run dev` then open `http://localhost:3000/obs/quotes?demo=1` (and the other overlay routes) | overlay renders; demo modes unaffected |
 
 ## Scope
+
+This is a supporting cost improvement, not an isolation prerequisite. After the
+quote pilot changes client context, preserve that context in all data/status
+fetches. Never gate creator A's overlay using creator B's live state. The future
+live-state isolation work remains required before enabling non-default overlays.
+
 
 **In scope** (only these files):
 - `src/components/obs-quote-overlay.tsx` (interval value only)
@@ -73,7 +81,7 @@ All five overlay components are `"use client"` and poll `force-dynamic`, `no-sto
 - `src/components/obs-wheel-overlay.tsx`
 
 **Out of scope** (do NOT touch):
-- Any `/api/obs/*` route handler — no caching, no endpoint changes (that's plan 011/013 territory).
+- Any `/api/obs/*` route handler — no caching, no endpoint changes (transport redesign is deferred; plan 011 excludes OBS endpoints).
 - The quote overlay's live-status gating logic — it is already correct.
 - Demo-mode behavior (`isDemo` branches, demo cycle intervals, `setNow` clock intervals).
 - Streamer.bot scripts, bridge, `quoteOverlayDurationSeconds` config.
@@ -90,7 +98,7 @@ All five overlay components are `"use client"` and poll `force-dynamic`, `no-sto
 
 In `obs-quote-overlay.tsx:28`, change `QUOTE_POLL_INTERVAL_MS` from `200` to `1_000`. Nothing else in this file.
 
-**Verify**: `grep -n "QUOTE_POLL_INTERVAL_MS = 1_000" src/components/obs-quote-overlay.tsx` → 1 match.
+**Verify**: `rg -n "QUOTE_POLL_INTERVAL_MS = 1_000" src/components/obs-quote-overlay.tsx` → 1 match.
 
 ### Step 2: Add live-status gating to the four ungated overlays
 
@@ -103,7 +111,7 @@ For each of bet/like-goal/subscriber/wheel, replicate the quote overlay's struct
 
 One judgment call made for you: when the live-status fetch **fails**, treat it as `isLive = false` (same as the quote overlay's catch at `:132-136`) — overlays go quiet on network trouble rather than hammering.
 
-**Verify**: `npx tsc --noEmit` → exit 0; `grep -c "live-status" src/components/obs-bet-overlay.tsx src/components/obs-like-goal-overlay.tsx src/components/obs-subscriber-overlay.tsx src/components/obs-wheel-overlay.tsx` → ≥1 each.
+**Verify**: `npm run typecheck` → exit 0; `rg -c "live-status" src/components/obs-bet-overlay.tsx src/components/obs-like-goal-overlay.tsx src/components/obs-subscriber-overlay.tsx src/components/obs-wheel-overlay.tsx` → ≥1 each.
 
 ### Step 3: Manual behavior check
 
@@ -113,13 +121,13 @@ One judgment call made for you: when the live-status fetch **fails**, treat it a
 
 ### Step 4: Full gate
 
-`npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build`.
+`npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
 
 **Verify**: all exit 0.
 
 ## Test plan
 
-- No component test harness exists for overlays; the regression surface is covered by the manual demo checks in Step 3 plus the full existing suite (300 tests) staying green.
+- Verify all overlay demo modes and live/offline network behavior in Step 3, plus the current regression suite. Reuse existing Vitest/component-test conventions for any needed automated coverage; do not assume a historical test count or framework limitation.
 - Do not invent a new test framework for this plan.
 
 ## Done criteria
@@ -127,7 +135,7 @@ One judgment call made for you: when the live-status fetch **fails**, treat it a
 - [ ] `QUOTE_POLL_INTERVAL_MS` is `1_000`
 - [ ] All four previously-ungated overlays poll data only when live; live-status at 15s
 - [ ] No `/api/obs/*` route handler modified (`git diff --stat` shows only the five components)
-- [ ] `npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build` all exit 0
+- [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
 - [ ] `plans/README.md` status row updated
 
 ## STOP conditions

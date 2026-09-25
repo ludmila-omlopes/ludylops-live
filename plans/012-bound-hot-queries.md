@@ -8,17 +8,19 @@
 > maintain the index.
 >
 > **Drift check (run first)**:
-> `git diff --stat f245ee1..HEAD -- src/lib/db/repository.ts src/components/leaderboard-table.tsx "src/app/(public)/ranking/page.tsx"`
+> `git diff --stat ec19f8f..HEAD -- src/lib/db/repository.ts src/components/leaderboard-table.tsx "src/app/(community)/ranking/page.tsx"`
 > On drift, compare the "Current state" excerpts; mismatch = STOP.
 
 ## Status
+
+- **Reconciliation**: planning update only; implementation remains pending. Issue #177 is synchronized from this file.
 
 - **Priority**: P2
 - **Effort**: M
 - **Risk**: MED (touches `repository.ts` — the shared data layer; changes are additive parameters + one behavioral move)
 - **Depends on**: none (complements 011; independent)
 - **Category**: perf
-- **Planned at**: commit `f245ee1` (origin/master), 2026-07-07
+- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15 (same file tree as remote master `f353ce2`).
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/177
 
 ## Why this matters
@@ -29,11 +31,11 @@ Three request-path costs grow with data size, not audience size — they make ev
 2. **`listGameSuggestions()` does an O(n×m) boost join in JS** — for each suggestion it `.filter()`s the full boosts array; fine at 30 suggestions, quadratic pain at 500.
 3. **`refreshStaleHowLongToBeatRows` runs external HowLongToBeat API calls + DB writes during viewer page renders** — a viewer opening `/jogos` can trigger up-to-batch-limit outbound HTTP calls and row updates before the page returns. Under concurrency, multiple renders race to refresh the same rows (duplicate external calls + writes), and page latency depends on a third-party API.
 
-Fixing these caps per-request work regardless of how big the community gets — and matters double once white-label multiplies datasets per creator.
+Fixing these caps per-request work regardless of how big the community gets — and matters double once creator-specific datasets grow.
 
 ## Current state
 
-- `src/lib/db/repository.ts:5461` — `getLeaderboard()`:
+- `src/lib/db/repository.ts:5529` — `getLeaderboard()`:
   ```ts
   export async function getLeaderboard() {
     ...
@@ -45,16 +47,16 @@ Fixing these caps per-request work regardless of how big the community gets — 
     return rows;
   }
   ```
-  Demo path likewise returns all viewers sorted. Callers: enumerate with `grep -rn "getLeaderboard" src/ --include=*.ts --include=*.tsx` — at minimum `src/app/(public)/ranking/page.tsx` (public) and possibly admin panels (admin may legitimately want everything; check before changing them).
+  Demo path likewise returns all viewers sorted. Callers: enumerate with `rg -n "getLeaderboard" src -g "*.ts" -g "*.tsx"` — at minimum `src/app/(community)/ranking/page.tsx` (public) and possibly admin panels (admin may legitimately want everything; check before changing them).
 
 - `src/components/leaderboard-table.tsx:44` — `entries.map((entry, index) => …` renders all rows, no pagination/cap.
 
-- `src/lib/db/repository.ts:5918` — `listGameSuggestions(viewerId?)`, DB path:
+- `src/lib/db/repository.ts, listGameSuggestions` — `listGameSuggestions(viewerId?)`, DB path:
   - selects **all** `gameSuggestions` ordered by votes (unbounded, acceptable for now — do not paginate suggestions in this plan; the boost-join and HLTB issues are the targets),
   - then per suggestion: `boosts: serializedBoosts.filter((entry) => entry.suggestionId === suggestion.id)` — the O(n×m) join,
-  - and before serialization calls `suggestionRows = await refreshStaleHowLongToBeatRows(db, suggestionRows);` — the on-request external refresh. The function (find with `grep -n "refreshStaleHowLongToBeatRows" src/lib/db/repository.ts`) filters stale rows, caps at `HOWLONGTOBEAT_REFRESH_BATCH_LIMIT`, then `Promise.all` of `resolveHowLongToBeatGame(...)` (external HTTP) + `db.update(...)` per row, best-effort try/catch.
+  - and before serialization calls `suggestionRows = await refreshStaleHowLongToBeatRows(db, suggestionRows);` — the on-request external refresh. The function (find with `rg -n "refreshStaleHowLongToBeatRows" src/lib/db/repository.ts`) filters stale rows, caps at `HOWLONGTOBEAT_REFRESH_BATCH_LIMIT`, then `Promise.all` of `resolveHowLongToBeatGame(...)` (external HTTP) + `db.update(...)` per row, best-effort try/catch.
 
-- `listVideoSuggestions` (`repository.ts:5970`) — inspect for the same boost-filter shape; it has no HLTB refresh.
+- `listVideoSuggestions` (`repository.ts, listVideoSuggestions`) — inspect for the same boost-filter shape; it has no HLTB refresh.
 
 - `listAdminGameSuggestions()` currently just calls `listGameSuggestions()` — the admin path can keep (or explicitly trigger) the HLTB refresh.
 
@@ -68,15 +70,22 @@ Fixing these caps per-request work regardless of how big the community gets — 
 |-----------|--------------------|---------------------|
 | Install   | `npm install`      | exit 0              |
 | Lint      | `npm run lint`     | exit 0              |
-| Typecheck | `npx tsc --noEmit` | exit 0              |
-| Tests     | `npm test`         | all pass (300 baseline + new) |
+| Typecheck | `npm run typecheck` | exit 0              |
+| Tests     | `npm test`         | all pass (current suite plus relevant new tests) |
 | Build     | `npm run build`    | exit 0 (dummy `NEXTAUTH_SECRET`) |
 
 ## Scope
 
+Supporting work after the product pilot unless current latency justifies it.
+If the selected functions have acquired required creator context, preserve it
+on all reads, joins, counts and sync operations. A scheduled refresh must use an
+explicit authorized creator or a deliberate platform-wide reference-data job;
+never silently fall back to Ludylops. This plan does not implement tenancy.
+
+
 **In scope**:
 - `src/lib/db/repository.ts` — ONLY: `getLeaderboard`, `listGameSuggestions`, `listVideoSuggestions`, `refreshStaleHowLongToBeatRows` call sites, and (if created) a small exported `refreshHowLongToBeatData` entry point
-- `src/components/leaderboard-table.tsx` + `src/app/(public)/ranking/page.tsx` — only as needed for the limit's UX copy
+- `src/components/leaderboard-table.tsx` + `src/app/(community)/ranking/page.tsx` — only as needed for the limit's UX copy
 - `src/app/api/internal/hltb/sync/route.ts` (create, optional Step 3 variant B) + `src/lib/env.ts` ONLY to add an optional `HLTB_SYNC_SECRET` mirroring `STEAM_SYNC_SECRET` (additive; no changes to existing env behavior)
 - New tests alongside existing repository tests
 - `README.md` — internal-endpoints section if variant B is chosen
@@ -95,7 +104,7 @@ Fixing these caps per-request work regardless of how big the community gets — 
 
 ### Step 1: Bound the leaderboard
 
-Add an options parameter: `getLeaderboard(options?: { limit?: number })`, applying `.limit(options?.limit ?? 100)` in the DB path and `.slice(0, limit)` in the demo path. Enumerate all callers first (`grep -rn "getLeaderboard" src/`); public ranking uses the default 100; any **admin** caller that needs everything passes an explicit high/absent limit — preserve current admin behavior deliberately, don't let it silently truncate. If the leaderboard feeds a "find my own rank" feature anywhere, STOP (a limit breaks it; report the coupling).
+Add public limit options without weakening any required creator parameter introduced by isolation work. Default the public path to 100 and mirror its limit in demo mode. Enumerate all callers first (`rg -n "getLeaderboard" src`); any admin caller that needs everything uses an explicit admin-only unbounded path. An omitted limit must not ambiguously mean both 100 and unlimited. If the leaderboard feeds a "find my own rank" feature, preserve its rank calculation separately; do not silently truncate that input. Report the coupling before expanding the plan's scope.
 
 Ranking page UX: with the cap, add one line of copy to `/ranking` if appropriate (e.g. "Top 100") — pt-BR with correct accents, no eyebrow labels.
 
@@ -116,12 +125,12 @@ In `listGameSuggestions` (and `listVideoSuggestions` if it has the same shape): 
 
 Either way, stale HLTB data must degrade gracefully in the UI (it already does — the refresh was best-effort).
 
-**Verify**: `grep -n "refreshStaleHowLongToBeatRows" src/lib/db/repository.ts` shows it is no longer reachable from the default viewer path (only behind the flag/endpoint).
+**Verify**: `rg -n "refreshStaleHowLongToBeatRows" src/lib/db/repository.ts` shows it is no longer reachable from the default viewer path (only behind the flag/endpoint).
 
 ### Step 4: Tests
 
 Add to a new `src/lib/db/repository-perf.test.ts` (model on `repository.test.ts`, demo mode):
-1. `getLeaderboard({ limit: 2 })` returns 2 entries; default returns ≤100.
+1. `getLeaderboard({ limit: 2 })` returns 2 entries; public default returns ≤100; admin-only unbounded access remains explicit.
 2. Suggestions with multiple boosts attach the right boosts to the right suggestion (guards the Map refactor).
 3. `listGameSuggestions()` (default) does not invoke the HLTB resolver — spy/stub `resolveHowLongToBeatGame` if it's injectable; if it isn't stub-able in demo mode (demo path may skip it anyway), assert via the DB-path unit seam you can reach and note the limitation.
 
@@ -129,18 +138,18 @@ Add to a new `src/lib/db/repository-perf.test.ts` (model on `repository.test.ts`
 
 ### Step 5: Full gate
 
-`npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build`.
+`npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
 
 ## Test plan
 
-See Step 4. Existing 300 tests must pass unchanged — identical output from Step 2 is the regression bar.
+See Step 4. The existing test suite must pass unchanged — identical output from Step 2 is the regression bar.
 
 ## Done criteria
 
 - [ ] `getLeaderboard` accepts and enforces a limit; public ranking capped at 100; admin callers' behavior preserved explicitly
 - [ ] Boost join is a Map lookup (no `.filter` inside the suggestion `.map`) in game + video suggestion lists
 - [ ] Viewer-path `listGameSuggestions` performs zero HLTB external calls
-- [ ] New tests exist and pass; `npm run lint` / `npx tsc --noEmit` / `npm test` / `npm run build` all exit 0
+- [ ] New tests exist and pass; `npm run lint` / `npm run typecheck` / `npm test` / `npm run build` all exit 0
 - [ ] `git diff --stat` touches only in-scope files
 - [ ] `plans/README.md` status row updated; report states which Step 3 variant shipped
 

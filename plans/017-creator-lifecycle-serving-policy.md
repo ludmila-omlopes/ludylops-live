@@ -4,16 +4,18 @@
 > disabled and archived creators. Apply status policy only at public/operational
 > serving boundaries, with explicit behavior for each status.
 >
-> **Drift check (run first)**: `git diff --stat 2565323..HEAD -- src/lib/creators/tenant.ts src/lib/creators/service.ts src/lib/creators/instances.ts src/app/c src/lib/creators/*.test.ts`
+> **Drift check (run first)**: `git diff --stat ec19f8f..HEAD -- src/lib/creators/tenant.ts src/lib/creators/service.ts src/lib/creators/instances.ts "src/app/(creator-public)/c" src/lib/creators/*.test.ts`
 
 ## Status
+
+- **State**: IN PROGRESS (2026-09-20): implementation and local validation complete in `.worktrees/issue-183`; [PR #192](https://github.com/ludmila-omlopes/ludylops-live/pull/192) awaiting integration. Public creator resolution serves only active creators, while administrative recovery remains available. Validation: 64 focused tests, 362 full-suite tests, typecheck, lint, and a demo-environment build passed. Lifecycle persistence tests use a simulated database adapter; manual validation in a disposable database remains pending. No shared database was queried or changed.
 
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: bug
-- **Planned at**: commit `2565323`, 2026-07-13
+- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15 (same file tree as remote master `f353ce2`).
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/183
 
 ## Why this matters
@@ -46,11 +48,11 @@ threaded into more APIs, this gap would also keep operational routes active.
 lifecycle tests, and a concise documented status policy.
 
 **Out of scope**: deleting creator data, changing platform-owner permissions,
-module-level gating, or automatically disabling integrations as a side effect.
+module-level gating, a new draft/publish workflow, or integration teardown. Request-time lifecycle checks will be adopted by plans 009/018/019.
 
 ## Git workflow
 
-- Branch `codex/017-creator-lifecycle-serving-policy`.
+- Update the remote base first, then branch `codex/017-creator-lifecycle-serving-policy`.
 - Commit message: `enforce creator lifecycle serving policy`.
 
 ## Steps
@@ -67,7 +69,7 @@ generic unavailable response without leaking private state.
 ### Step 2: Separate administrative and public resolution
 
 Keep raw/admin loaders status-agnostic. Add an explicit public resolver or mode
-that never falls back to the default creator after finding a non-active tenant.
+that never falls back to the default creator after an explicit unknown/inactive creator request. Permit default routing only on an explicit allowlist of legacy/default hosts and paths.
 Update `getCreatorAreaBySlug` and future public hostname callers to use it.
 
 **Verify**: unit tests prove inactive slug and hostname requests cannot resolve
@@ -88,17 +90,17 @@ and mutation endpoints can still find and reactivate the creator.
 
 - Active creator resolves by slug and hostname.
 - Disabled and archived creators do not resolve publicly.
-- Unknown hosts retain the intentional default fallback only where explicitly
-  allowed; a known inactive host never falls back.
+- Unknown hosts or explicit unknown slugs fail closed; only explicitly allowed
+  default/legacy host paths can resolve the default creator.
 - Admin listing includes all statuses and reactivation works.
 
 ## Done criteria
 
-- [ ] Status controls actual public availability.
-- [ ] Admin recovery paths retain inactive creators.
-- [ ] Known inactive tenants cannot fall through to default data.
-- [ ] Tests cover slug, hostname, transition, and admin recovery.
-- [ ] Lint, typecheck, and tests pass.
+- [x] Status controls actual public availability at `/c/[creatorSlug]` and the new reusable public resolver.
+- [x] Admin recovery paths retain inactive creators.
+- [x] Unknown/invalid explicit contexts and inactive tenants cannot fall through to default data.
+- [x] Tests cover slug, hostname, transition, and admin recovery.
+- [x] Lint, typecheck, focused/full tests, and demo-environment build pass.
 
 ## STOP conditions
 

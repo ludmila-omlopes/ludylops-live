@@ -5,16 +5,18 @@
 > Node-only modules. Unknown server failures must be logged server-side and must
 > never be returned verbatim.
 >
-> **Drift check (run first)**: `git diff --stat 2565323..HEAD -- src/lib/creators/area-form.ts src/lib/creators/service.ts src/app/api/me/creator-area/route.ts src/lib/creators/service.test.ts`
+> **Drift check (run first)**: `git diff --stat ec19f8f..HEAD -- src/lib/creators/area-form.ts src/lib/creators/service.ts src/app/api/me/creator-area/route.ts src/lib/creators/service.test.ts`
 
 ## Status
+
+- **State**: IN PROGRESS (2026-09-15): implementation and local validation complete in `.worktrees/issue-181`; [PR #191](https://github.com/ludmila-omlopes/ludylops-live/pull/191) awaiting integration. Validation: 362 tests (43 new), typecheck, lint, and build without a real database. Transaction/concurrency tests use an adapter simulation; no shared database was queried or changed.
 
 - **Priority**: P1
 - **Effort**: S
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: security / bug
-- **Planned at**: commit `2565323`, 2026-07-13
+- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15 (same file tree as remote master `f353ce2`).
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/181
 
 ## Why this matters
@@ -26,7 +28,7 @@ parameters, and every unknown server failure is incorrectly returned as HTTP
 400. The endpoint needs stable domain errors, conflict semantics, and a generic
 500 boundary.
 
-## Current state
+## Baseline before implementation
 
 - `area-form.ts` maps known strings, then returns the original `Error.message`.
 - `service.ts` checks for an existing slug before a later transaction and
@@ -107,12 +109,20 @@ but not secrets.
 
 ## Done criteria
 
-- [ ] No unknown error message is returned verbatim.
-- [ ] Slug conflicts are deterministic under concurrency.
-- [ ] Status codes distinguish validation, conflict, and server failure.
-- [ ] New route/service tests pass.
-- [ ] Client bundle boundary remains intact.
-- [ ] Lint, typecheck, and full tests pass.
+- [x] No unknown error message is returned verbatim.
+- [x] Slug conflicts use the existing unique constraint and are covered by simulated concurrent requests.
+- [x] Status codes distinguish validation, conflict, and server failure.
+- [x] New route/service tests pass.
+- [x] Client bundle boundary remains intact.
+- [x] Lint, typecheck, full tests, and build pass.
+
+## Implementation notes
+
+- PostgreSQL code `23505` and constraint `creators_slug_idx` must occur on the same cause object to produce HTTP 409. Query text is never parsed to infer conflicts or missing schema.
+- Unexpected failures during authorization, payload reading, transaction execution, or post-commit resolution produce a generic HTTP 500. Logs contain only the operation stage and allowlisted diagnostic codes; the original error is retained internally as a cause, without dumping SQL, parameters, messages, or stacks.
+- Malformed JSON alone produces the payload-specific HTTP 400. Input validation and reserved/invalid slugs remain HTTP 400; authentication/origin checks retain HTTP 401/403.
+- The resolver result must match the newly inserted creator ID, slug, and owner. A post-commit resolution failure does not undo the successful transaction; retrying that slug returns a conflict, including for the same owner. No existing creator is returned as retry recovery.
+- No schema, historical migration, dependency, or UI component changed. PostgreSQL behavior itself was not exercised against a live database.
 
 ## STOP conditions
 
