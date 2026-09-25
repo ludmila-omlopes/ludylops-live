@@ -1,10 +1,11 @@
 "use client";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ownerFieldClass, ownerPanelClass, ownerPanelTitleClass } from "@/components/ui/owner-panel";
 import { Button } from "@/components/ui/button";
 import type { CreatorCatalogItem, PublicCatalogItem } from "@/lib/creators/redemptions";
 
-const inputClass = "w-full min-w-0 border-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-2";
+const inputClass = ownerFieldClass;
 export function CreatorCatalog({ items, slug, currencyLabel, signedIn }: { items: PublicCatalogItem[]; slug: string; currencyLabel: string; signedIn: boolean }) {
   const [message, setMessage] = useState("");
   const [pending, start] = useTransition();
@@ -40,8 +41,8 @@ const blank: CreatorCatalogItem = { id: "", revision: 0, name: "", description: 
 export function CreatorCatalogManager({ items, creatorId, currencyLabel }: { items: CreatorCatalogItem[]; creatorId: string; currencyLabel: string }) {
   const [draft, setDraft] = useState<CreatorCatalogItem>(blank), [message, setMessage] = useState("");
   const [pending, start] = useTransition(); const router = useRouter();
-  return <section className="panel grid min-w-0 gap-5 p-4 sm:p-6">
-    <h2 className="text-2xl font-bold">Seus itens para a live</h2>
+  return <section className={ownerPanelClass}>
+    <h2 className={ownerPanelTitleClass}>Seus itens para a live</h2>
     <p>Associe cada item a uma ação do seu Streamer.bot. Novos itens começam pausados.</p>
     <ul className="grid gap-2">{items.map((item) => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 border-b py-3">
       <span className="min-w-0 break-words">{item.name} · {item.isActive ? "Ativo" : "Pausado"}</span>

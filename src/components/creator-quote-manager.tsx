@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ownerFieldClass, ownerPanelClass, ownerPanelTitleClass } from "@/components/ui/owner-panel";
 import { Button } from "@/components/ui/button";
 import { quoteBodySchema, type OwnedQuote, type OwnedQuotePage } from "@/lib/creators/quote-management";
 
@@ -53,16 +54,16 @@ export function CreatorQuoteManager({ creatorId, defaultOpen = false }: { creato
     } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível salvar a frase."); }
     finally { setBusy(false); }
   }
-  const textareaClass = "min-h-28 w-full min-w-0 rounded-none border-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-3 text-[var(--color-ink)]";
+  const textareaClass = `min-h-28 ${ownerFieldClass}`;
   useEffect(() => {
     // Sections opened directly load their data once, like opening the toggle.
     if (defaultOpen) void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return <section id="gerenciar-frases" className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
+  return <section id="gerenciar-frases" className={defaultOpen ? "" : "mx-auto w-full max-w-4xl px-4 py-6 sm:px-6"}>
     {!defaultOpen && <Button type="button" variant="neutral" disabled={busy} aria-expanded={open} onClick={() => open ? setOpen(false) : void load()}>Gerenciar frases</Button>}
-    {open && <div className="mt-4 grid gap-5 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-4">
-      <h2 className="text-2xl font-black">Frases da sua comunidade</h2>
+    {open && <div className={`${defaultOpen ? "" : "mt-4 "}${ownerPanelClass}`}>
+      <h2 className={ownerPanelTitleClass}>Frases da sua comunidade</h2>
       <p className="text-sm">Registre os momentos da live e corrija o texto quando precisar. Cada frase mantém seu número e quem a registrou.</p>
       <form onSubmit={(e) => void save(e, "create")} className="grid gap-3">
         <label htmlFor={`${creatorId}-new-quote`} className="font-bold">Nova frase</label>

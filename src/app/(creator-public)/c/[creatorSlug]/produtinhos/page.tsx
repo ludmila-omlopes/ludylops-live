@@ -3,7 +3,8 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { CreatorRecommendationManager } from "@/components/creator-recommendation-manager";
+import { OwnerManageLink } from "@/components/owner-manage-link";
+import { communitySectionPath } from "@/lib/creators/owner-dashboard";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { canUseModules } from "@/lib/creators/module-access";
 import { getCreatorAreaBySlug } from "@/lib/creators/service";
@@ -33,7 +34,7 @@ export default async function CreatorProductsPage({ params, searchParams }: {
     <Link href={`/c/${tenant.creator.slug}`} className="font-bold underline">{tenant.creator.displayName}</Link>
     <h1 className="mt-6 break-words text-4xl font-black">Produtos indicados por {tenant.creator.displayName}</h1>
     <p className="mt-4 max-w-2xl leading-7">Escolhas para o setup, o jogo e o dia a dia.</p>
-    {owner && <CreatorRecommendationManager creatorId={tenant.creator.id} />}
+    {owner && <OwnerManageLink className="mt-6" href={communitySectionPath(tenant.creator.slug, "produtos")} label="Gerenciar produtos" />}
     {!data ? <p className="mt-6" role="alert">Não foi possível consultar os produtos agora. Tente novamente mais tarde.</p>
       : <>
         {!data.items.length && <p className="mt-8">Nenhum produto publicado ainda.</p>}

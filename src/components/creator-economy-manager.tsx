@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ownerFieldClass, ownerPanelClass, ownerPanelTitleClass } from "@/components/ui/owner-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -50,8 +51,8 @@ export function CreatorEconomyManager({ creatorId, currencyLabel }: { creatorId:
     } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível concluir agora. Tente novamente."); }
     finally { setBusy(false); }
   }
-  return <section className="grid gap-4 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5">
-    <h2 className="text-2xl font-black">Distribuir e ajustar {currencyLabel}</h2>
+  return <section className={ownerPanelClass}>
+    <h2 className={ownerPanelTitleClass}>Distribuir e ajustar {currencyLabel}</h2>
     <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
       <label className="grid gap-2 font-bold">ID do canal do YouTube
         <Input value={channel} required pattern="UC[A-Za-z0-9_-]{22}" placeholder="UC…" disabled={busy}
@@ -61,7 +62,7 @@ export function CreatorEconomyManager({ creatorId, currencyLabel }: { creatorId:
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2 font-bold">
           <label htmlFor={`economy-operation-${creatorId}`}>Operação</label>
-          <select id={`economy-operation-${creatorId}`} className="border-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-3" value={kind} disabled={busy} onChange={(e) => setKind(e.target.value)}>
+          <select id={`economy-operation-${creatorId}`} className={ownerFieldClass} value={kind} disabled={busy} onChange={(e) => setKind(e.target.value)}>
             <option value="credit">Adicionar</option><option value="debit">Descontar</option>
           </select>
         </div>

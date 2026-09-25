@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DurationInput } from "@/components/ui/duration-input";
 import { Input } from "@/components/ui/input";
+import { ownerPanelClass, ownerPanelTitleClass } from "@/components/ui/owner-panel";
 import { chatRewardSettingsSchema, defaultChatRewards, type ChatRewardSettings } from "@/lib/creators/chat-rewards";
 
 export function CreatorChatRewardsForm({ creatorId, initial }: { creatorId: string; initial?: ChatRewardSettings }) {
@@ -12,7 +14,8 @@ export function CreatorChatRewardsForm({ creatorId, initial }: { creatorId: stri
   const [busy, setBusy] = useState(false);
   const [enabled, setEnabled] = useState(initial?.enabled ?? false);
   const [amount, setAmount] = useState(String(initial?.amount ?? defaultChatRewards.amount));
-  const [cooldown, setCooldown] = useState(String(initial?.cooldownSeconds ?? defaultChatRewards.cooldownSeconds));
+  const [cooldown, setCooldown] = useState<number>(initial?.cooldownSeconds ?? defaultChatRewards.cooldownSeconds);
+  const [version, setVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const endpoint = `/api/me/creator-area/${encodeURIComponent(creatorId)}/chat-rewards`;
@@ -20,7 +23,7 @@ export function CreatorChatRewardsForm({ creatorId, initial }: { creatorId: stri
     const payload = await response.json();
     if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Não foi possível salvar os ganhos por mensagem.");
     const settings = chatRewardSettingsSchema.parse(payload.data);
-    setEnabled(settings.enabled); setAmount(String(settings.amount)); setCooldown(String(settings.cooldownSeconds));
+    setEnabled(settings.enabled); setAmount(String(settings.amount)); setCooldown(settings.cooldownSeconds); setVersion((v) => v + 1);
   }
   async function load() {
     setOpen(true); setLoaded(false); setBusy(true); setError(null); setSaved(false);
@@ -30,8 +33,8 @@ export function CreatorChatRewardsForm({ creatorId, initial }: { creatorId: stri
   }
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(null); setSaved(false);
-    const parsed = chatRewardSettingsSchema.safeParse({ enabled, amount: Number(amount), cooldownSeconds: Number(cooldown) });
-    if (!parsed.success) { setError("Use de 1 a 10.000 por mensagem e um intervalo de 10 a 86.400 segundos."); return; }
+    const parsed = chatRewardSettingsSchema.safeParse({ enabled, amount: Number(amount), cooldownSeconds: cooldown });
+    if (!parsed.success) { setError("Use de 1 a 10.000 por mensagem e um intervalo entre 10 segundos e 24 horas."); return; }
     setBusy(true);
     try {
       await receive(await fetch(endpoint, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) }));
@@ -43,8 +46,8 @@ export function CreatorChatRewardsForm({ creatorId, initial }: { creatorId: stri
     {!embedded && <Button type="button" variant="neutral" disabled={busy} aria-expanded={open} onClick={() => open ? setOpen(false) : void load()}>
       {open ? "Fechar ganhos no chat" : "Configurar ganhos no chat"}
     </Button>}
-    {open && <form onSubmit={save} className="mt-3 grid gap-4 border-2 border-[var(--color-ink)] p-4">
-      <h2 className="text-xl font-bold">Ganhos por mensagem</h2>
+    {open && <form onSubmit={save} className={`${embedded ? "" : "mt-3 "}${ownerPanelClass}`}>
+      <h2 className={ownerPanelTitleClass}>Ganhos por mensagem</h2>
       <p className="text-sm">Cada espectador ganha sua moeda ao conversar no chat do YouTube, respeitando o intervalo entre ganhos. Canais vinculados à mesma conta compartilham esse intervalo.</p>
       <fieldset disabled={busy || !loaded} className="grid min-w-0 gap-4">
         <label className="flex items-center gap-2 text-sm font-bold">
@@ -54,9 +57,10 @@ export function CreatorChatRewardsForm({ creatorId, initial }: { creatorId: stri
         <label className="grid gap-2 text-sm font-bold">Unidades da moeda por mensagem
           <Input type="number" min={1} max={10000} step={1} required value={amount} onChange={(e) => { setAmount(e.target.value); setSaved(false); }} />
         </label>
-        <label className="grid gap-2 text-sm font-bold">Intervalo mínimo por espectador (segundos)
-          <Input type="number" min={10} max={86400} step={1} required value={cooldown} onChange={(e) => { setCooldown(e.target.value); setSaved(false); }} />
-        </label>
+        <div className="grid gap-2 text-sm font-bold">
+          <label htmlFor={`${creatorId}-chat-cooldown`}>Intervalo mínimo por espectador</label>
+          <DurationInput key={version} id={`${creatorId}-chat-cooldown`} seconds={cooldown} onChange={(value) => { setCooldown(value); setSaved(false); }} />
+        </div>
       </fieldset>
       <p className="text-sm">É necessário conectar a ação de ganhos por mensagem no Streamer.bot. Pausar os ganhos preserva tudo que a comunidade já acumulou.</p>
       {error && <p role="alert" className="text-sm">{error}</p>}

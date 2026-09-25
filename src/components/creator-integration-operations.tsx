@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ownerFieldClass, ownerPanelClass, ownerPanelTitleClass } from "@/components/ui/owner-panel";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
 import type { IntegrationOperations } from "@/lib/creators/integration-operations";
@@ -16,8 +17,8 @@ export function CreatorIntegrationOperations({ creatorId }: { creatorId: string 
     setBusy(true); setError(""); setMessage(""); setSelected(null);
     try { await load(); } catch (e) { setError(e instanceof Error ? e.message : "Consulta indisponível."); } finally { setBusy(false); }
   }
-  return <section className="panel grid min-w-0 gap-4 p-4 sm:p-6">
-    <h2 className="text-2xl font-bold">Integração e resgates pendentes</h2>
+  return <section className={ownerPanelClass}>
+    <h2 className={ownerPanelTitleClass}>Integração e resgates pendentes</h2>
     <Button className="min-w-0 max-w-full whitespace-normal break-words" variant="neutral" disabled={busy} onClick={() => void refresh()}>{busy ? "Aguarde…" : "Consultar integração e pendências"}</Button>
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
     {data && <>
@@ -44,8 +45,8 @@ export function CreatorIntegrationOperations({ creatorId }: { creatorId: string 
         <p>Pare todas as instâncias do bridge desta comunidade e aguarde qualquer action em andamento terminar. Confira o resultado no Streamer.bot e na transmissão antes de decidir.</p>
         <label className="flex items-start gap-2"><input type="checkbox" required disabled={busy} checked={stopped} onChange={e => setStopped(e.target.checked)} />Parei os bridges e não há action em andamento.</label>
         <label className="flex items-start gap-2"><input type="checkbox" required disabled={busy} checked={checked} onChange={e => setChecked(e.target.checked)} />Conferi o resultado deste resgate no Streamer.bot e na live.</label>
-        <label className="grid gap-1">Resultado observado<select className="w-full min-w-0 border-2 p-2" required disabled={busy} value={outcome} onChange={e => setOutcome(e.target.value)}><option value="">Selecione o resultado</option><option value="completed">Executou: registrar conclusão</option><option value="failed">Falhou: devolver a moeda</option></select></label>
-        <label className="grid gap-1">O que você verificou?<textarea className="w-full min-w-0 border-2 p-2" minLength={5} maxLength={255} required disabled={busy} value={note} onChange={e => setNote(e.target.value)} /></label>
+        <label className="grid gap-1">Resultado observado<select className={ownerFieldClass} required disabled={busy} value={outcome} onChange={e => setOutcome(e.target.value)}><option value="">Selecione o resultado</option><option value="completed">Executou: registrar conclusão</option><option value="failed">Falhou: devolver a moeda</option></select></label>
+        <label className="grid gap-1">O que você verificou?<textarea className={ownerFieldClass} minLength={5} maxLength={255} required disabled={busy} value={note} onChange={e => setNote(e.target.value)} /></label>
         <p className="text-sm">A falha devolve {selected.cost} {data.currencyLabel} uma única vez. O estoque não é reposto automaticamente. O resultado fica registrado com sua identificação e não pode ser trocado por este fluxo.</p>
         <div className="flex flex-wrap gap-2"><Button className="min-w-0 max-w-full whitespace-normal break-words" type="submit" disabled={busy || !stopped || !checked || !outcome || note.trim().length < 5}>Registrar resolução</Button><Button className="min-w-0 max-w-full whitespace-normal break-words" variant="neutral" disabled={busy} onClick={() => setSelected(null)}>Cancelar resolução</Button></div>
       </form>}

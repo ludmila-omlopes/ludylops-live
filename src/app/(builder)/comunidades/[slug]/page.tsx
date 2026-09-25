@@ -10,6 +10,7 @@ import { loadCommunitySection } from "@/lib/creators/community-workspace.server"
 import { communitySectionPath, summarizeSetup } from "@/lib/creators/owner-dashboard";
 import type { SetupStep } from "@/lib/creators/setup";
 import { getOwnedCreatorSetup } from "@/lib/creators/setup.server";
+import { formatDuration } from "@/lib/duration";
 
 export const metadata: Metadata = {
   title: "Visão geral da comunidade",
@@ -74,7 +75,7 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
     summary.push({
       label: "Ganhos no chat",
       value: chatRewards.enabled
-        ? `${chatRewards.amount} ${setup?.currencyLabel ?? "unidades"} a cada ${chatRewards.cooldownSeconds} s`
+        ? `${chatRewards.amount} ${setup?.currencyLabel ?? "unidades"} a cada ${formatDuration(chatRewards.cooldownSeconds)}`
         : "Pausados",
       href: communitySectionPath(slug, "economia"),
     });
