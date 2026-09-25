@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { env } from "@/lib/env";
 import { ok } from "@/lib/api";
 import { placeBetFromChatCommand } from "@/lib/db/repository";
 import { streamerbotChatBetSchema } from "@/lib/streamerbot/schemas";
-import { verifySignedRequest } from "@/lib/streamerbot/security";
+import { authenticateStreamerbotRequest, authorizeStreamerbotOperation } from "@/lib/streamerbot/authenticate";
 import { formatPipetz } from "@/lib/utils";
 
 function mapChatBetReply(message: string, viewerName?: string) {
@@ -31,31 +30,11 @@ function mapChatBetReply(message: string, viewerName?: string) {
 }
 
 export async function POST(request: Request) {
-  const raw = await request.text();
-  const timestamp = request.headers.get("x-timestamp");
-  const signature = request.headers.get("x-signature");
-
-  const valid = verifySignedRequest({
-    body: raw,
-    timestamp,
-    signature,
-    secret: env.STREAMERBOT_SHARED_SECRET,
-  });
-  if (!valid) {
-    console.warn("[streamerbot/bets/place] Invalid signature.", {
-      hasSecret: Boolean(env.STREAMERBOT_SHARED_SECRET),
-      hasTimestamp: Boolean(timestamp),
-      hasSignature: Boolean(signature),
-    });
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Invalid signature.",
-        replyMessage: "Assinatura inválida no comando de aposta.",
-      },
-      { status: 401 },
-    );
-  }
+  const authentication = await authenticateStreamerbotRequest(request);
+  if (!authentication.ok) return authentication.response;
+  const denied = await authorizeStreamerbotOperation(authentication, "bets.place");
+  if (denied) return denied;
+  const raw = authentication.raw;
 
   try {
     const payload = streamerbotChatBetSchema.parse(JSON.parse(raw));

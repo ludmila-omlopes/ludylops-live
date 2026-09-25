@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { formatDateTime } from "@/lib/utils";
 
 type ViewerLinkPayload = {
   id: string;
@@ -15,13 +16,6 @@ type ViewerLinkPayload = {
 type LinkCodeResponse = {
   link: ViewerLinkPayload | null;
 };
-
-function formatExpiry(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
 
 export function ViewerLinkCard({
   alreadyLinked = false,
@@ -116,7 +110,7 @@ export function ViewerLinkCard({
               </p>
               <p className="mt-3 text-sm leading-6 text-[var(--color-ink-soft)]">
                 {link
-                  ? `Expira em ${formatExpiry(link.expiresAt)}. Gerar outro código substitui este código não usado.`
+                  ? `Expira em ${formatDateTime(link.expiresAt)} (horário de Brasília). Gerar outro código substitui este código não usado.`
                   : "Gere um código novo para fazer o vínculo pelo chat."}
               </p>
             </div>

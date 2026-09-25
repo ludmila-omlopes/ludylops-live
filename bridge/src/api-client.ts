@@ -1,4 +1,5 @@
 import { URL } from "node:url";
+import { createHmac } from "node:crypto";
 
 import type { BridgeConfig } from "./config";
 import { signRequest } from "./crypto";
@@ -62,12 +63,24 @@ export class HostedApiClient {
   }
 
   private async request<T>({ path, method = "GET", body }: RequestOptions): Promise<T> {
+    const credentialId = this.config.STREAMERBOT_CREDENTIAL_ID;
+    if (credentialId) {
+      const parts = path.split("/");
+      const operation = parts.at(-1)!;
+      const fields = body as { bridgeId: string; executionNote?: string; failureReason?: string };
+      body = { operation, bridgeId: fields.bridgeId,
+        ...(["claim", "complete", "fail"].includes(operation) ? { redemptionId: parts.at(-2) } : {}),
+        ...(operation === "complete" ? { executionNote: fields.executionNote } : {}),
+        ...(operation === "fail" ? { failureReason: fields.failureReason } : {}) };
+      path = "/api/internal/streamerbot/redemptions";
+    }
     const requestBody = body === undefined ? "" : JSON.stringify(body);
     const timestamp = `${Date.now()}`;
-    const signature = signRequest({
+    const signature = credentialId ? createHmac("sha256", this.config.STREAMERBOT_CREDENTIAL_SECRET!)
+      .update(`v2\n${timestamp}\n${credentialId}\n${method}\n${path}\n${requestBody}`).digest("hex") : signRequest({
       timestamp,
       body: requestBody,
-      secret: this.config.BRIDGE_SHARED_SECRET,
+      secret: this.config.BRIDGE_SHARED_SECRET!,
     });
 
     const url = new URL(path, this.config.BRIDGE_API_BASE_URL);
@@ -85,6 +98,7 @@ export class HostedApiClient {
           "x-machine-key": this.config.BRIDGE_MACHINE_KEY,
           "x-timestamp": timestamp,
           "x-signature": signature,
+          ...(credentialId ? { "x-streamerbot-credential-id": credentialId } : {}),
         },
         body: requestBody || undefined,
         signal: controller.signal,

@@ -430,7 +430,7 @@ describe("streamerbot route handlers", () => {
 
     const response = await quotesPost(signedRequest({ action: "get" }));
 
-    expect(runQuoteCommandFromChatMock).toHaveBeenCalledWith(payload);
+    expect(runQuoteCommandFromChatMock).toHaveBeenCalledWith({ creatorId: "creator_ludylops" }, payload);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       ok: true,

@@ -24,13 +24,15 @@ Como a fonte é baseada em busca no site, a integração trata os dados como com
 
 Os dados são persistidos em `game_suggestions` pelas colunas `hltb_*`.
 
-O cache é atualizado quando uma sugestão é criada ou quando o admin corrige o cadastro IGDB do jogo. A listagem pública também tenta atualizar, de forma limitada, até oito sugestões com cache vazio ou vencido por chamada. O cache vence depois de 30 dias.
+O cache é atualizado quando uma sugestão é criada ou quando o admin corrige o cadastro IGDB do jogo. Ao carregar as sugestões no admin, até oito jogos com cache vazio ou vencido são atualizados por chamada. O cache vence depois de 30 dias.
+
+Espectadores recebem os dados já salvos, sem aguardar uma consulta ao HowLongToBeat. O bônus de prioridade para jogos curtos também usa o último tempo salvo. Dados ausentes continuam aparecendo como `Sem dado confiável` até uma atualização pelo admin, pela criação/correção do jogo ou pelo backfill.
 
 Buscas sem correspondência confiável são marcadas por apenas 15 minutos. Assim, falhas temporárias do site ou do deploy anterior não prendem a sugestão em estado vazio por 30 dias, e a listagem consegue avançar para outros jogos no lote seguinte.
 
 ## Backfill
 
-Para preencher jogos antigos sem depender da listagem pública, rode:
+Para preencher jogos antigos sem abrir as sugestões no admin, rode:
 
 ```bash
 npm run backfill:hltb -- --limit=100

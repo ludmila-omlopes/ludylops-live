@@ -1,9 +1,13 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { fail, ok } from "@/lib/api";
 import { isIgdbConfigured, searchIgdbGames } from "@/lib/igdb";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["game_suggestions"]);
+  if (moduleDenial) return moduleDenial;
+
   const url = new URL(request.url);
   const query = url.searchParams.get("q") ?? "";
 

@@ -13,7 +13,7 @@
 
 ## Status
 
-- **Reconciliation**: planning update only; implementation remains pending. Issue #177 is synchronized from this file.
+- **State**: IMPLEMENTED; validated, awaiting PR review/merge. Reconciled with issue #177 and master 166af8d on 2026-09-22.
 
 - **Priority**: P2
 - **Effort**: M
@@ -32,6 +32,37 @@ Three request-path costs grow with data size, not audience size — they make ev
 3. **`refreshStaleHowLongToBeatRows` runs external HowLongToBeat API calls + DB writes during viewer page renders** — a viewer opening `/jogos` can trigger up-to-batch-limit outbound HTTP calls and row updates before the page returns. Under concurrency, multiple renders race to refresh the same rows (duplicate external calls + writes), and page latency depends on a third-party API.
 
 Fixing these caps per-request work regardless of how big the community gets — and matters double once creator-specific datasets grow.
+
+## Delivery — 2026-09-22
+
+- Rechecked against `166af8d` (PR #199 merged). The drift from `ec19f8f` adds
+  quote isolation and module guards; the selected leaderboard and suggestion
+  loaders still match the costs described below. Existing guards remain intact.
+- All leaderboard callers were enumerated: `/ranking`, `/api/leaderboard` and
+  `/api/viewers` now use the default 100. None computes an individual rank or
+  merges the full result. The authenticated `/admin` caller explicitly uses
+  `{ limit: null }` to preserve its total badge and top-20 display. Numeric
+  limits must be integers from 1 to 100; omitted means 100, never unlimited.
+- Both database suggestion lists group boosts once, keeping viewer filters,
+  per-suggestion totals, sorting and all other returned fields unchanged.
+- **Variant A shipped**: default `listGameSuggestions` only reads stored HLTB
+  data; `listAdminGameSuggestions` opts into the existing best-effort refresh,
+  including its eight-row cap and TTLs. Creation and metadata correction still
+  resolve HLTB as before. No endpoint, scheduler or new secret is needed.
+- HLTB duration also affects the short-game priority multiplier. Viewer reads
+  preserve the last stored duration and its multiplier; freshness was already
+  best-effort. Without an admin refresh or backfill, those values can remain
+  stale. No balance or recorded vote amount is recomputed by this change.
+- `docs/howlongtobeat.md` describes the new refresh trigger. The only admin
+  source edit is its explicit unbounded leaderboard call, required to preserve
+  behavior. No schema or Streamer.bot configuration changes.
+- This is supporting performance work. Ranking and suggestions remain behind
+  the default-creator guards until their own isolation follow-ups are complete.
+  It does not unblock #176's requirement for isolated cache loaders.
+
+Validation: 783 tests passed (18 new), two pre-existing opt-in PostgreSQL tests skipped; typecheck, lint and production build passed with demo/test configuration. Headless Edge checked ranking at 1440px and 390px, public games/videos, and both ranking APIs (200 for the default community, 403 for an unknown creator). No browser JavaScript errors. Screenshots confirmed the new copy fits. A pre-existing 2px mobile overflow is in the unchanged social-links footer, outside this delivery. New tests
+exercise both demo and database code paths with stubbed database I/O; they do
+not claim a production load benchmark or a real PostgreSQL integration run.
 
 ## Current state
 
@@ -146,12 +177,12 @@ See Step 4. The existing test suite must pass unchanged — identical output fro
 
 ## Done criteria
 
-- [ ] `getLeaderboard` accepts and enforces a limit; public ranking capped at 100; admin callers' behavior preserved explicitly
-- [ ] Boost join is a Map lookup (no `.filter` inside the suggestion `.map`) in game + video suggestion lists
-- [ ] Viewer-path `listGameSuggestions` performs zero HLTB external calls
-- [ ] New tests exist and pass; `npm run lint` / `npm run typecheck` / `npm test` / `npm run build` all exit 0
-- [ ] `git diff --stat` touches only in-scope files
-- [ ] `plans/README.md` status row updated; report states which Step 3 variant shipped
+- [x] `getLeaderboard` accepts and enforces a limit; public ranking capped at 100; admin callers' behavior preserved explicitly
+- [x] Boost join is a Map lookup (no `.filter` inside the suggestion `.map`) in game + video suggestion lists
+- [x] Viewer-path `listGameSuggestions` performs zero HLTB external calls
+- [x] New tests exist and pass; `npm run lint` / `npm run typecheck` / `npm test` / `npm run build` all exit 0
+- [x] `git diff --stat` touches only in-scope files
+- [x] `plans/README.md` status row updated; report states which Step 3 variant shipped
 
 ## STOP conditions
 

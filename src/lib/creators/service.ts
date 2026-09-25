@@ -2,13 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import { desc, eq } from "drizzle-orm";
 
+import { classifyCreatorAreaError, CreatorAreaError, isMissingCreatorSchemaError } from "@/lib/creators/area-errors.server";
 import {
   createCreatorAreaSchema,
   flattenCreatorAreaSchemaErrors,
   formatCreateCreatorAreaError,
   type CreateCreatorAreaInput,
 } from "@/lib/creators/area-form";
-import { DEFAULT_CREATOR_BRANDING, DEFAULT_CREATOR_DOMAIN } from "@/lib/creators/defaults";
+import { DEFAULT_CREATOR_BRANDING, DEFAULT_CREATOR_DOMAIN, DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import { creatorPlatformUrl } from "./platform";
 import {
   buildDemoCreatorModules,
   findDemoCreatorTenantBySlug,
@@ -17,9 +19,9 @@ import {
 } from "@/lib/creators/demo-store";
 import { creatorSlugFromInput, isReservedCreatorSlug, normalizeCreatorSlug } from "@/lib/creators/identity";
 import { creatorModuleCatalog } from "@/lib/creators/modules";
-import { resolveCreatorFromRequest } from "@/lib/creators/tenant";
+import { resolveCreatorFromRequest, resolvePublicCreatorFromRequest, type ResolveCreatorOptions } from "@/lib/creators/tenant";
 import { getDb } from "@/lib/db/client";
-import { creatorBranding, creatorDomains, creatorModules, creators } from "@/lib/db/schema";
+import { creatorBranding, creatorModules, creators } from "@/lib/db/schema";
 import type { CreatorRecord, CreatorTenantRecord } from "@/lib/types";
 
 // Client-safe validation/formatting lives in area-form.ts so the "use client"
@@ -35,7 +37,7 @@ export {
 
 export type CreatorAreaSummary = CreatorRecord & {
   publicPath: string;
-  publicHostname: string;
+  publicUrl: string;
 };
 
 function nowIso() {
@@ -62,64 +64,18 @@ function toAreaSummary(creator: CreatorRecord): CreatorAreaSummary {
   return {
     ...creator,
     publicPath: `/c/${creator.slug}`,
-    publicHostname: `${creator.slug}.${DEFAULT_CREATOR_DOMAIN}`,
+    publicUrl: creator.id === DEFAULT_CREATOR_ID ? `https://${DEFAULT_CREATOR_DOMAIN}` : creatorPlatformUrl(creator.slug),
   };
 }
-
-function isMissingCreatorSchemaError(error: unknown) {
-  const schemaTerms = [
-    '"creators"',
-    '"creator_domains"',
-    '"creator_branding"',
-    '"creator_modules"',
-    "creators",
-    "creator_domains",
-    "creator_branding",
-    "creator_modules",
-    "owner_user_id",
-    "display_name",
-  ];
-  const queue: unknown[] = [error];
-  const visited = new Set<unknown>();
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current || visited.has(current)) {
-      continue;
-    }
-    visited.add(current);
-
-    const message = current instanceof Error ? current.message : typeof current === "string" ? current : "";
-    const normalized = message.toLowerCase();
-    const mentionsCreatorSchema = schemaTerms.some((term) => normalized.includes(term));
-
-    if (
-      mentionsCreatorSchema &&
-      (normalized.includes("does not exist") ||
-        normalized.includes("relation") ||
-        normalized.includes("column") ||
-        normalized.includes("failed query"))
-    ) {
-      return true;
-    }
-
-    if (typeof current === "object" && current && "cause" in current) {
-      queue.push((current as { cause?: unknown }).cause);
-    }
-  }
-
-  return false;
-}
-
 
 function parseCreatorAreaInput(input: unknown) {
   const parsed = createCreatorAreaSchema.parse(input);
   const slug = creatorSlugFromInput(parsed);
   if (!slug) {
-    throw new Error("invalid_creator_slug");
+    throw new CreatorAreaError("invalid_creator_slug");
   }
   if (isReservedCreatorSlug(slug)) {
-    throw new Error("creator_slug_reserved");
+    throw new CreatorAreaError("creator_slug_reserved");
   }
   return { ...parsed, slug };
 }
@@ -130,6 +86,7 @@ function buildDemoTenant(input: {
   slug: string;
   primaryColor: string;
   accentColor: string;
+  currencyLabel: string;
 }): CreatorTenantRecord {
   const creatorId = `creator_${input.slug}`.slice(0, 64);
   const now = nowIso();
@@ -151,22 +108,14 @@ function buildDemoTenant(input: {
       accentColor: input.accentColor,
       updatedAt: now,
     },
-    domains: [
-      {
-        id: `domain_${input.slug}`.slice(0, 64),
-        creatorId,
-        hostname: `${input.slug}.${DEFAULT_CREATOR_DOMAIN}`,
-        isPrimary: true,
-        createdAt: now,
-      },
-    ],
-    modules: buildDemoCreatorModules(creatorId),
+    domains: [],
+    modules: buildDemoCreatorModules(creatorId, input.currencyLabel),
   };
 }
 
 export async function createCreatorArea(ownerUserId: string | null | undefined, input: unknown) {
   if (!ownerUserId) {
-    throw new Error("missing_creator_owner");
+    throw new CreatorAreaError("missing_creator_owner");
   }
 
   const parsed = parseCreatorAreaInput(input);
@@ -174,7 +123,7 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
 
   if (!db) {
     if (findDemoCreatorTenantBySlug(parsed.slug)) {
-      throw new Error("creator_slug_exists");
+      throw new CreatorAreaError("creator_slug_exists");
     }
     return insertDemoCreatorTenant(
       buildDemoTenant({
@@ -183,22 +132,13 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
         slug: parsed.slug,
         primaryColor: parsed.primaryColor,
         accentColor: parsed.accentColor,
+        currencyLabel: parsed.currencyLabel,
       }),
     );
   }
 
   try {
-    const [existing] = await db
-      .select({ id: creators.id })
-      .from(creators)
-      .where(eq(creators.slug, parsed.slug))
-      .limit(1);
-    if (existing) {
-      throw new Error("creator_slug_exists");
-    }
-
     const creatorId = `creator_${randomUUID()}`.slice(0, 64);
-    const domainId = `creator_domain_${randomUUID()}`.slice(0, 64);
 
     await db.transaction(async (tx) => {
       await tx.insert(creators).values({
@@ -207,13 +147,6 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
         displayName: parsed.displayName,
         ownerUserId,
         status: "active",
-      });
-
-      await tx.insert(creatorDomains).values({
-        id: domainId,
-        creatorId,
-        hostname: `${parsed.slug}.${DEFAULT_CREATOR_DOMAIN}`,
-        isPrimary: true,
       });
 
       await tx.insert(creatorBranding).values({
@@ -234,28 +167,31 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
           creatorId,
           moduleKey: module.key,
           status: "installed",
-          configJson: module.defaultConfig,
+          configJson: module.key === "points" ? { ...module.defaultConfig, currencyLabel: parsed.currencyLabel } : module.defaultConfig,
         })),
       );
     });
-  } catch (error) {
-    if (isMissingCreatorSchemaError(error)) {
-      throw new Error("creator_schema_missing");
-    }
-    throw error;
-  }
 
-  return resolveCreatorFromRequest({ slug: parsed.slug });
+    const tenant = await resolveCreatorFromRequest({ slug: parsed.slug });
+    if (tenant.creator.id !== creatorId || tenant.creator.slug !== parsed.slug || tenant.creator.ownerUserId !== ownerUserId) {
+      throw new CreatorAreaError("creator_area_unexpected");
+    }
+    return tenant;
+  } catch (error) {
+    throw classifyCreatorAreaError(error);
+  }
 }
 
-export async function listCreatorAreasForOwner(ownerUserId: string | null | undefined): Promise<CreatorAreaSummary[]> {
+export async function listCreatorAreasForOwner(ownerUserId: string | null | undefined, options: { includeArchived?: boolean } = {}): Promise<CreatorAreaSummary[]> {
   if (!ownerUserId) {
     return [];
   }
 
   const db = getDb();
   if (!db) {
-    return findDemoCreatorTenantsByOwner(ownerUserId).map((tenant) => toAreaSummary(tenant.creator));
+    return findDemoCreatorTenantsByOwner(ownerUserId)
+      .filter((tenant) => options.includeArchived || tenant.creator.status !== "archived")
+      .map((tenant) => toAreaSummary(tenant.creator));
   }
 
   let rows: Array<typeof creators.$inferSelect>;
@@ -272,15 +208,17 @@ export async function listCreatorAreasForOwner(ownerUserId: string | null | unde
     throw error;
   }
 
-  return rows.map((row) => toAreaSummary(serializeCreator(row)));
+  return rows.filter((row) => options.includeArchived || row.status !== "archived").map((row) => toAreaSummary(serializeCreator(row)));
 }
 
-export async function getCreatorAreaBySlug(slugInput: string | null | undefined) {
+export async function getCreatorAreaBySlug(
+  slugInput: string | null | undefined,
+  context: Omit<ResolveCreatorOptions, "slug"> = {},
+) {
   const slug = normalizeCreatorSlug(slugInput);
   if (!slug) {
     return null;
   }
 
-  const tenant = await resolveCreatorFromRequest({ slug });
-  return tenant.creator.slug === slug ? tenant : null;
+  return resolvePublicCreatorFromRequest({ ...context, slug });
 }

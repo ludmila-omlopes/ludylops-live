@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 
 import { ok } from "@/lib/api";
 import { getViewerBalanceFromChatCommand } from "@/lib/db/repository";
-import { env } from "@/lib/env";
 import { streamerbotViewerBalanceCommandSchema } from "@/lib/streamerbot/schemas";
-import { verifySignedRequest } from "@/lib/streamerbot/security";
+import { authenticateStreamerbotRequest, authorizeStreamerbotOperation } from "@/lib/streamerbot/authenticate";
 import { formatPipetz } from "@/lib/utils";
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import { economyFailure, economyReply, readIntegrationChannelEconomy } from "@/lib/creators/economy-api";
 
 function mapViewerBalanceReply(message: string, viewerName?: string) {
   const prefix = viewerName ? `${viewerName}, ` : "";
@@ -21,30 +22,22 @@ function mapViewerBalanceReply(message: string, viewerName?: string) {
 }
 
 export async function POST(request: Request) {
-  const raw = await request.text();
-  const timestamp = request.headers.get("x-timestamp");
-  const signature = request.headers.get("x-signature");
+  const authentication = await authenticateStreamerbotRequest(request);
+  if (!authentication.ok) return authentication.response;
+  const denied = await authorizeStreamerbotOperation(authentication, "points");
+  if (denied) return denied;
+  const raw = authentication.raw;
 
-  const valid = verifySignedRequest({
-    body: raw,
-    timestamp,
-    signature,
-    secret: env.STREAMERBOT_SHARED_SECRET,
-  });
-  if (!valid) {
-    console.warn("[streamerbot/points] Invalid signature.", {
-      hasSecret: Boolean(env.STREAMERBOT_SHARED_SECRET),
-      hasTimestamp: Boolean(timestamp),
-      hasSignature: Boolean(signature),
-    });
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Invalid signature.",
-        replyMessage: "Assinatura inválida no comando de saldo.",
-      },
-      { status: 401 },
-    );
+  if (authentication.creatorId !== DEFAULT_CREATOR_ID) {
+    try {
+      const payload = streamerbotViewerBalanceCommandSchema.parse(JSON.parse(raw));
+      const result = await readIntegrationChannelEconomy(authentication, payload);
+      const viewerName = payload.youtubeDisplayName?.trim() || payload.viewerExternalId;
+      return economyReply({ ok: true, data: { viewerId: result.viewerId, viewerExternalId: payload.viewerExternalId,
+        balance: result.balance.currentBalance, lifetimeEarned: result.balance.lifetimeEarned,
+        lifetimeSpent: result.balance.lifetimeSpent, currencyLabel: result.currencyLabel,
+        replyMessage: `${viewerName}, seu saldo atual é ${formatPipetz(result.balance.currentBalance)} ${result.currencyLabel}.` } });
+    } catch (error) { return economyFailure(error); }
   }
 
   try {

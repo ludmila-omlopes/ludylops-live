@@ -1,17 +1,20 @@
+import { requireModulePage } from '@/lib/creators/module-page-access';
 import { auth } from "@/auth";
 import { VideoSuggestionList } from "@/components/video-suggestion-list";
 import {
   getPipetzPricing,
-  getViewerDashboard,
+  getViewerPoints,
   listVideoSuggestions,
 } from "@/lib/db/repository";
 
 export default async function VideosPage() {
+  await requireModulePage(["video_suggestions"]);
+
   const session = await auth();
   const activeViewerId = session?.user?.activeViewerId ?? null;
   const [suggestions, dashboard, pricing] = await Promise.all([
     listVideoSuggestions(activeViewerId),
-    activeViewerId ? getViewerDashboard(activeViewerId) : Promise.resolve(null),
+    activeViewerId ? getViewerPoints(activeViewerId) : Promise.resolve(null),
     getPipetzPricing(),
   ]);
 

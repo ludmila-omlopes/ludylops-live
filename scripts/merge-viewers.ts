@@ -125,6 +125,9 @@ async function main() {
 
   const args = parseArgs(process.argv.slice(2));
   const sql = neon(databaseUrl);
+  if ((await sql`SELECT to_regclass('public.creator_balances') AS storage`)[0]?.storage) {
+    throw new Error("This legacy merge script is disabled after the creator economy migration. Use the application account-linking flow, which transfers each currency atomically.");
+  }
 
   const [sourceViewer] = (await sql`
     SELECT

@@ -1,7 +1,10 @@
+import { requireModulePage } from '@/lib/creators/module-page-access';
 import { LeaderboardTable } from "@/components/leaderboard-table";
 import { getLeaderboard } from "@/lib/db/repository";
 
 export default async function RankingPage() {
+  await requireModulePage(["ranking"]);
+
   const leaderboard = await getLeaderboard();
 
   return (
@@ -14,8 +17,9 @@ export default async function RankingPage() {
               className="text-4xl uppercase sm:text-6xl lg:text-7xl"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Quem ta mandando na live.
+              Quem tá mandando na live.
             </h1>
+            <p className="mt-4 text-lg">Os 100 maiores saldos de pipetz da comunidade.</p>
           </div>
         </div>
       </section>

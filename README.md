@@ -45,24 +45,34 @@ O fluxo atual cria:
 
 Em modo demo, sem `DATABASE_URL`, as áreas ficam em memória até reiniciar o servidor. Em banco real, os registros são persistidos.
 
+A raiz de `{slug}.ludylops.live` abre a mesma página de reserva de `/c/{slug}`, desde que o domínio esteja cadastrado e o criador esteja ativo. O wildcard precisa estar configurado no DNS e na Vercel, com TLS válido. Veja [configuração e testes dos subdomínios](docs/creator-hostname-routing.md). Este roteamento cobre apenas a raiz; os módulos ainda dependem de isolamento por criador.
+
 O acesso ao beta é configurado no admin, em `Comunidade > Beta áreas`. Admins gerais continuam liberados para testar mesmo sem aparecer na lista.
 
 Observação: a criação da área já separa creator, domínio, branding e módulos. O isolamento completo de pipetz, apostas, catálogo, sugestões e overlays por criador ainda depende de adicionar `creator_id` nas tabelas operacionais e escopar as consultas do repositório.
 
 ## Streamer.bot
 
-As chamadas do Streamer.bot para o app usam HMAC SHA-256. Todas devem enviar:
+As chamadas novas do Streamer.bot usam uma credencial exclusiva por streamer e HMAC SHA-256. Envie:
 
 - `x-timestamp`
 - `x-signature`
+- `x-streamerbot-credential-id`
 
 A assinatura é calculada sobre:
 
 ```text
-<timestamp>.<body_json>
+v2
+<timestamp_em_milissegundos>
+<id_da_credencial>
+POST
+<pathname_do_endpoint>
+<body_json_exatamente_como_enviado>
 ```
 
-usando `STREAMERBOT_SHARED_SECRET`.
+Use o segredo da credencial, UTF-8 e uma quebra LF entre os campos, sem quebra adicional no final. O servidor deriva o streamer da credencial verificada. Host e `x-creator-slug` não autorizam outro streamer. Consulte [emissão, rotação, teste e revogação](docs/streamerbot-credentials.md).
+
+A assinatura antiga `<timestamp>.<body_json>` com `STREAMERBOT_SHARED_SECRET` continua temporariamente aceita somente para a Ludylops, sem o cabeçalho de credencial. `STREAMERBOT_LEGACY_AUTH_ENABLED=false` desativa essa compatibilidade. Scripts novos exigem ID e segredo próprios; não retornam automaticamente à chave global.
 
 Scripts prontos para colar em `Core > C# > Execute C# Code` ficam em `streamerbot/`:
 
@@ -79,7 +89,8 @@ Scripts prontos para colar em `Core > C# > Execute C# Code` ficam em `streamerbo
 Variáveis globais normalmente usadas no Streamer.bot:
 
 - `lojaneon.appBaseUrl`
-- `lojaneon.streamerbotSharedSecret`
+- `lojaneon.streamerbotCredentialId`
+- `lojaneon.streamerbotCredentialSecret`
 - `lojaneon.useBotAccount`
 - `lojaneon.activeBetId`
 - `lojaneon.counterGameKey`
@@ -96,6 +107,7 @@ Para comandos e C# actions, confira a documentação oficial do Streamer.bot ant
 
 ### Streamer.bot
 
+- `POST /api/internal/streamerbot/credentials/check`: testa autenticação e informa o streamer, sem executar comandos da live.
 - `POST /api/internal/streamerbot/events`: registra presença, bônus e eventos vindos da live.
 - `POST /api/internal/streamerbot/link`: vincula um código de `/me` ao canal do viewer no chat.
 - `POST /api/internal/streamerbot/points`: responde saldo do viewer para comandos como `!pontos`.
@@ -274,11 +286,18 @@ Gerar migração:
 npm run db:generate
 ```
 
-Aplicar schema no banco configurado:
+Verificar os dados de fundação, sem escrever no banco:
 
 ```bash
-npm run db:push
+npm run db:baseline:check
 ```
+
+O caminho de aplicação continua sendo `npm run db:push`, após inventário, backup,
+preparação dos dados e revisão da alteração. Push compara o schema e **não executa
+os seeds dos arquivos SQL gerados**. Registros faltantes são preparados separadamente
+com `npm run db:baseline:ensure -- --apply`, somente no alvo revisado e aprovado.
+Leia a sequência completa, incluindo banco vazio e limites do check, em
+[Banco: schema e preparação de dados](docs/database-migrations.md).
 
 Sem `DATABASE_URL`, o app usa dados em memória para desenvolvimento visual e testes simples.
 
@@ -291,7 +310,7 @@ npm run lint
 npm test
 npm run test:watch
 npm run db:generate
-npm run db:push
+npm run db:baseline:check
 npm run bridge:dev
 npm run smoke:auth
 npm run google:risc -- status

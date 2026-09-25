@@ -1,3 +1,4 @@
+import { defaultCreatorContext } from "@/lib/creators/context";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getDbMock = vi.hoisted(() => vi.fn());
@@ -9,7 +10,7 @@ vi.mock("@/lib/db/client", () => ({
 }));
 
 vi.mock("@/lib/env", () => ({
-  isDemoMode: false,
+  get isDemoMode() { return !getDbMock(); },
   adminEmails: new Set(["admin@example.com"]),
 }));
 
@@ -625,13 +626,15 @@ function createStreamerbotEventDb({
 
         if (table === viewerBalances) {
           return {
-            values: async (
+            values: (
               value: Omit<(typeof balanceRows)[number], "lastSyncedAt"> & { lastSyncedAt?: Date },
             ) => {
-              balanceRows.push({
-                ...value,
-                lastSyncedAt: value.lastSyncedAt ?? new Date(),
-              });
+              const insert = () => {
+                if (!balanceRows.some(row => row.viewerId === value.viewerId)) {
+                  balanceRows.push({ ...value, lastSyncedAt: value.lastSyncedAt ?? new Date() });
+                }
+              };
+              return { then: (resolve: () => void) => { insert(); resolve(); }, onConflictDoNothing: async () => { insert(); } };
             },
           };
         }
@@ -1283,7 +1286,7 @@ describe("runQuoteCommandFromChat", () => {
   });
 
   it("creates quotes from chat without backend role checks", async () => {
-    const result = await runQuoteCommandFromChat({
+    const result = await runQuoteCommandFromChat(defaultCreatorContext, {
       action: "create",
       viewerExternalId: "yt_mod_1",
       youtubeDisplayName: "Mod Neon",
@@ -1307,7 +1310,7 @@ describe("runQuoteCommandFromChat", () => {
   });
 
   it("returns a quote by numeric id", async () => {
-    const result = await runQuoteCommandFromChat({
+    const result = await runQuoteCommandFromChat(defaultCreatorContext, {
       action: "get",
       quoteId: 2,
       source: "streamerbot_chat",
@@ -1325,7 +1328,7 @@ describe("runQuoteCommandFromChat", () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.75);
 
     try {
-      const result = await runQuoteCommandFromChat({
+      const result = await runQuoteCommandFromChat(defaultCreatorContext, {
         action: "get",
         source: "streamerbot_chat",
       });
@@ -1341,7 +1344,7 @@ describe("runQuoteCommandFromChat", () => {
 
   it("reports quote not found for an unknown id", async () => {
     await expect(
-      runQuoteCommandFromChat({
+      runQuoteCommandFromChat(defaultCreatorContext, {
         action: "get",
         quoteId: 99,
         source: "streamerbot_chat",
@@ -1350,13 +1353,13 @@ describe("runQuoteCommandFromChat", () => {
   });
 
   it("lists quotes with the newest first", async () => {
-    const quotes = await listQuotes();
+    const quotes = await listQuotes(defaultCreatorContext);
 
     expect(quotes.map((entry) => entry.quoteNumber)).toEqual([2, 1]);
   });
 
   it("charges 50 pipetz and activates the OBS overlay for a quote", async () => {
-    const result = await runQuoteCommandFromChat({
+    const result = await runQuoteCommandFromChat(defaultCreatorContext, {
       action: "show",
       viewerExternalId: "yt_lia",
       youtubeDisplayName: "Lia Pixel",
@@ -1387,7 +1390,7 @@ describe("runQuoteCommandFromChat", () => {
     const dashboard = await getViewerDashboard("viewer_lia");
     expect(dashboard?.balance.currentBalance).toBe(470);
 
-    const activeOverlay = await getActiveQuoteOverlay();
+    const activeOverlay = await getActiveQuoteOverlay(defaultCreatorContext);
     expect(activeOverlay).toMatchObject({
       overlayId: result.overlay!.overlayId,
       quoteNumber: 2,
@@ -1395,9 +1398,9 @@ describe("runQuoteCommandFromChat", () => {
   });
 
   it("queues quote overlay requests while OBS calls are paused and resumes FIFO", async () => {
-    await setObsOverlayPaused({ paused: true, updatedBy: "admin@example.com" });
+    await setObsOverlayPaused(defaultCreatorContext, { paused: true, updatedBy: "admin@example.com" });
 
-    const result = await runQuoteCommandFromChat({
+    const result = await runQuoteCommandFromChat(defaultCreatorContext, {
       action: "show",
       viewerExternalId: "yt_lia",
       youtubeDisplayName: "Lia Pixel",
@@ -1413,20 +1416,20 @@ describe("runQuoteCommandFromChat", () => {
       status: "queued",
       cost: 50,
     });
-    expect(await getActiveQuoteOverlay()).toBeNull();
+    expect(await getActiveQuoteOverlay(defaultCreatorContext)).toBeNull();
 
-    let status = await getObsOverlayAdminStatus();
+    let status = await getObsOverlayAdminStatus(defaultCreatorContext);
     expect(status.control.status).toBe("paused");
     expect(status.pendingCount).toBe(1);
 
     const dashboardAfterQueue = await getViewerDashboard("viewer_lia");
     expect(dashboardAfterQueue?.balance.currentBalance).toBe(470);
 
-    status = await setObsOverlayPaused({ paused: false, updatedBy: "admin@example.com" });
+    status = await setObsOverlayPaused(defaultCreatorContext, { paused: false, updatedBy: "admin@example.com" });
     expect(status.control.status).toBe("active");
     expect(status.pendingCount).toBe(0);
 
-    const activeOverlay = await getActiveQuoteOverlay();
+    const activeOverlay = await getActiveQuoteOverlay(defaultCreatorContext);
     expect(activeOverlay).toMatchObject({
       quoteNumber: 2,
       requestedByDisplayName: "Lia Pixel",
@@ -1434,8 +1437,8 @@ describe("runQuoteCommandFromChat", () => {
   });
 
   it("cancels queued quote overlays and refunds the viewer", async () => {
-    await setObsOverlayPaused({ paused: true, updatedBy: "admin@example.com" });
-    await runQuoteCommandFromChat({
+    await setObsOverlayPaused(defaultCreatorContext, { paused: true, updatedBy: "admin@example.com" });
+    await runQuoteCommandFromChat(defaultCreatorContext, {
       action: "show",
       viewerExternalId: "yt_lia",
       youtubeDisplayName: "Lia Pixel",
@@ -1446,7 +1449,7 @@ describe("runQuoteCommandFromChat", () => {
     const dashboardAfterQueue = await getViewerDashboard("viewer_lia");
     expect(dashboardAfterQueue?.balance.currentBalance).toBe(470);
 
-    const status = await cancelQueuedQuoteOverlays({ updatedBy: "admin@example.com" });
+    const status = await cancelQueuedQuoteOverlays(defaultCreatorContext, { updatedBy: "admin@example.com" });
     expect(status.pendingCount).toBe(0);
 
     const dashboardAfterCancel = await getViewerDashboard("viewer_lia");
@@ -1455,7 +1458,7 @@ describe("runQuoteCommandFromChat", () => {
 
   it("rejects quote overlay requests when the viewer lacks pipetz", async () => {
     await expect(
-      runQuoteCommandFromChat({
+      runQuoteCommandFromChat(defaultCreatorContext, {
         action: "show",
         viewerExternalId: "yt_low",
         youtubeDisplayName: "Viewer Sem Saldo",
@@ -1467,7 +1470,7 @@ describe("runQuoteCommandFromChat", () => {
 
   it("requires an existing quote number for the OBS overlay flow", async () => {
     await expect(
-      runQuoteCommandFromChat({
+      runQuoteCommandFromChat(defaultCreatorContext, {
         action: "show",
         viewerExternalId: "yt_lia",
         youtubeDisplayName: "Lia Pixel",
@@ -1477,7 +1480,7 @@ describe("runQuoteCommandFromChat", () => {
   });
 
   it("blocks a second quote overlay while one is still active", async () => {
-    await runQuoteCommandFromChat({
+    await runQuoteCommandFromChat(defaultCreatorContext, {
       action: "show",
       viewerExternalId: "yt_lia",
       youtubeDisplayName: "Lia Pixel",
@@ -1486,7 +1489,7 @@ describe("runQuoteCommandFromChat", () => {
     });
 
     await expect(
-      runQuoteCommandFromChat({
+      runQuoteCommandFromChat(defaultCreatorContext, {
         action: "show",
         viewerExternalId: "yt_ana",
         youtubeDisplayName: "Ana Neon",
@@ -1500,7 +1503,7 @@ describe("runQuoteCommandFromChat", () => {
     isStreamerbotLivestreamActiveMock.mockResolvedValue(false);
 
     await expect(
-      runQuoteCommandFromChat({
+      runQuoteCommandFromChat(defaultCreatorContext, {
         action: "show",
         viewerExternalId: "yt_lia",
         youtubeDisplayName: "Lia Pixel",
@@ -1521,7 +1524,7 @@ describe("showQuoteOverlayForViewer", () => {
   });
 
   it("allows calling an existing quote from the site and debits the viewer", async () => {
-    const result = await showQuoteOverlayForViewer({
+    const result = await showQuoteOverlayForViewer(defaultCreatorContext, {
       viewerId: "viewer_ana",
       quoteId: 1,
       source: "web",
@@ -1550,7 +1553,7 @@ describe("showQuoteOverlayForViewer", () => {
     isStreamerbotLivestreamActiveMock.mockResolvedValue(false);
 
     await expect(
-      showQuoteOverlayForViewer({
+      showQuoteOverlayForViewer(defaultCreatorContext, {
         viewerId: "viewer_ana",
         quoteId: 1,
         source: "web",
@@ -1581,7 +1584,7 @@ describe("getViewerDashboard spending history", () => {
       amount: 40,
       source: "web",
     });
-    await showQuoteOverlayForViewer({
+    await showQuoteOverlayForViewer(defaultCreatorContext, {
       viewerId: "viewer_ana",
       quoteId: 1,
       source: "web",

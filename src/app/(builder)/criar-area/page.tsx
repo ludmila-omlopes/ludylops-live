@@ -1,16 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Coins, Palette, Sparkles, Ticket, type LucideIcon } from "lucide-react";
+import { Coins, Palette, Sparkles, MessageSquare, type LucideIcon } from "lucide-react";
 
 import { auth } from "@/auth";
 import { CreatorAreaCreateForm } from "@/components/creator-area-create-form";
+import { CreatorCurrencyForm } from "@/components/creator-currency-form";
+import { CreatorProfileForm } from "@/components/creator-profile-form";
+import { CreatorChatRewardsForm } from "@/components/creator-chat-rewards-form";
+import { PeriodicMessagesManager } from "@/components/periodic-messages-manager";
+import { StreamerbotCredentials } from "@/components/streamerbot-credentials";
+import { CreatorSetup } from "@/components/creator-setup";
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { CreatorLandingCta } from "@/components/creator-landing-cta";
 import { canCreateCreatorArea } from "@/lib/creators/access";
-import { PLATFORM_NAME, resolveCreatorLandingState } from "@/lib/creators/platform";
+import { resolveCreatorLandingState } from "@/lib/creators/platform";
 import { listCreatorAreasForOwner } from "@/lib/creators/service";
 
 export const metadata: Metadata = {
-  title: `${PLATFORM_NAME} — crie a área da sua comunidade`,
+  title: "Sua comunidade",
 };
 
 type CommunityStep = {
@@ -23,14 +30,14 @@ type CommunityStep = {
 const COMMUNITY_STEPS: CommunityStep[] = [
   {
     title: "Pontos acumulados",
-    body: "Sua comunidade acumula pontos enquanto assiste, direto na live.",
+    body: "Sua comunidade ganha sua moeda pelas mensagens no chat, conforme a regra que você ativar.",
     icon: Coins,
     bg: "bg-[var(--color-mint)]",
   },
   {
-    title: "Bolões ao vivo",
-    body: "Ela aposta nos rumos do jogo enquanto a partida acontece.",
-    icon: Ticket,
+    title: "Frases da comunidade",
+    body: "Guarde as frases que marcaram as lives e relembre esses momentos com o chat.",
+    icon: MessageSquare,
     bg: "bg-[var(--color-pink)]",
   },
   {
@@ -86,7 +93,7 @@ export default async function CreateCreatorAreaPage() {
   const landingState = resolveCreatorLandingState({ hasUsableSession, canCreateArea });
 
   const creatorAreas =
-    landingState === "approved" ? await listCreatorAreasForOwner(session!.user!.activeViewerId) : [];
+    hasUsableSession ? await listCreatorAreasForOwner(session!.user!.activeViewerId, { includeArchived: true }) : [];
 
   return (
     <div className="surface-section flex w-full flex-col">
@@ -96,16 +103,16 @@ export default async function CreateCreatorAreaPage() {
             className="max-w-3xl text-4xl uppercase leading-[0.9] text-pretty sm:text-5xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Sua live, sua área, sua comunidade.
+            Sua live, sua moeda, sua comunidade.
           </h1>
           <p className="mt-5 max-w-2xl text-base font-medium leading-7 text-[var(--color-ink-soft)]">
-            {PLATFORM_NAME} está em beta fechado: crie um ponto de encontro para a sua comunidade,
-            com pontos, bolões e resgates que acontecem durante a sua live.
+            Reúna sua comunidade com uma moeda própria e resgates durante a live.
+            O acesso para novos streamers está disponível por convite, em beta fechado.
           </p>
 
           <CommunitySection />
 
-          {landingState === "approved" && creatorAreas.length > 0 ? (
+          {creatorAreas.length > 0 ? (
             <div className="mt-8 grid gap-3">
               <h2
                 className="text-2xl uppercase text-[var(--color-ink)]"
@@ -114,9 +121,9 @@ export default async function CreateCreatorAreaPage() {
                 Suas áreas
               </h2>
               {creatorAreas.map((creator) => (
+                <div key={creator.id}>
                 <Link
-                  key={creator.id}
-                  href={creator.publicPath}
+                  href={creator.publicUrl}
                   className="group flex items-center justify-between gap-3 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-4 shadow-[4px_4px_0_var(--shadow-color)] transition-transform hover:-translate-y-0.5"
                 >
                   <span className="min-w-0">
@@ -124,13 +131,25 @@ export default async function CreateCreatorAreaPage() {
                       {creator.displayName}
                     </span>
                     <span className="mt-1 block break-all text-sm font-bold text-[var(--color-ink-soft)]">
-                      {creator.publicHostname}
+                      {creator.publicUrl}
                     </span>
                   </span>
                   <span aria-hidden="true" className="text-xl font-black">
                     →
                   </span>
                 </Link>
+                {creator.status !== "active" && creator.id !== DEFAULT_CREATOR_ID && <p className="mt-3 text-sm">Comunidade {creator.status === "archived" ? "arquivada" : "desativada"}. Você ainda pode revogar suas credenciais.</p>}
+                {creator.id !== DEFAULT_CREATOR_ID && <CreatorSetup creatorId={creator.id} />}
+                {creator.status === "active" && creator.id !== DEFAULT_CREATOR_ID && <>
+                  <div id={`perfil-${creator.id}`} className="scroll-mt-24"><CreatorProfileForm creatorId={creator.id} /></div>
+                  <CreatorCurrencyForm creatorId={creator.id} />
+                  <div id={`ganhos-${creator.id}`} className="scroll-mt-24"><CreatorChatRewardsForm creatorId={creator.id} /></div>
+                  <PeriodicMessagesManager creatorId={creator.id} />
+                  <Link href={`/c/${creator.slug}/quotes#gerenciar-frases`} className="mt-3 block font-bold underline">Gerenciar frases</Link>
+                  <Link href={`/c/${creator.slug}/produtinhos`} className="mt-3 block font-bold underline">Gerenciar produtos</Link>
+                </>}
+                {creator.id !== DEFAULT_CREATOR_ID && <div id={`integracao-${creator.id}`} className="scroll-mt-24"><StreamerbotCredentials creatorId={creator.id} enabled={creator.status === "active"} mode="creator" /></div>}
+                </div>
               ))}
             </div>
           ) : null}

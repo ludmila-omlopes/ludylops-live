@@ -1,3 +1,8 @@
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import { consolidateAccountEconomies, lockEconomyIdentity, mergeCreatorEconomies } from "@/lib/creators/economy-identity";
+import { consolidateDemoAccountEconomies, economyDemoStore, mergeDemoEconomies } from "@/lib/creators/economy-demo";
+import { type CreatorContext, requireCreatorContext, requireDefaultCreatorCapability } from "@/lib/creators/context";
+
 import { randomUUID } from "node:crypto";
 
 import { and, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
@@ -16,6 +21,9 @@ import {
   bets,
   bridgeClients,
   catalogItems,
+  creatorBalances,
+  creatorLedger,
+  economyViewerRedirects,
   creatorSuggestionBoosts,
   creatorSuggestions,
   gameSuggestionBoosts,
@@ -432,6 +440,7 @@ type DemoStore = {
   balances: ViewerBalanceRecord[];
   catalog: CatalogItemRecord[];
   ledger: LedgerEntryRecord[];
+  creatorQuotes?: Record<string, QuoteDemoStore>;
   quotes: QuoteRecord[];
   quoteOverlayState: QuoteOverlayStateRecord | null;
   obsOverlayControl: ObsOverlayControlRecord | null;
@@ -453,6 +462,16 @@ type DemoStore = {
   streamerbotCounters: StreamerbotCounterRecord[];
   streamerbotEvents: DemoStreamerbotEventLogRecord[];
 };
+
+type QuoteDemoStore = Pick<DemoStore, "quotes" | "quoteOverlayState" | "obsOverlayControl" | "quoteOverlayQueue">;
+
+export function getQuoteDemoStore(context: CreatorContext): QuoteDemoStore {
+  const creatorId = requireCreatorContext(context);
+  const store = getDemoStore();
+  if (creatorId === DEFAULT_CREATOR_ID) return store;
+  store.creatorQuotes ??= Object.create(null) as Record<string, QuoteDemoStore>;
+  return store.creatorQuotes[creatorId] ??= { quotes: [], quoteOverlayState: null, obsOverlayControl: null, quoteOverlayQueue: [] };
+}
 
 type DemoStreamerbotEventLogRecord = {
   eventId: string;
@@ -1481,7 +1500,9 @@ function getDemoViewerActivity(store: DemoStore, viewerId: string) {
     currentBalance: balance.currentBalance,
     lifetimeEarned: balance.lifetimeEarned,
     lifetimeSpent: balance.lifetimeSpent,
-    hasLedger: store.ledger.some((entry) => entry.viewerId === viewerId),
+    hasLedger: store.ledger.some((entry) => entry.viewerId === viewerId)
+      || economyDemoStore().entries.some((entry) => entry.viewerId === viewerId)
+      || Object.values(economyDemoStore().redirects).includes(viewerId),
     hasRedemptions: store.redemptions.some((entry) => entry.viewerId === viewerId),
     hasBetEntries: store.betEntries.some((entry) => entry.viewerId === viewerId),
   };
@@ -1534,6 +1555,7 @@ function mergeDemoViewerIntoTarget(input: {
 
   const sourceBalance = getBalance(store, sourceViewerId);
   const targetBalance = getBalance(store, targetViewerId);
+  mergeDemoEconomies(sourceViewerId, targetViewerId);
   targetViewer.googleUserId ??= sourceViewer.googleUserId;
   targetViewer.email ??= sourceViewer.email;
   targetViewer.avatarUrl ??= sourceViewer.avatarUrl;
@@ -1620,6 +1642,7 @@ async function mergeViewerIntoTarget(input: {
   }
 
   return db.transaction(async (tx) => {
+    await lockEconomyIdentity(tx, true);
     const [sourceViewer, targetViewer, sourceBalance, targetBalance, sourceOwnerLink, targetOwnerLink] =
       await Promise.all([
         tx.select().from(users).where(eq(users.id, input.sourceViewerId)).limit(1),
@@ -1662,6 +1685,7 @@ async function mergeViewerIntoTarget(input: {
       return { merged: false, transferredOwnerLink: false };
     }
 
+    await mergeCreatorEconomies(tx, input.sourceViewerId, input.targetViewerId);
     await tx.update(pointLedger).set({ viewerId: input.targetViewerId }).where(eq(pointLedger.viewerId, input.sourceViewerId));
     await tx.update(redemptions).set({ viewerId: input.targetViewerId }).where(eq(redemptions.viewerId, input.sourceViewerId));
     await tx.update(betEntries).set({ viewerId: input.targetViewerId }).where(eq(betEntries.viewerId, input.sourceViewerId));
@@ -2292,6 +2316,7 @@ function serializeCreatorSuggestionBoost(
 
 function serializeQuote(row: typeof quotes.$inferSelect): QuoteRecord {
   return {
+    creatorId: row.creatorId,
     id: row.id,
     quoteNumber: row.quoteNumber,
     body: row.body,
@@ -2307,6 +2332,7 @@ function serializeQuoteOverlayState(
   row: typeof quoteOverlayState.$inferSelect,
 ): QuoteOverlayStateRecord {
   return {
+    creatorId: row.creatorId,
     slot: row.slot,
     overlayId: row.overlayId,
     quoteNumber: row.quoteNumber,
@@ -2323,8 +2349,10 @@ function serializeQuoteOverlayState(
   };
 }
 
-function buildDefaultObsOverlayControl(now = new Date()): ObsOverlayControlRecord {
+function buildDefaultObsOverlayControl(context: CreatorContext, now = new Date()): ObsOverlayControlRecord {
+  const creatorId = requireCreatorContext(context);
   return {
+    creatorId,
     key: OBS_OVERLAY_CONTROL_KEY,
     status: "active",
     pausedAt: null,
@@ -2349,6 +2377,7 @@ function isMissingObsOverlayTablesError(error: unknown) {
   return (
     maybePostgresError.code === "42P01" ||
     maybePostgresError.cause?.code === "42P01" ||
+    ((maybePostgresError.code === "42703" || maybePostgresError.cause?.code === "42703") && message.includes("creator_id")) ||
     message.includes('relation "quote_overlay_queue" does not exist') ||
     message.includes('relation "obs_overlay_control" does not exist')
   );
@@ -2358,6 +2387,7 @@ function serializeObsOverlayControl(
   row: typeof obsOverlayControl.$inferSelect,
 ): ObsOverlayControlRecord {
   return {
+    creatorId: row.creatorId,
     key: row.key,
     status: row.status as ObsOverlayControlRecord["status"],
     pausedAt: row.pausedAt?.toISOString() ?? null,
@@ -2372,6 +2402,7 @@ function serializeQuoteOverlayQueue(
   row: typeof quoteOverlayQueue.$inferSelect,
 ): QuoteOverlayQueueRecord {
   return {
+    creatorId: row.creatorId,
     id: row.id,
     quoteNumber: row.quoteNumber,
     quoteBody: row.quoteBody,
@@ -2392,33 +2423,38 @@ function serializeQuoteOverlayQueue(
   };
 }
 
-async function getObsOverlayControlRecord(): Promise<ObsOverlayControlRecord> {
+export async function getObsOverlayControlRecord(context: CreatorContext): Promise<ObsOverlayControlRecord> {
+  const creatorId = requireCreatorContext(context);
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
-    store.obsOverlayControl ??= buildDefaultObsOverlayControl();
+    const store = getQuoteDemoStore(context);
+    store.obsOverlayControl ??= buildDefaultObsOverlayControl(context);
     return store.obsOverlayControl;
   }
 
   const [control] = await db
     .select()
     .from(obsOverlayControl)
-    .where(eq(obsOverlayControl.key, OBS_OVERLAY_CONTROL_KEY))
+    .where(and(eq(obsOverlayControl.creatorId, creatorId), eq(obsOverlayControl.key, OBS_OVERLAY_CONTROL_KEY)))
     .limit(1);
 
-  return control ? serializeObsOverlayControl(control) : buildDefaultObsOverlayControl();
+  return control ? serializeObsOverlayControl(control) : buildDefaultObsOverlayControl(context);
 }
 
-function buildQuoteOverlayQueueRecord(input: {
+function buildQuoteOverlayQueueRecord(context: CreatorContext, input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
   cost: number;
   displayDurationSeconds: number;
 }) {
+  const creatorId = requireCreatorContext(context);
+  if (input.quote.creatorId !== creatorId) throw new Error("quote_not_found");
   const queuedAt = new Date();
   return {
+    creatorId,
     id: randomUUID(),
     quoteNumber: input.quote.quoteNumber,
     quoteBody: input.quote.body,
@@ -2439,19 +2475,22 @@ function buildQuoteOverlayQueueRecord(input: {
   } satisfies QuoteOverlayQueueRecord;
 }
 
-function buildQuoteOverlayState(input: {
+function buildQuoteOverlayState(context: CreatorContext, input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
   cost?: number;
   durationSeconds?: number;
 }) {
+  const creatorId = requireCreatorContext(context);
+  if (input.quote.creatorId !== creatorId) throw new Error("quote_not_found");
   const activatedAt = new Date();
   const expiresAt = new Date(
     activatedAt.getTime() + (input.durationSeconds ?? QUOTE_OVERLAY_DURATION_SECONDS) * 1000,
   );
 
   return {
+    creatorId,
     slot: QUOTE_OVERLAY_SLOT,
     overlayId: randomUUID(),
     quoteNumber: input.quote.quoteNumber,
@@ -2478,7 +2517,7 @@ function isQuoteOverlayActive(overlay: QuoteOverlayStateRecord | null, now = Dat
 
 type SerializableProductRecommendationRow = Omit<
   typeof productRecommendations.$inferSelect,
-  "moderationStatus"
+  "moderationStatus" | "creatorId"
 > & {
   moderationStatus?: string | null;
 };
@@ -2602,39 +2641,45 @@ function buildCreatorSuggestionWithMeta(params: {
   };
 }
 
-function listDemoQuotes() {
-  const store = getDemoStore();
+function listDemoQuotes(context: CreatorContext) {
+  requireCreatorContext(context);
+  const store = getQuoteDemoStore(context);
   return [...store.quotes].sort((a, b) => a.quoteNumber - b.quoteNumber);
 }
 
-export async function listQuotes() {
+export async function listQuotes(context: CreatorContext) {
+  const creatorId = requireCreatorContext(context);
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    return [...listDemoQuotes()].sort((a, b) => b.quoteNumber - a.quoteNumber);
+    return [...listDemoQuotes(context)].sort((a, b) => b.quoteNumber - a.quoteNumber);
   }
 
-  const rows = await db.select().from(quotes).orderBy(desc(quotes.quoteNumber));
+  const rows = await db.select().from(quotes).where(eq(quotes.creatorId, creatorId)).orderBy(desc(quotes.quoteNumber));
   return rows.map(serializeQuote);
 }
 
-async function createQuoteRecord(input: {
+export async function createQuoteRecord(context: CreatorContext, input: {
   body: string;
   viewer: ViewerRecord;
   source: string;
 }) {
+  const creatorId = requireCreatorContext(context);
   const body = input.body.trim();
   if (!body) {
     throw new Error("quote_text_required");
   }
 
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const nextQuoteNumber =
       store.quotes.reduce((highest, entry) => Math.max(highest, entry.quoteNumber), 0) + 1;
     const createdAt = new Date().toISOString();
     const quote: QuoteRecord = {
+      creatorId,
       id: randomUUID(),
       quoteNumber: nextQuoteNumber,
       body,
@@ -2649,15 +2694,18 @@ async function createQuoteRecord(input: {
   }
 
   return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(42002, hashtext(${creatorId}))`);
     const [latestQuote] = await tx
       .select({ quoteNumber: quotes.quoteNumber })
       .from(quotes)
+      .where(eq(quotes.creatorId, creatorId))
       .orderBy(desc(quotes.quoteNumber))
       .limit(1);
 
     const [createdQuote] = await tx
       .insert(quotes)
       .values({
+        creatorId,
         id: randomUUID(),
         quoteNumber: (latestQuote?.quoteNumber ?? 0) + 1,
         body,
@@ -2677,12 +2725,14 @@ async function createQuoteRecord(input: {
   });
 }
 
-async function getQuoteRecord(input: { quoteId?: number | null }) {
+async function getQuoteRecord(context: CreatorContext, input: { quoteId?: number | null }) {
+  const creatorId = requireCreatorContext(context);
   const quoteId = input.quoteId ?? null;
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const quotes = listDemoQuotes();
+    const quotes = listDemoQuotes(context);
     if (quotes.length === 0) {
       throw new Error("quote_list_empty");
     }
@@ -2702,7 +2752,7 @@ async function getQuoteRecord(input: { quoteId?: number | null }) {
     const [quote] = await db
       .select()
       .from(quotes)
-      .where(eq(quotes.quoteNumber, quoteId))
+      .where(and(eq(quotes.creatorId, creatorId), eq(quotes.quoteNumber, quoteId)))
       .limit(1);
 
     if (!quote) {
@@ -2712,7 +2762,7 @@ async function getQuoteRecord(input: { quoteId?: number | null }) {
     return serializeQuote(quote);
   }
 
-  const allQuotes = await db.select().from(quotes).orderBy(desc(quotes.quoteNumber));
+  const allQuotes = await db.select().from(quotes).where(eq(quotes.creatorId, creatorId)).orderBy(desc(quotes.quoteNumber));
   if (allQuotes.length === 0) {
     throw new Error("quote_list_empty");
   }
@@ -2720,19 +2770,21 @@ async function getQuoteRecord(input: { quoteId?: number | null }) {
   return serializeQuote(allQuotes[Math.floor(Math.random() * allQuotes.length)]!);
 }
 
-export async function getActiveQuoteOverlay() {
+export async function getActiveQuoteOverlay(context: CreatorContext) {
+  const creatorId = requireCreatorContext(context);
   const now = Date.now();
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const overlay = getDemoStore().quoteOverlayState;
+    const overlay = getQuoteDemoStore(context).quoteOverlayState;
     return isQuoteOverlayActive(overlay, now) ? overlay : null;
   }
 
   const [overlay] = await db
     .select()
     .from(quoteOverlayState)
-    .where(eq(quoteOverlayState.slot, QUOTE_OVERLAY_SLOT))
+    .where(and(eq(quoteOverlayState.creatorId, creatorId), eq(quoteOverlayState.slot, QUOTE_OVERLAY_SLOT)))
     .limit(1);
 
   if (!overlay) {
@@ -2744,18 +2796,22 @@ export async function getActiveQuoteOverlay() {
 }
 
 async function refundQueuedQuoteOverlay(
+  context: CreatorContext,
   queueEntry: QuoteOverlayQueueRecord,
   reason: "cancelled" | "expired" | "failed",
 ) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  if (queueEntry.creatorId !== creatorId) throw new Error("quote_not_found");
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
-    const balance = getBalance(store, queueEntry.requestedByViewerId);
+    const balance = getBalance(getDemoStore(), queueEntry.requestedByViewerId);
     balance.currentBalance += queueEntry.cost;
     balance.lifetimeSpent = Math.max(0, balance.lifetimeSpent - queueEntry.cost);
     balance.lastSyncedAt = new Date().toISOString();
-    createLedgerEntry(store, {
+    createLedgerEntry(getDemoStore(), {
       viewerId: queueEntry.requestedByViewerId,
       kind: "quote_overlay_debit",
       amount: queueEntry.cost,
@@ -2781,6 +2837,7 @@ async function refundQueuedQuoteOverlay(
       .where(eq(viewerBalances.viewerId, queueEntry.requestedByViewerId));
 
     await tx.insert(pointLedger).values({
+      creatorId,
       id: randomUUID(),
       viewerId: queueEntry.requestedByViewerId,
       kind: "quote_overlay_debit",
@@ -2797,12 +2854,15 @@ async function refundQueuedQuoteOverlay(
   });
 }
 
-async function expireQueuedQuoteOverlays() {
+async function expireQueuedQuoteOverlays(context: CreatorContext) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
   const now = new Date();
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const expired = store.quoteOverlayQueue.filter(
       (entry) => entry.status === "queued" && new Date(entry.expiresAt).getTime() <= now.getTime(),
     );
@@ -2810,7 +2870,7 @@ async function expireQueuedQuoteOverlays() {
       entry.status = "expired";
       entry.cancelledAt = now.toISOString();
       entry.failureReason = "queue_expired";
-      await refundQueuedQuoteOverlay(entry, "expired");
+      await refundQueuedQuoteOverlay(context, entry, "expired");
     }
     return expired.length;
   }
@@ -2822,39 +2882,43 @@ async function expireQueuedQuoteOverlays() {
       cancelledAt: now,
       failureReason: "queue_expired",
     })
-    .where(and(eq(quoteOverlayQueue.status, "queued"), lt(quoteOverlayQueue.expiresAt, now)))
+    .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.status, "queued"), lt(quoteOverlayQueue.expiresAt, now)))
     .returning();
 
   for (const row of expiredRows) {
-    await refundQueuedQuoteOverlay(serializeQuoteOverlayQueue(row), "expired");
+    await refundQueuedQuoteOverlay(context, serializeQuoteOverlayQueue(row), "expired");
   }
 
   return expiredRows.length;
 }
 
-async function enqueueQuoteOverlay(input: {
+async function enqueueQuoteOverlay(context: CreatorContext, input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
   cost: number;
   displayDurationSeconds: number;
 }) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  if (input.quote.creatorId !== creatorId) throw new Error("quote_not_found");
   await requireActiveLivestream({
     failureError: "livestream_not_live",
   });
-  await expireQueuedQuoteOverlays();
+  await expireQueuedQuoteOverlays(context);
 
-  const queued = buildQuoteOverlayQueueRecord(input);
+  const queued = buildQuoteOverlayQueueRecord(context, input);
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const pendingCount = store.quoteOverlayQueue.filter((entry) => entry.status === "queued").length;
     if (pendingCount >= QUOTE_OVERLAY_QUEUE_LIMIT) {
       throw new Error("quote_overlay_queue_full");
     }
 
-    const balance = getBalance(store, input.viewer.id);
+    const balance = getBalance(getDemoStore(), input.viewer.id);
     if (balance.currentBalance < input.cost) {
       throw new Error("saldo_insuficiente");
     }
@@ -2862,7 +2926,7 @@ async function enqueueQuoteOverlay(input: {
     balance.currentBalance -= input.cost;
     balance.lifetimeSpent += input.cost;
     balance.lastSyncedAt = queued.queuedAt;
-    createLedgerEntry(store, {
+    createLedgerEntry(getDemoStore(), {
       viewerId: input.viewer.id,
       kind: "quote_overlay_debit",
       amount: -input.cost,
@@ -2881,12 +2945,12 @@ async function enqueueQuoteOverlay(input: {
   }
 
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY})`);
+    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY}, hashtext(${creatorId}))`);
 
     const [{ pendingCount }] = await tx
       .select({ pendingCount: sql<number>`count(*)::int` })
       .from(quoteOverlayQueue)
-      .where(eq(quoteOverlayQueue.status, "queued"));
+      .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.status, "queued")));
 
     if ((pendingCount ?? 0) >= QUOTE_OVERLAY_QUEUE_LIMIT) {
       throw new Error("quote_overlay_queue_full");
@@ -2912,6 +2976,7 @@ async function enqueueQuoteOverlay(input: {
     }
 
     await tx.insert(pointLedger).values({
+      creatorId,
       id: randomUUID(),
       viewerId: input.viewer.id,
       kind: "quote_overlay_debit",
@@ -2930,6 +2995,7 @@ async function enqueueQuoteOverlay(input: {
     const [created] = await tx
       .insert(quoteOverlayQueue)
       .values({
+        creatorId,
         id: queued.id,
         quoteNumber: queued.quoteNumber,
         quoteBody: queued.quoteBody,
@@ -2951,24 +3017,27 @@ async function enqueueQuoteOverlay(input: {
   });
 }
 
-async function hasPendingQuoteOverlayQueue() {
-  await expireQueuedQuoteOverlays();
+async function hasPendingQuoteOverlayQueue(context: CreatorContext) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  await expireQueuedQuoteOverlays(context);
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    return getDemoStore().quoteOverlayQueue.some((entry) => entry.status === "queued");
+    return getQuoteDemoStore(context).quoteOverlayQueue.some((entry) => entry.status === "queued");
   }
 
   const [entry] = await db
     .select({ id: quoteOverlayQueue.id })
     .from(quoteOverlayQueue)
-    .where(eq(quoteOverlayQueue.status, "queued"))
+    .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.status, "queued")))
     .limit(1);
 
   return Boolean(entry);
 }
 
-async function activateQuoteOverlay(input: {
+async function activateQuoteOverlay(context: CreatorContext, input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
@@ -2977,12 +3046,15 @@ async function activateQuoteOverlay(input: {
   debit?: boolean;
   queueId?: string | null;
 }) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  if (input.quote.creatorId !== creatorId) throw new Error("quote_not_found");
   await requireActiveLivestream({
     failureError: "livestream_not_live",
   });
 
   const cost = input.cost ?? QUOTE_OVERLAY_COST;
-  const overlay = buildQuoteOverlayState({
+  const overlay = buildQuoteOverlayState(context, {
     quote: input.quote,
     viewer: input.viewer,
     source: input.source,
@@ -2991,16 +3063,17 @@ async function activateQuoteOverlay(input: {
   });
 
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
   const shouldDebit = input.debit ?? true;
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const activeOverlay = store.quoteOverlayState;
     if (isQuoteOverlayActive(activeOverlay)) {
       throw new Error("quote_overlay_busy");
     }
 
     if (shouldDebit) {
-      const balance = getBalance(store, input.viewer.id);
+      const balance = getBalance(getDemoStore(), input.viewer.id);
       if (balance.currentBalance < cost) {
         throw new Error("saldo_insuficiente");
       }
@@ -3009,7 +3082,7 @@ async function activateQuoteOverlay(input: {
       balance.lifetimeSpent += cost;
       balance.lastSyncedAt = overlay.activatedAt;
 
-      createLedgerEntry(store, {
+      createLedgerEntry(getDemoStore(), {
         viewerId: input.viewer.id,
         kind: "quote_overlay_debit",
         amount: -cost,
@@ -3030,12 +3103,12 @@ async function activateQuoteOverlay(input: {
   }
 
   await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY})`);
+    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY}, hashtext(${creatorId}))`);
 
     const [existingOverlay] = await tx
       .select()
       .from(quoteOverlayState)
-      .where(eq(quoteOverlayState.slot, QUOTE_OVERLAY_SLOT))
+      .where(and(eq(quoteOverlayState.creatorId, creatorId), eq(quoteOverlayState.slot, QUOTE_OVERLAY_SLOT)))
       .limit(1);
 
     if (existingOverlay && existingOverlay.expiresAt.getTime() > Date.now()) {
@@ -3063,6 +3136,7 @@ async function activateQuoteOverlay(input: {
       }
 
       await tx.insert(pointLedger).values({
+      creatorId,
         id: randomUUID(),
         viewerId: input.viewer.id,
         kind: "quote_overlay_debit",
@@ -3082,6 +3156,7 @@ async function activateQuoteOverlay(input: {
     await tx
       .insert(quoteOverlayState)
       .values({
+        creatorId,
         slot: overlay.slot,
         overlayId: overlay.overlayId,
         quoteNumber: overlay.quoteNumber,
@@ -3097,7 +3172,7 @@ async function activateQuoteOverlay(input: {
         expiresAt: new Date(overlay.expiresAt),
       })
       .onConflictDoUpdate({
-        target: quoteOverlayState.slot,
+        target: [quoteOverlayState.creatorId, quoteOverlayState.slot],
         set: {
           overlayId: overlay.overlayId,
           quoteNumber: overlay.quoteNumber,
@@ -3118,13 +3193,17 @@ async function activateQuoteOverlay(input: {
   return overlay;
 }
 
-async function activateQueuedQuoteOverlay(entry: QuoteOverlayQueueRecord) {
+async function activateQueuedQuoteOverlay(context: CreatorContext, entry: QuoteOverlayQueueRecord) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  if (entry.creatorId !== creatorId) throw new Error("quote_not_found");
   const viewer = await withViewerById(entry.requestedByViewerId);
   if (!viewer) {
     throw new Error("viewer_not_ready");
   }
 
   const quote: QuoteRecord = {
+    creatorId,
     id: `queued:${entry.id}`,
     quoteNumber: entry.quoteNumber,
     body: entry.quoteBody,
@@ -3135,7 +3214,7 @@ async function activateQueuedQuoteOverlay(entry: QuoteOverlayQueueRecord) {
     createdAt: entry.queuedAt,
   };
 
-  return activateQuoteOverlay({
+  return activateQuoteOverlay(context, {
     quote,
     viewer,
     source: entry.source,
@@ -3146,22 +3225,25 @@ async function activateQueuedQuoteOverlay(entry: QuoteOverlayQueueRecord) {
   });
 }
 
-export async function processNextQueuedQuoteOverlay() {
-  const control = await getObsOverlayControlRecord();
+export async function processNextQueuedQuoteOverlay(context: CreatorContext) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  const control = await getObsOverlayControlRecord(context);
   if (control.status === "paused") {
     return null;
   }
 
-  await expireQueuedQuoteOverlays();
+  await expireQueuedQuoteOverlays(context);
 
-  const activeOverlay = await getActiveQuoteOverlay();
+  const activeOverlay = await getActiveQuoteOverlay(context);
   if (activeOverlay) {
     return activeOverlay;
   }
 
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const entry = [...store.quoteOverlayQueue]
       .filter((item) => item.status === "queued")
       .sort((left, right) => +new Date(left.queuedAt) - +new Date(right.queuedAt))[0];
@@ -3172,7 +3254,7 @@ export async function processNextQueuedQuoteOverlay() {
 
     entry.status = "processing";
     try {
-      const overlay = await activateQueuedQuoteOverlay(entry);
+      const overlay = await activateQueuedQuoteOverlay(context, entry);
       entry.status = "completed";
       entry.processedAt = overlay.activatedAt;
       return overlay;
@@ -3180,17 +3262,18 @@ export async function processNextQueuedQuoteOverlay() {
       entry.status = "failed";
       entry.cancelledAt = new Date().toISOString();
       entry.failureReason = error instanceof Error ? error.message : "queue_processing_failed";
+      await refundQueuedQuoteOverlay(context, entry, "failed");
       throw error;
     }
   }
 
   const [claimed] = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY})`);
+    await tx.execute(sql`select pg_advisory_xact_lock(${QUOTE_OVERLAY_LOCK_KEY}, hashtext(${creatorId}))`);
 
     const [entry] = await tx
       .select()
       .from(quoteOverlayQueue)
-      .where(eq(quoteOverlayQueue.status, "queued"))
+      .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.status, "queued")))
       .orderBy(quoteOverlayQueue.queuedAt)
       .limit(1);
 
@@ -3201,7 +3284,7 @@ export async function processNextQueuedQuoteOverlay() {
     return tx
       .update(quoteOverlayQueue)
       .set({ status: "processing" })
-      .where(eq(quoteOverlayQueue.id, entry.id))
+      .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.id, entry.id)))
       .returning();
   });
 
@@ -3211,14 +3294,14 @@ export async function processNextQueuedQuoteOverlay() {
 
   const queued = serializeQuoteOverlayQueue(claimed);
   try {
-    const overlay = await activateQueuedQuoteOverlay(queued);
+    const overlay = await activateQueuedQuoteOverlay(context, queued);
     await db
       .update(quoteOverlayQueue)
       .set({
         status: "completed",
         processedAt: new Date(overlay.activatedAt),
       })
-      .where(eq(quoteOverlayQueue.id, queued.id));
+      .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.id, queued.id)));
     return overlay;
   } catch (error) {
     const message = error instanceof Error ? error.message : "queue_processing_failed";
@@ -3229,24 +3312,27 @@ export async function processNextQueuedQuoteOverlay() {
         cancelledAt: new Date(),
         failureReason: message,
       })
-      .where(eq(quoteOverlayQueue.id, queued.id));
-    await refundQueuedQuoteOverlay(queued, "failed");
+      .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.id, queued.id)));
+    await refundQueuedQuoteOverlay(context, queued, "failed");
     throw error;
   }
 }
 
-async function requestQuoteOverlay(input: {
+async function requestQuoteOverlay(context: CreatorContext, input: {
   quote: QuoteRecord;
   viewer: ViewerRecord;
   source: string;
   durationSeconds?: number;
 }) {
-  const control = await getObsOverlayControlRecord();
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
+  if (input.quote.creatorId !== creatorId) throw new Error("quote_not_found");
+  const control = await getObsOverlayControlRecord(context);
   const cost = (await getPipetzPricing()).quoteOverlayCost;
   const displayDurationSeconds = input.durationSeconds ?? QUOTE_OVERLAY_DURATION_SECONDS;
 
-  if (control.status === "paused" || (await hasPendingQuoteOverlayQueue())) {
-    const queued = await enqueueQuoteOverlay({
+  if (control.status === "paused" || (await hasPendingQuoteOverlayQueue(context))) {
+    const queued = await enqueueQuoteOverlay(context, {
       quote: input.quote,
       viewer: input.viewer,
       source: input.source,
@@ -3260,7 +3346,7 @@ async function requestQuoteOverlay(input: {
     };
   }
 
-  const overlay = await activateQuoteOverlay({
+  const overlay = await activateQuoteOverlay(context, {
     quote: input.quote,
     viewer: input.viewer,
     source: input.source,
@@ -3274,18 +3360,21 @@ async function requestQuoteOverlay(input: {
   };
 }
 
-export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusRecord> {
+export async function getObsOverlayAdminStatus(context: CreatorContext): Promise<ObsOverlayAdminStatusRecord> {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
   try {
-    await expireQueuedQuoteOverlays();
+    await expireQueuedQuoteOverlays(context);
     const [control, activeOverlay, overlayStyle] = await Promise.all([
-      getObsOverlayControlRecord(),
-      getActiveQuoteOverlay(),
+      getObsOverlayControlRecord(context),
+      getActiveQuoteOverlay(context),
       getObsOverlayStyleConfig(),
     ]);
     const db = getDb();
+    if (!isDemoMode && !db) throw new Error("database_unavailable");
 
     if (isDemoMode || !db) {
-      const queue = [...getDemoStore().quoteOverlayQueue];
+      const queue = [...getQuoteDemoStore(context).quoteOverlayQueue];
       const pending = queue
         .filter((entry) => entry.status === "queued")
         .sort((left, right) => +new Date(left.queuedAt) - +new Date(right.queuedAt));
@@ -3304,6 +3393,7 @@ export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusR
     const queue = (await db
       .select()
       .from(quoteOverlayQueue)
+      .where(eq(quoteOverlayQueue.creatorId, creatorId))
       .orderBy(quoteOverlayQueue.queuedAt)
       .limit(50)).map(serializeQuoteOverlayQueue);
     const pending = queue.filter((entry) => entry.status === "queued");
@@ -3324,12 +3414,12 @@ export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusR
 
     return {
       control: {
-        ...buildDefaultObsOverlayControl(),
+        ...buildDefaultObsOverlayControl(context),
         status: "error",
-        lastError: "Migration pendente: crie as tabelas obs_overlay_control e quote_overlay_queue.",
+        lastError: "Migração pendente: atualize as tabelas de frases e overlays.",
       },
       overlayStyle: await getObsOverlayStyleConfig(),
-      activeOverlay: await getActiveQuoteOverlay(),
+      activeOverlay: null,
       pending: [],
       pendingCount: 0,
       processingCount: 0,
@@ -3338,14 +3428,17 @@ export async function getObsOverlayAdminStatus(): Promise<ObsOverlayAdminStatusR
   }
 }
 
-export async function setObsOverlayPaused(input: { paused: boolean; updatedBy?: string | null }) {
+export async function setObsOverlayPaused(context: CreatorContext, input: { paused: boolean; updatedBy?: string | null }) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
   const now = new Date();
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     store.obsOverlayControl = {
-      ...(store.obsOverlayControl ?? buildDefaultObsOverlayControl(now)),
+      ...(store.obsOverlayControl ?? buildDefaultObsOverlayControl(context, now)),
       status: input.paused ? "paused" : "active",
       pausedAt: input.paused ? now.toISOString() : store.obsOverlayControl?.pausedAt ?? null,
       resumedAt: input.paused ? store.obsOverlayControl?.resumedAt ?? null : now.toISOString(),
@@ -3354,14 +3447,15 @@ export async function setObsOverlayPaused(input: { paused: boolean; updatedBy?: 
       lastError: null,
     };
     if (!input.paused) {
-      await processNextQueuedQuoteOverlay();
+      await processNextQueuedQuoteOverlay(context);
     }
-    return getObsOverlayAdminStatus();
+    return getObsOverlayAdminStatus(context);
   }
 
   await db
     .insert(obsOverlayControl)
     .values({
+      creatorId,
       key: OBS_OVERLAY_CONTROL_KEY,
       status: input.paused ? "paused" : "active",
       pausedAt: input.paused ? now : null,
@@ -3371,7 +3465,7 @@ export async function setObsOverlayPaused(input: { paused: boolean; updatedBy?: 
       lastError: null,
     })
     .onConflictDoUpdate({
-      target: obsOverlayControl.key,
+      target: [obsOverlayControl.creatorId, obsOverlayControl.key],
       set: {
         status: input.paused ? "paused" : "active",
         pausedAt: input.paused ? now : sql`${obsOverlayControl.pausedAt}`,
@@ -3383,31 +3477,34 @@ export async function setObsOverlayPaused(input: { paused: boolean; updatedBy?: 
     });
 
   if (!input.paused) {
-    await processNextQueuedQuoteOverlay();
+    await processNextQueuedQuoteOverlay(context);
   }
 
-  return getObsOverlayAdminStatus();
+  return getObsOverlayAdminStatus(context);
 }
 
-export async function cancelQueuedQuoteOverlays(input: { updatedBy?: string | null }) {
+export async function cancelQueuedQuoteOverlays(context: CreatorContext, input: { updatedBy?: string | null }) {
+  const creatorId = requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
   const now = new Date();
   const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
 
   if (isDemoMode || !db) {
-    const store = getDemoStore();
+    const store = getQuoteDemoStore(context);
     const pending = store.quoteOverlayQueue.filter((entry) => entry.status === "queued");
     for (const entry of pending) {
       entry.status = "cancelled";
       entry.cancelledAt = now.toISOString();
       entry.failureReason = "cancelled_by_admin";
-      await refundQueuedQuoteOverlay(entry, "cancelled");
+      await refundQueuedQuoteOverlay(context, entry, "cancelled");
     }
     store.obsOverlayControl = {
-      ...(store.obsOverlayControl ?? buildDefaultObsOverlayControl(now)),
+      ...(store.obsOverlayControl ?? buildDefaultObsOverlayControl(context, now)),
       updatedAt: now.toISOString(),
       updatedBy: input.updatedBy ?? null,
     };
-    return getObsOverlayAdminStatus();
+    return getObsOverlayAdminStatus(context);
   }
 
   const cancelled = await db
@@ -3417,16 +3514,17 @@ export async function cancelQueuedQuoteOverlays(input: { updatedBy?: string | nu
       cancelledAt: now,
       failureReason: "cancelled_by_admin",
     })
-    .where(eq(quoteOverlayQueue.status, "queued"))
+    .where(and(eq(quoteOverlayQueue.creatorId, creatorId), eq(quoteOverlayQueue.status, "queued")))
     .returning();
 
   for (const row of cancelled) {
-    await refundQueuedQuoteOverlay(serializeQuoteOverlayQueue(row), "cancelled");
+    await refundQueuedQuoteOverlay(context, serializeQuoteOverlayQueue(row), "cancelled");
   }
 
   await db
     .insert(obsOverlayControl)
     .values({
+      creatorId,
       key: OBS_OVERLAY_CONTROL_KEY,
       status: "active",
       pausedAt: null,
@@ -3436,14 +3534,14 @@ export async function cancelQueuedQuoteOverlays(input: { updatedBy?: string | nu
       lastError: null,
     })
     .onConflictDoUpdate({
-      target: obsOverlayControl.key,
+      target: [obsOverlayControl.creatorId, obsOverlayControl.key],
       set: {
         updatedAt: now,
         updatedBy: input.updatedBy ?? null,
       },
     });
 
-  return getObsOverlayAdminStatus();
+  return getObsOverlayAdminStatus(context);
 }
 
 function sortGameSuggestionWithMeta(left: GameSuggestionWithMeta, right: GameSuggestionWithMeta) {
@@ -4517,6 +4615,7 @@ async function transferViewerBalanceToUnifiedViewer(input: {
     const store = getDemoStore();
     const sourceBalance = getBalance(store, input.sourceViewerId);
     const targetBalance = getBalance(store, input.targetViewerId);
+    mergeDemoEconomies(input.sourceViewerId, input.targetViewerId, true);
 
     targetBalance.currentBalance += sourceBalance.currentBalance;
     targetBalance.lifetimeEarned += sourceBalance.lifetimeEarned;
@@ -4540,6 +4639,7 @@ async function transferViewerBalanceToUnifiedViewer(input: {
   }
 
   await db.transaction(async (tx) => {
+    await mergeCreatorEconomies(tx, input.sourceViewerId, input.targetViewerId, true);
     const [sourceBalance, targetBalance] = await Promise.all([
       tx.select().from(viewerBalances).where(eq(viewerBalances.viewerId, input.sourceViewerId)).limit(1),
       tx.select().from(viewerBalances).where(eq(viewerBalances.viewerId, input.targetViewerId)).limit(1),
@@ -4630,6 +4730,14 @@ async function pruneSyntheticViewersForGoogleAccount(googleAccountId: string, pr
       continue;
     }
 
+    // New currency activity and redirect targets keep a global identity alive.
+    const [communityBalance, communityEntry, redirect] = await Promise.all([
+      db.select({ id: creatorBalances.viewerId }).from(creatorBalances).where(eq(creatorBalances.viewerId, viewer.id)).limit(1),
+      db.select({ id: creatorLedger.id }).from(creatorLedger).where(eq(creatorLedger.viewerId, viewer.id)).limit(1),
+      db.select({ id: economyViewerRedirects.sourceViewerId }).from(economyViewerRedirects).where(eq(economyViewerRedirects.targetViewerId, viewer.id)).limit(1),
+    ]);
+    if (communityBalance.length || communityEntry.length || redirect.length) continue;
+
     const [balance, ledger, redemption, betEntry] = await Promise.all([
       db.select().from(viewerBalances).where(eq(viewerBalances.viewerId, viewer.id)).limit(1),
       db.select({ id: pointLedger.id }).from(pointLedger).where(eq(pointLedger.viewerId, viewer.id)).limit(1),
@@ -4655,9 +4763,18 @@ async function pruneSyntheticViewersForGoogleAccount(googleAccountId: string, pr
   }
 
   for (const viewerId of removableViewerIds) {
-    await db.delete(googleAccountViewers).where(eq(googleAccountViewers.viewerId, viewerId));
-    await db.delete(viewerBalances).where(eq(viewerBalances.viewerId, viewerId));
-    await db.delete(users).where(eq(users.id, viewerId));
+    await db.transaction(async (tx) => {
+      await lockEconomyIdentity(tx, true);
+      const [balance, entry, redirect] = await Promise.all([
+        tx.select({ id: creatorBalances.viewerId }).from(creatorBalances).where(eq(creatorBalances.viewerId, viewerId)).limit(1),
+        tx.select({ id: creatorLedger.id }).from(creatorLedger).where(eq(creatorLedger.viewerId, viewerId)).limit(1),
+        tx.select({ id: economyViewerRedirects.sourceViewerId }).from(economyViewerRedirects).where(eq(economyViewerRedirects.targetViewerId, viewerId)).limit(1),
+      ]);
+      if (balance.length || entry.length || redirect.length) return;
+      await tx.delete(googleAccountViewers).where(eq(googleAccountViewers.viewerId, viewerId));
+      await tx.delete(viewerBalances).where(eq(viewerBalances.viewerId, viewerId));
+      await tx.delete(users).where(eq(users.id, viewerId));
+    });
   }
 }
 
@@ -4678,7 +4795,7 @@ export async function listViewerChannelsForGoogleAccount(googleAccountId: string
           return channel;
         }
 
-        const dashboard = await getViewerDashboard(unifiedViewer.id);
+        const dashboard = await getViewerPoints(unifiedViewer.id);
         return dashboard
           ? {
               ...channel,
@@ -4702,14 +4819,16 @@ export async function listViewerChannelsForGoogleAccount(googleAccountId: string
     })
     .from(googleAccountViewers)
     .innerJoin(users, eq(googleAccountViewers.viewerId, users.id))
-    .innerJoin(viewerBalances, eq(users.id, viewerBalances.viewerId))
+    .leftJoin(viewerBalances, eq(users.id, viewerBalances.viewerId))
     .where(eq(googleAccountViewers.googleAccountId, googleAccountId))
     .orderBy(desc(googleAccountViewers.createdAt));
 
   return sortChannels(
     await withUnifiedBalances(
       filterVisibleViewerChannels(
-        rows.map(({ viewer, balance }) => buildViewerChannelOption(serializeViewer(viewer), serializeViewerBalance(balance))),
+        rows.map(({ viewer, balance }) => buildViewerChannelOption(serializeViewer(viewer), balance ? serializeViewerBalance(balance) : {
+          viewerId: viewer.id, currentBalance: 0, lifetimeEarned: 0, lifetimeSpent: 0, lastSyncedAt: viewer.createdAt.toISOString(),
+        })),
       ),
     ),
   );
@@ -4728,16 +4847,15 @@ export async function setActiveViewerForGoogleAccount(googleAccountId: string, v
     if (!account) {
       return null;
     }
+    consolidateDemoAccountEconomies(googleAccountId, viewerId);
     account.activeViewerId = viewerId;
     return getDemoViewerById(store, viewerId);
   }
 
-  await db
-    .update(googleAccounts)
-    .set({
-      activeViewerId: viewerId,
-    })
-    .where(eq(googleAccounts.id, googleAccountId));
+  await db.transaction(async (tx) => {
+    await consolidateAccountEconomies(tx, googleAccountId, viewerId);
+    await tx.update(googleAccounts).set({ activeViewerId: viewerId }).where(eq(googleAccounts.id, googleAccountId));
+  });
 
   return withViewerById(viewerId);
 }
@@ -5292,6 +5410,7 @@ export async function ensureViewerFromSession(input: SessionBootstrapInput) {
     googleAccount.email = input.email;
     googleAccount.displayName = input.name;
     googleAccount.avatarUrl = input.image;
+    consolidateDemoAccountEconomies(googleAccount.id, preferredViewer.id);
     googleAccount.activeViewerId = preferredViewer.id;
 
     return preferredViewer;
@@ -5495,16 +5614,13 @@ export async function ensureViewerFromSession(input: SessionBootstrapInput) {
     });
   }
 
-  await db
-    .update(googleAccounts)
-    .set({
-      googleUserId: input.googleUserId,
-      email: input.email,
-      displayName: input.name,
-      avatarUrl: input.image,
-      activeViewerId: preferredViewer.id,
-    })
-    .where(eq(googleAccounts.id, googleAccount.id));
+  await db.transaction(async (tx) => {
+    await consolidateAccountEconomies(tx, googleAccount.id, preferredViewer.id);
+    await tx.update(googleAccounts).set({
+      googleUserId: input.googleUserId, email: input.email!, displayName: input.name,
+      avatarUrl: input.image, activeViewerId: preferredViewer.id,
+    }).where(eq(googleAccounts.id, googleAccount.id));
+  });
 
   return withViewerById(preferredViewer.id);
 }
@@ -5526,20 +5642,25 @@ export async function getCatalog() {
   }));
 }
 
-export async function getLeaderboard() {
+export async function getLeaderboard({ limit = 100 }: { limit?: number | null } = {}) {
+  // Only authenticated admin callers may explicitly request the full list.
+  if (limit !== null && (!Number.isSafeInteger(limit) || limit < 1 || limit > 100)) {
+    throw new Error("invalid_leaderboard_limit");
+  }
   const db = getDb();
 
   if (isDemoMode || !db) {
     const store = getDemoStore();
-    return store.viewers
+    const entries = store.viewers
       .map((viewer) => ({
         viewer,
         balance: getBalance(store, viewer.id),
       }))
       .sort((a, b) => b.balance.currentBalance - a.balance.currentBalance);
+    return limit === null ? entries : entries.slice(0, limit);
   }
 
-  const rows = await db
+  const query = db
     .select({
       id: users.id,
       youtubeChannelId: users.youtubeChannelId,
@@ -5556,7 +5677,7 @@ export async function getLeaderboard() {
     .where(eq(users.excludeFromRanking, false))
     .orderBy(desc(viewerBalances.currentBalance));
 
-  return rows;
+  return limit === null ? await query : await query.limit(limit);
 }
 
 export async function getViewerByYoutubeChannelId(youtubeChannelId: string) {
@@ -5603,7 +5724,7 @@ export async function getViewerByYoutubeChannelId(youtubeChannelId: string) {
     return row;
   }
 
-  const unifiedDashboard = await getViewerDashboard(unifiedViewer.id);
+  const unifiedDashboard = await getViewerPoints(unifiedViewer.id);
   return unifiedDashboard
     ? {
         ...row,
@@ -5613,6 +5734,29 @@ export async function getViewerByYoutubeChannelId(youtubeChannelId: string) {
         lastSyncedAt: unifiedDashboard.balance.lastSyncedAt,
       }
     : row;
+}
+
+/** Points-only projection: callers must not read redemption history just to show a balance. */
+export async function getViewerPoints(viewerId: string) {
+  const db = getDb();
+  if (!isDemoMode && !db) throw new Error("database_unavailable");
+  const viewer = await withViewerById(viewerId);
+  if (!viewer) return null;
+  if (!db) {
+    const creditedViewer = await resolveUnifiedViewerForLinkedChannel(viewer);
+    return { viewer, balance: getBalance(getDemoStore(), creditedViewer.id) };
+  }
+  const [balance] = await db.select().from(viewerBalances).where(eq(viewerBalances.viewerId, viewer.id)).limit(1);
+  return {
+    viewer,
+    balance: {
+      viewerId: viewer.id,
+      currentBalance: balance?.currentBalance ?? 0,
+      lifetimeEarned: balance?.lifetimeEarned ?? 0,
+      lifetimeSpent: balance?.lifetimeSpent ?? 0,
+      lastSyncedAt: balance?.lastSyncedAt.toISOString() ?? new Date().toISOString(),
+    },
+  };
 }
 
 export async function getViewerDashboard(viewerId: string) {
@@ -5658,6 +5802,7 @@ export async function getViewerDashboard(viewerId: string) {
     ...entry,
     status: entry.status as RedemptionRecord["status"],
     claimedByBridgeId: entry.claimedByBridgeId,
+    claimedAt: entry.claimedAt?.toISOString() ?? null,
     queuedAt: entry.queuedAt.toISOString(),
     executedAt: entry.executedAt?.toISOString() ?? null,
     failedAt: entry.failedAt?.toISOString() ?? null,
@@ -5912,6 +6057,8 @@ export async function adminAttachYoutubeChannelToGoogleAccount(input: {
     });
     store.googleAccountViewers.push(link);
 
+    if (googleAccount.activeViewerId) consolidateDemoAccountEconomies(googleAccount.id, googleAccount.activeViewerId);
+
     viewer.googleUserId = googleAccount.googleUserId ?? viewer.googleUserId;
     viewer.email = googleAccount.email ?? viewer.email;
     viewer.avatarUrl = viewer.avatarUrl ?? googleAccount.avatarUrl ?? null;
@@ -5957,6 +6104,8 @@ export async function adminAttachYoutubeChannelToGoogleAccount(input: {
         createdAt: new Date(link.createdAt),
       });
 
+      if (googleAccountRow[0].activeViewerId) await consolidateAccountEconomies(tx, input.googleAccountId, googleAccountRow[0].activeViewerId);
+
       await tx
         .update(users)
         .set({
@@ -5983,7 +6132,10 @@ export async function adminAttachYoutubeChannelToGoogleAccount(input: {
   };
 }
 
-export async function listGameSuggestions(viewerId?: string | null) {
+export async function listGameSuggestions(
+  viewerId?: string | null,
+  { refreshHltb = false }: { refreshHltb?: boolean } = {},
+) {
   const db = getDb();
 
   if (isDemoMode || !db) {
@@ -6009,7 +6161,9 @@ export async function listGameSuggestions(viewerId?: string | null) {
     throw error;
   }
 
-  suggestionRows = await refreshStaleHowLongToBeatRows(db, suggestionRows);
+  if (refreshHltb) {
+    suggestionRows = await refreshStaleHowLongToBeatRows(db, suggestionRows);
+  }
 
   const serializedSuggestions = suggestionRows.map(serializeGameSuggestion);
   const viewerIds = [...new Set(serializedSuggestions.map((entry) => entry.viewerId))];
@@ -6018,13 +6172,19 @@ export async function listGameSuggestions(viewerId?: string | null) {
     : [];
   const viewerMap = new Map(suggestionViewers.map((row) => [row.id, serializeViewer(row)]));
   const serializedBoosts = boostRows.map(serializeGameSuggestionBoost);
+  const boostsBySuggestion = new Map<string, GameSuggestionBoostRecord[]>();
+  for (const boost of serializedBoosts) {
+    const entries = boostsBySuggestion.get(boost.suggestionId);
+    if (entries) entries.push(boost);
+    else boostsBySuggestion.set(boost.suggestionId, [boost]);
+  }
 
   return serializedSuggestions
     .map((suggestion) =>
       buildGameSuggestionWithMeta({
         suggestion,
         viewer: viewerMap.get(suggestion.viewerId) ?? null,
-        boosts: serializedBoosts.filter((entry) => entry.suggestionId === suggestion.id),
+        boosts: boostsBySuggestion.get(suggestion.id) ?? [],
         boostSettings,
       }),
     )
@@ -6032,7 +6192,7 @@ export async function listGameSuggestions(viewerId?: string | null) {
 }
 
 export async function listAdminGameSuggestions() {
-  return listGameSuggestions();
+  return listGameSuggestions(undefined, { refreshHltb: true });
 }
 
 export async function listVideoSuggestions(viewerId?: string | null) {
@@ -6066,12 +6226,18 @@ export async function listVideoSuggestions(viewerId?: string | null) {
     : [];
   const viewerMap = new Map(suggestionViewers.map((row) => [row.id, serializeViewer(row)]));
   const serializedBoosts = boostRows.map(serializeVideoSuggestionBoost);
+  const boostsBySuggestion = new Map<string, VideoSuggestionBoostRecord[]>();
+  for (const boost of serializedBoosts) {
+    const entries = boostsBySuggestion.get(boost.suggestionId);
+    if (entries) entries.push(boost);
+    else boostsBySuggestion.set(boost.suggestionId, [boost]);
+  }
 
   return serializedSuggestions.map((suggestion) =>
     buildVideoSuggestionWithMeta({
       suggestion,
       viewer: viewerMap.get(suggestion.viewerId) ?? null,
-      boosts: serializedBoosts.filter((entry) => entry.suggestionId === suggestion.id),
+      boosts: boostsBySuggestion.get(suggestion.id) ?? [],
     }),
   );
 }
@@ -6314,12 +6480,14 @@ export async function listProductRecommendations(options?: {
       ? await db
           .select()
           .from(productRecommendations)
+          .where(eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID))
           .orderBy(productRecommendations.sortOrder, productRecommendations.name)
       : await db
           .select()
           .from(productRecommendations)
           .where(
             and(
+              eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID),
               eq(productRecommendations.isActive, true),
               eq(productRecommendations.moderationStatus, "approved"),
             ),
@@ -6348,6 +6516,7 @@ export async function listProductRecommendations(options?: {
                 updatedAt: productRecommendations.updatedAt,
               })
               .from(productRecommendations)
+              .where(eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID))
               .orderBy(productRecommendations.sortOrder, productRecommendations.name)
           : await db
               .select({
@@ -6366,7 +6535,7 @@ export async function listProductRecommendations(options?: {
                 updatedAt: productRecommendations.updatedAt,
               })
               .from(productRecommendations)
-              .where(eq(productRecommendations.isActive, true))
+              .where(and(eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID), eq(productRecommendations.isActive, true)))
               .orderBy(productRecommendations.sortOrder, productRecommendations.name);
 
         return legacyRows.map((row) =>
@@ -7780,10 +7949,11 @@ export async function createBet(input: {
   return buildBetWithOptions({ bet, options, viewerEntry: null });
 }
 
-async function ensureViewerFromStreamerbotIdentity(input: {
+export async function ensureViewerFromStreamerbotIdentity(input: {
   viewerExternalId: string;
   youtubeDisplayName?: string | null;
   youtubeHandle?: string | null;
+  initializeBalance?: boolean;
 }) {
   const youtubeDisplayName = input.youtubeDisplayName?.trim() || undefined;
   const youtubeHandle = normalizeYoutubeHandle(input.youtubeHandle);
@@ -7805,7 +7975,7 @@ async function ensureViewerFromStreamerbotIdentity(input: {
         isLinked: false,
       });
       store.viewers.push(viewer);
-      getBalance(store, viewer.id);
+      if (input.initializeBalance !== false) getBalance(store, viewer.id);
       return viewer;
     }
 
@@ -7845,7 +8015,7 @@ async function ensureViewerFromStreamerbotIdentity(input: {
       createdAt: new Date(viewer.createdAt),
     });
 
-    await db.insert(viewerBalances).values({
+    if (input.initializeBalance !== false) await db.insert(viewerBalances).values({
       viewerId: viewer.id,
       currentBalance: 0,
       lifetimeEarned: 0,
@@ -7888,7 +8058,7 @@ async function placeBetForViewer(input: {
   source: string;
   requireLinkedViewer: boolean;
 }): Promise<{ entry: BetEntryRecord; option: BetOptionRecord }> {
-  const dashboard = await getViewerDashboard(input.viewer.id);
+  const dashboard = await getViewerPoints(input.viewer.id);
   if (!dashboard) {
     throw new Error("Viewer not found.");
   }
@@ -8290,7 +8460,7 @@ export async function getViewerBalanceFromChatCommand(input: {
   }
 
   const unifiedViewer = await resolveUnifiedViewerForLinkedChannel(viewer);
-  const dashboard = await getViewerDashboard(unifiedViewer.id);
+  const dashboard = await getViewerPoints(unifiedViewer.id);
   if (!dashboard) {
     throw new Error("viewer_not_ready");
   }
@@ -8302,7 +8472,7 @@ export async function getViewerBalanceFromChatCommand(input: {
   };
 }
 
-export async function runQuoteCommandFromChat(input: {
+export async function runQuoteCommandFromChat(context: CreatorContext, input: {
   action: "create" | "get" | "show";
   viewerExternalId?: string;
   youtubeDisplayName?: string | null;
@@ -8315,6 +8485,9 @@ export async function runQuoteCommandFromChat(input: {
   isAdmin?: boolean;
   source: string;
 }) {
+  const creatorId = requireCreatorContext(context);
+  if (!isDemoMode && !getDb()) throw new Error("database_unavailable");
+  if (input.action === "show") requireDefaultCreatorCapability(context);
   if (input.action === "create") {
     if (!input.viewerExternalId?.trim()) {
       throw new Error("viewer_external_id_required");
@@ -8328,9 +8501,10 @@ export async function runQuoteCommandFromChat(input: {
       viewerExternalId: input.viewerExternalId,
       youtubeDisplayName: input.youtubeDisplayName,
       youtubeHandle: input.youtubeHandle,
+      initializeBalance: creatorId === DEFAULT_CREATOR_ID,
     });
     const unifiedViewer = await resolveUnifiedViewerForLinkedChannel(viewer);
-    const quote = await createQuoteRecord({
+    const quote = await createQuoteRecord(context, {
       body: input.quoteText,
       viewer: unifiedViewer,
       source: input.source,
@@ -8358,8 +8532,8 @@ export async function runQuoteCommandFromChat(input: {
       youtubeHandle: input.youtubeHandle,
     });
     const unifiedViewer = await resolveUnifiedViewerForLinkedChannel(viewer);
-    const quote = await getQuoteRecord({ quoteId: input.quoteId });
-    const request = await requestQuoteOverlay({
+    const quote = await getQuoteRecord(context, { quoteId: input.quoteId });
+    const request = await requestQuoteOverlay(context, {
       quote,
       viewer: unifiedViewer,
       source: input.source,
@@ -8375,7 +8549,7 @@ export async function runQuoteCommandFromChat(input: {
     };
   }
 
-  const quote = await getQuoteRecord({ quoteId: input.quoteId });
+  const quote = await getQuoteRecord(context, { quoteId: input.quoteId });
   return {
     action: "get" as const,
     quote,
@@ -8383,19 +8557,21 @@ export async function runQuoteCommandFromChat(input: {
   };
 }
 
-export async function showQuoteOverlayForViewer(input: {
+export async function showQuoteOverlayForViewer(context: CreatorContext, input: {
   viewerId: string;
   quoteId: number;
   source: string;
   displayDurationSeconds?: number | null;
 }) {
+  requireCreatorContext(context);
+  requireDefaultCreatorCapability(context);
   const viewer = await withViewerById(input.viewerId);
   if (!viewer) {
     throw new Error("Viewer not found.");
   }
 
-  const quote = await getQuoteRecord({ quoteId: input.quoteId });
-  const request = await requestQuoteOverlay({
+  const quote = await getQuoteRecord(context, { quoteId: input.quoteId });
+  const request = await requestQuoteOverlay(context, {
     quote,
     viewer,
     source: input.source,
@@ -9270,7 +9446,7 @@ export async function redeemItem({
   itemId: string;
   source: string;
 }) {
-  const dashboard = await getViewerDashboard(viewerId);
+  const dashboard = await getViewerPoints(viewerId);
   if (!dashboard) {
     throw new Error("Viewer not found.");
   }
@@ -9357,6 +9533,7 @@ export async function redeemItem({
       ...entry,
       status: entry.status as RedemptionRecord["status"],
       claimedByBridgeId: entry.claimedByBridgeId,
+      claimedAt: entry.claimedAt?.toISOString() ?? null,
       queuedAt: entry.queuedAt.toISOString(),
       executedAt: entry.executedAt?.toISOString() ?? null,
       failedAt: entry.failedAt?.toISOString() ?? null,
@@ -9365,6 +9542,7 @@ export async function redeemItem({
     ...entry,
     status: entry.status as RedemptionRecord["status"],
     claimedByBridgeId: entry.claimedByBridgeId,
+    claimedAt: entry.claimedAt?.toISOString() ?? null,
     queuedAt: entry.queuedAt.toISOString(),
     executedAt: entry.executedAt?.toISOString() ?? null,
     failedAt: entry.failedAt?.toISOString() ?? null,
@@ -9526,9 +9704,10 @@ export async function upsertProductRecommendation(input: ProductRecommendationRe
   }
 
   try {
-    await db
+    const [saved] = await db
       .insert(productRecommendations)
       .values({
+        creatorId: DEFAULT_CREATOR_ID,
         id: input.id,
         slug: input.slug,
         name: input.name,
@@ -9546,6 +9725,7 @@ export async function upsertProductRecommendation(input: ProductRecommendationRe
       })
       .onConflictDoUpdate({
         target: productRecommendations.id,
+        setWhere: eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID),
         set: {
           slug: input.slug,
           name: input.name,
@@ -9560,7 +9740,8 @@ export async function upsertProductRecommendation(input: ProductRecommendationRe
           sortOrder: input.sortOrder,
           updatedAt: new Date(input.updatedAt),
         },
-      });
+      }).returning({ id: productRecommendations.id });
+    if (!saved) throw new Error("recommendation_not_found");
   } catch (error) {
     if (isMissingProductRecommendationSchemaError(error)) {
       const store = getDemoStore();
@@ -9695,7 +9876,7 @@ export async function updateProductRecommendationStatus(input: {
     const [updated] = await db
       .update(productRecommendations)
       .set(changes)
-      .where(eq(productRecommendations.id, input.recommendationId))
+      .where(and(eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID), eq(productRecommendations.id, input.recommendationId)))
       .returning();
 
     if (!updated) {
@@ -9756,7 +9937,7 @@ export async function deleteProductRecommendation(recommendationId: string) {
   try {
     const [deleted] = await db
       .delete(productRecommendations)
-      .where(eq(productRecommendations.id, recommendationId))
+      .where(and(eq(productRecommendations.creatorId, DEFAULT_CREATOR_ID), eq(productRecommendations.id, recommendationId)))
       .returning();
 
     if (!deleted) {
@@ -9789,14 +9970,27 @@ export async function deleteProductRecommendation(recommendationId: string) {
 export async function listAdminRedemptions() {
   const db = getDb();
   if (isDemoMode || !db) {
-    return getDemoStore().redemptions;
+    const store = getDemoStore();
+    return [...store.redemptions].sort((a, b) => +new Date(b.queuedAt) - +new Date(a.queuedAt)).slice(0, 100).map((entry) => ({
+      ...entry,
+      itemName: store.catalog.find((item) => item.id === entry.catalogItemId)?.name ?? entry.catalogItemId,
+      viewerName: store.viewers.find((viewer) => viewer.id === entry.viewerId)?.youtubeDisplayName ?? entry.viewerId,
+    }));
   }
 
-  const rows = await db.select().from(redemptions).orderBy(desc(redemptions.queuedAt));
-  return rows.map((entry) => ({
+  const rows = await db.select({ redemption: redemptions, itemName: catalogItems.name, viewerName: users.youtubeDisplayName })
+    .from(redemptions)
+    .leftJoin(catalogItems, eq(catalogItems.id, redemptions.catalogItemId))
+    .leftJoin(users, eq(users.id, redemptions.viewerId))
+    .where(eq(redemptions.creatorId, DEFAULT_CREATOR_ID))
+    .orderBy(desc(redemptions.queuedAt), desc(redemptions.id)).limit(100);
+  return rows.map(({ redemption: entry, itemName, viewerName }) => ({
     ...entry,
+    itemName: itemName ?? entry.catalogItemId,
+    viewerName: viewerName ?? entry.viewerId,
     status: entry.status as RedemptionRecord["status"],
     claimedByBridgeId: entry.claimedByBridgeId,
+    claimedAt: entry.claimedAt?.toISOString() ?? null,
     queuedAt: entry.queuedAt.toISOString(),
     executedAt: entry.executedAt?.toISOString() ?? null,
     failedAt: entry.failedAt?.toISOString() ?? null,
@@ -10533,6 +10727,14 @@ export async function ingestStreamerbotEvent(input: {
 
     const serializedViewer = serializeViewer(viewer);
     const creditedViewer = await resolveUnifiedViewerForLinkedChannel(serializedViewer);
+    // A shared identity may have been created by another community's quote command,
+    // which deliberately does not initialize the default creator's economy.
+    await db.insert(viewerBalances).values({
+      viewerId: creditedViewer.id,
+      currentBalance: 0,
+      lifetimeEarned: 0,
+      lifetimeSpent: 0,
+    }).onConflictDoNothing({ target: viewerBalances.viewerId });
     if (input.eventType === "channel_subscription") {
       const [existingSubscriptionReward] = await db
         .select()
@@ -10761,6 +10963,7 @@ export async function bridgeClaim(redemptionId: string, bridgeId: string) {
     }
     redemption.status = "executing";
     redemption.claimedByBridgeId = bridgeId;
+    redemption.claimedAt = new Date().toISOString();
     redemption.bridgeAttemptCount += 1;
     return redemption;
   }
@@ -10770,15 +10973,16 @@ export async function bridgeClaim(redemptionId: string, bridgeId: string) {
     .set({
       status: "executing",
       claimedByBridgeId: bridgeId,
+      claimedAt: new Date(),
       bridgeAttemptCount: sql`${redemptions.bridgeAttemptCount} + 1`,
     })
-    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.status, "queued")))
+    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.creatorId, DEFAULT_CREATOR_ID), eq(redemptions.status, "queued")))
     .returning();
 
   return claimed ?? null;
 }
 
-export async function bridgeComplete(redemptionId: string) {
+export async function bridgeComplete(redemptionId: string, executionNote?: string) {
   const db = getDb();
   if (isDemoMode || !db) {
     const store = getDemoStore();
@@ -10794,6 +10998,7 @@ export async function bridgeComplete(redemptionId: string) {
     }
     redemption.status = "completed";
     redemption.executedAt = new Date().toISOString();
+    redemption.executionNote = executionNote ?? null;
     return redemption;
   }
 
@@ -10802,14 +11007,15 @@ export async function bridgeComplete(redemptionId: string) {
     .set({
       status: "completed",
       executedAt: new Date(),
+      executionNote: executionNote ?? null,
     })
-    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.status, "executing")))
+    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.creatorId, DEFAULT_CREATOR_ID), eq(redemptions.status, "executing")))
     .returning();
 
   if (completed) {
     return completed;
   }
-  const [redemption] = await db.select().from(redemptions).where(eq(redemptions.id, redemptionId)).limit(1);
+  const [redemption] = await db.select().from(redemptions).where(and(eq(redemptions.id, redemptionId), eq(redemptions.creatorId, DEFAULT_CREATOR_ID))).limit(1);
   return redemption?.status === "completed" ? redemption : null;
 }
 
@@ -10846,7 +11052,7 @@ export async function bridgeFail(redemptionId: string, failureReason: string) {
     return redemption;
   }
 
-  const [redemption] = await db.select().from(redemptions).where(eq(redemptions.id, redemptionId)).limit(1);
+  const [redemption] = await db.select().from(redemptions).where(and(eq(redemptions.id, redemptionId), eq(redemptions.creatorId, DEFAULT_CREATOR_ID))).limit(1);
   if (!redemption) {
     return null;
   }
@@ -10862,6 +11068,7 @@ export async function bridgeFail(redemptionId: string, failureReason: string) {
       .where(
         and(
           eq(redemptions.id, redemptionId),
+          eq(redemptions.creatorId, DEFAULT_CREATOR_ID),
           inArray(redemptions.status, ["queued", "executing"]),
         ),
       )
@@ -10890,6 +11097,6 @@ export async function bridgeFail(redemptionId: string, failureReason: string) {
     });
   });
 
-  const [updated] = await db.select().from(redemptions).where(eq(redemptions.id, redemptionId)).limit(1);
+  const [updated] = await db.select().from(redemptions).where(and(eq(redemptions.id, redemptionId), eq(redemptions.creatorId, DEFAULT_CREATOR_ID))).limit(1);
   return updated ?? null;
 }

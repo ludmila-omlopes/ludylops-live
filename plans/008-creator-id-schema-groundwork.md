@@ -15,7 +15,7 @@
 
 ## Status
 
-- **Reconciliation**: implemented and locally verified on 2026-09-20; [PR #194](https://github.com/ludmila-omlopes/ludylops-live/pull/194) brings this change to master. PR #193 was merged into the former #190 branch after #190 had reached master. Shared/production schema application remains a separate deployment step.
+- **Reconciliation**: implemented and locally verified on 2026-09-20; integrated via [PR #194](https://github.com/ludmila-omlopes/ludylops-live/pull/194). PR #193 had been merged into the former #190 branch after #190 reached master. Shared/production schema application remains a separate deployment step.
 
 - **Priority**: P1
 - **Effort**: M

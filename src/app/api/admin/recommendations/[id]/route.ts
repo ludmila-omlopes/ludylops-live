@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { fail, isTrustedAppMutationRequest, ok, requireAdminApiSession } from "@/lib/api";
 import {
   deleteProductRecommendation,
@@ -9,6 +10,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const moduleDenial = await guardModuleRequest(request, ["product_recommendations"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }
@@ -43,6 +47,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const moduleDenial = await guardModuleRequest(request, ["product_recommendations"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

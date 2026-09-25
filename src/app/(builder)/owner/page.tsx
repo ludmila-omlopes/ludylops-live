@@ -35,8 +35,7 @@ export default async function OwnerPage() {
                 Nova área
               </h2>
               <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[var(--color-ink-soft)]">
-                Crie uma instância para um criador aprovado no beta e deixe domínio,
-                branding inicial e módulos principais preparados.
+                Convide um criador para reunir sua comunidade com nome, cores e moeda próprios.
               </p>
             </div>
             <div className="border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5 shadow-[6px_6px_0_var(--shadow-color)] sm:p-6">

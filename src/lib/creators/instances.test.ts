@@ -21,27 +21,20 @@ describe("platform creator instances", () => {
     getDbMock.mockReset();
   });
 
-  it("returns the default creator when no database is configured", async () => {
+  it("does not synthesize installed modules when production storage is unavailable", async () => {
     getDbMock.mockReturnValue(null);
 
-    const instances = await listPlatformCreatorInstances();
-
-    expect(instances).toHaveLength(1);
-    expect(instances[0].creator.slug).toBe("ludylops");
-    expect(instances[0].moduleSummary.installed).toBeGreaterThan(0);
+    await expect(listPlatformCreatorInstances()).rejects.toThrow("module_policy_unavailable");
   });
 
-  it("keeps the default creator available while the creator schema is missing", async () => {
+  it("reports missing schema instead of presenting a synthetic configuration", async () => {
     getDbMock.mockReturnValue({
       select() {
         throw new Error('Failed query: select * from "creators": relation "creators" does not exist');
       },
     });
 
-    const instances = await listPlatformCreatorInstances();
-
-    expect(instances).toHaveLength(1);
-    expect(instances[0].creator.id).toBe("creator_ludylops");
+    await expect(listPlatformCreatorInstances()).rejects.toThrow("does not exist");
   });
 
   it("validates creator and module statuses", () => {

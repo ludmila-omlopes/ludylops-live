@@ -25,7 +25,7 @@ type LiveStatusPayload = {
   isLive: boolean;
 };
 
-const QUOTE_POLL_INTERVAL_MS = 200;
+const QUOTE_POLL_INTERVAL_MS = 1_000;
 const LIVE_STATUS_POLL_INTERVAL_MS = 5_000;
 
 const DEMO_OVERLAY: QuoteOverlayPayload = {
@@ -88,7 +88,7 @@ async function playQuoteOverlayChime() {
   });
 }
 
-export function ObsQuoteOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
+export function ObsQuoteOverlay({ creatorSlug, initialStyle = "classic" }: { creatorSlug: string; initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
   const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
@@ -106,7 +106,7 @@ export function ObsQuoteOverlay({ initialStyle = "classic" }: { initialStyle?: O
 
     async function loadLiveStatus() {
       try {
-        const response = await fetch("/api/obs/live-status", {
+        const response = await fetch(`/api/obs/live-status?creator=${encodeURIComponent(creatorSlug)}`, {
           cache: "no-store",
         });
 
@@ -159,7 +159,7 @@ export function ObsQuoteOverlay({ initialStyle = "classic" }: { initialStyle?: O
         window.clearTimeout(timeout);
       }
     };
-  }, [isDemo]);
+  }, [isDemo, creatorSlug]);
 
   useEffect(() => {
     if (isDemo || !isLive) {
@@ -171,7 +171,7 @@ export function ObsQuoteOverlay({ initialStyle = "classic" }: { initialStyle?: O
 
     async function loadOverlay() {
       try {
-        const response = await fetch("/api/obs/quotes/current", {
+        const response = await fetch(`/api/obs/quotes/current?creator=${encodeURIComponent(creatorSlug)}`, {
           cache: "no-store",
         });
 
@@ -216,7 +216,7 @@ export function ObsQuoteOverlay({ initialStyle = "classic" }: { initialStyle?: O
         window.clearTimeout(timeout);
       }
     };
-  }, [isDemo, isLive]);
+  }, [isDemo, isLive, creatorSlug]);
 
   const overlay = isDemo ? DEMO_OVERLAY : liveOverlay;
 

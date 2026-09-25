@@ -1,3 +1,4 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { z } from "zod";
 
 import { fail, isTrustedAppMutationRequest, ok, requireAdminApiSession } from "@/lib/api";
@@ -19,6 +20,9 @@ const currentGameActionSchema = z.discriminatedUnion("action", [
 ]);
 
 export async function POST(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["streamerbot"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

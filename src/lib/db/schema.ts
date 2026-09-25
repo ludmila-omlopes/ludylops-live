@@ -1,14 +1,19 @@
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 
 export const users = pgTable(
   "users",
@@ -43,6 +48,23 @@ export const creators = pgTable(
   (table) => ({
     slugIdx: uniqueIndex("creators_slug_idx").on(table.slug),
     ownerUserIdIdx: index("creators_owner_user_id_idx").on(table.ownerUserId),
+  }),
+);
+
+export const streamerbotCredentials = pgTable(
+  "streamerbot_credentials",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+    encryptedSecret: text("encrypted_secret").notNull(),
+    status: varchar("status", { length: 16 }).default("active").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    retiringUntil: timestamp("retiring_until", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (table) => ({
+    creatorIdIdx: index("streamerbot_credentials_creator_id_idx").on(table.creatorId),
   }),
 );
 
@@ -159,6 +181,113 @@ export const viewerBalances = pgTable("viewer_balances", {
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Additive storage: legacy deployments cannot read or mutate another creator's currency.
+export const creatorBalances = pgTable("creator_balances", {
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  viewerId: varchar("viewer_id", { length: 64 }).references(() => users.id).notNull(),
+  currentBalance: integer("current_balance").default(0).notNull(),
+  lifetimeEarned: integer("lifetime_earned").default(0).notNull(),
+  lifetimeSpent: integer("lifetime_spent").default(0).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.creatorId, table.viewerId] }),
+  viewerIdx: index("creator_balances_viewer_idx").on(table.viewerId),
+  nonnegative: check("creator_balances_nonnegative", sql`${table.currentBalance} >= 0 AND ${table.lifetimeEarned} >= 0 AND ${table.lifetimeSpent} >= 0`),
+  nonlegacy: check("creator_balances_nonlegacy", sql`${table.creatorId} <> 'creator_ludylops'`),
+}));
+
+export const creatorLedger = pgTable("creator_ledger", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  viewerId: varchar("viewer_id", { length: 64 }).references(() => users.id).notNull(),
+  operationKey: varchar("operation_key", { length: 128 }).notNull(),
+  kind: varchar("kind", { length: 16 }).notNull(),
+  amount: integer("amount").notNull(),
+  reason: varchar("reason", { length: 160 }).notNull(),
+  refundOf: varchar("refund_of", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  eventIdx: uniqueIndex("creator_ledger_operation_idx").on(table.creatorId, table.operationKey),
+  refundIdx: uniqueIndex("creator_ledger_refund_idx").on(table.creatorId, table.refundOf),
+  historyIdx: index("creator_ledger_history_idx").on(table.creatorId, table.viewerId, table.createdAt),
+  nonlegacy: check("creator_ledger_nonlegacy", sql`${table.creatorId} <> 'creator_ludylops'`),
+}));
+
+// Source IDs deliberately survive deletion of a merged identity.
+export const economyViewerRedirects = pgTable("economy_viewer_redirects", {
+  sourceViewerId: varchar("source_viewer_id", { length: 64 }).primaryKey(),
+  targetViewerId: varchar("target_viewer_id", { length: 64 }).references(() => users.id).notNull(),
+});
+
+// New communities never enter the legacy catalog/bridge queue.
+export const creatorCatalogItems = pgTable("creator_catalog_items", {
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  id: varchar("id", { length: 64 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  description: varchar("description", { length: 1000 }).notNull(),
+  cost: integer("cost").notNull(),
+  stock: integer("stock"),
+  isActive: boolean("is_active").default(false).notNull(),
+  globalCooldownSeconds: integer("global_cooldown_seconds").default(0).notNull(),
+  viewerCooldownSeconds: integer("viewer_cooldown_seconds").default(0).notNull(),
+  streamerbotActionRef: varchar("streamerbot_action_ref", { length: 255 }).notNull(),
+  revision: integer("revision").default(1).notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.creatorId, t.id] }),
+  nonlegacy: check("creator_catalog_nonlegacy", sql`${t.creatorId} <> 'creator_ludylops'`),
+  values: check("creator_catalog_values", sql`${t.cost} > 0 AND (${t.stock} IS NULL OR ${t.stock} >= 0) AND ${t.globalCooldownSeconds} >= 0 AND ${t.viewerCooldownSeconds} >= 0`),
+}));
+
+export const creatorRedemptions = pgTable("creator_redemptions", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  viewerId: varchar("viewer_id", { length: 64 }).references(() => users.id).notNull(),
+  catalogItemId: varchar("catalog_item_id", { length: 64 }).notNull(),
+  itemName: varchar("item_name", { length: 120 }).notNull(),
+  actionRef: varchar("action_ref", { length: 255 }).notNull(),
+  status: varchar("status", { length: 32 }).default("queued").notNull(),
+  costAtPurchase: integer("cost_at_purchase").notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 128 }).notNull(),
+  debitId: varchar("debit_id", { length: 64 }).references(() => creatorLedger.id).notNull(),
+  bridgeAttemptCount: integer("bridge_attempt_count").default(0).notNull(),
+  claimedByBridgeId: varchar("claimed_by_bridge_id", { length: 64 }),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  executionNote: varchar("execution_note", { length: 255 }),
+  queuedAt: timestamp("queued_at", { withTimezone: true }).defaultNow().notNull(),
+  executedAt: timestamp("executed_at", { withTimezone: true }),
+  failedAt: timestamp("failed_at", { withTimezone: true }),
+  failureReason: varchar("failure_reason", { length: 255 }),
+}, (t) => ({
+  eventIdx: uniqueIndex("creator_redemptions_event_idx").on(t.creatorId, t.idempotencyKey),
+  queueIdx: index("creator_redemptions_queue_idx").on(t.creatorId, t.status, t.queuedAt),
+  historyIdx: index("creator_redemptions_history_idx").on(t.creatorId, t.viewerId, t.queuedAt),
+  itemIdx: index("creator_redemptions_item_idx").on(t.creatorId, t.catalogItemId, t.queuedAt),
+  nonlegacy: check("creator_redemptions_nonlegacy", sql`${t.creatorId} <> 'creator_ludylops'`),
+}));
+
+export const creatorBridgeStatus = pgTable("creator_bridge_status", {
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  bridgeId: varchar("bridge_id", { length: 64 }).notNull(),
+  lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => ({
+  pk: primaryKey({ columns: [t.creatorId, t.bridgeId] }),
+  nonlegacy: check("creator_bridge_status_nonlegacy", sql`${t.creatorId} <> 'creator_ludylops'`),
+}));
+
+export const creatorRedemptionResolutions = pgTable("creator_redemption_resolutions", {
+  redemptionId: varchar("redemption_id", { length: 64 }).primaryKey().references(() => creatorRedemptions.id),
+  creatorId: varchar("creator_id", { length: 64 }).references(() => creators.id).notNull(),
+  // Historical actor, intentionally not an FK: account consolidation must not rewrite the audit.
+  ownerViewerId: varchar("owner_viewer_id", { length: 64 }).notNull(),
+  outcome: varchar("outcome", { length: 16 }).notNull(),
+  note: varchar("note", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => ({
+  creatorIdx: index("creator_resolutions_creator_idx").on(t.creatorId, t.createdAt),
+  nonlegacy: check("creator_resolutions_nonlegacy", sql`${t.creatorId} <> 'creator_ludylops'`),
+  validOutcome: check("creator_resolutions_outcome", sql`${t.outcome} in ('completed', 'failed')`),
+}));
+
 export const viewerLinks = pgTable(
   "viewer_links",
   {
@@ -204,6 +333,10 @@ export const pointLedger = pgTable(
   "point_ledger",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull()
+      .default(DEFAULT_CREATOR_ID),
     viewerId: varchar("viewer_id", { length: 64 })
       .references(() => users.id)
       .notNull(),
@@ -216,12 +349,17 @@ export const pointLedger = pgTable(
   },
   (table) => ({
     eventIdx: uniqueIndex("point_ledger_external_event_idx").on(table.externalEventId),
+    creatorIdIdx: index("point_ledger_creator_id_idx").on(table.creatorId),
     viewerCreatedIdx: index("point_ledger_viewer_created_idx").on(table.viewerId, table.createdAt),
   }),
 );
 
 export const bets = pgTable("bets", {
   id: varchar("id", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 })
+    .references(() => creators.id)
+    .notNull()
+    .default(DEFAULT_CREATOR_ID),
   question: text("question").notNull(),
   optionMode: varchar("option_mode", { length: 32 }).default("preset").notNull(),
   status: varchar("status", { length: 32 }).notNull(),
@@ -232,22 +370,34 @@ export const bets = pgTable("bets", {
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   winningOptionId: varchar("winning_option_id", { length: 64 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  creatorIdIdx: index("bets_creator_id_idx").on(table.creatorId),
+}));
 
 export const betOptions = pgTable("bet_options", {
   id: varchar("id", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 })
+    .references(() => creators.id)
+    .notNull()
+    .default(DEFAULT_CREATOR_ID),
   betId: varchar("bet_id", { length: 64 })
     .references(() => bets.id)
     .notNull(),
   label: varchar("label", { length: 255 }).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
   poolAmount: integer("pool_amount").default(0).notNull(),
-});
+}, (table) => ({
+  creatorIdIdx: index("bet_options_creator_id_idx").on(table.creatorId),
+}));
 
 export const betEntries = pgTable(
   "bet_entries",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull()
+      .default(DEFAULT_CREATOR_ID),
     betId: varchar("bet_id", { length: 64 })
       .references(() => bets.id)
       .notNull(),
@@ -266,24 +416,35 @@ export const betEntries = pgTable(
   },
   (table) => ({
     betViewerIdx: uniqueIndex("bet_entries_bet_viewer_idx").on(table.betId, table.viewerId),
+    creatorIdIdx: index("bet_entries_creator_id_idx").on(table.creatorId),
     viewerIdx: index("bet_entries_viewer_id_idx").on(table.viewerId),
   }),
 );
 
 export const liveLikeGoals = pgTable("live_like_goals", {
   id: varchar("id", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 })
+    .references(() => creators.id)
+    .notNull()
+    .default(DEFAULT_CREATOR_ID),
   label: varchar("label", { length: 255 }),
   targetLikeCount: integer("target_like_count").notNull(),
   rewardAmount: integer("reward_amount").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  creatorIdIdx: index("live_like_goals_creator_id_idx").on(table.creatorId),
+}));
 
 export const liveLikeGoalRewards = pgTable(
   "live_like_goal_rewards",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull()
+      .default(DEFAULT_CREATOR_ID),
     goalId: varchar("goal_id", { length: 64 })
       .references(() => liveLikeGoals.id)
       .notNull(),
@@ -299,11 +460,16 @@ export const liveLikeGoalRewards = pgTable(
       table.goalId,
       table.broadcastId,
     ),
+    creatorIdIdx: index("live_like_goal_rewards_creator_id_idx").on(table.creatorId),
   }),
 );
 
 export const gameSuggestions = pgTable("game_suggestions", {
   id: varchar("id", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 })
+    .references(() => creators.id)
+    .notNull()
+    .default(DEFAULT_CREATOR_ID),
   viewerId: varchar("viewer_id", { length: 64 })
     .references(() => users.id)
     .notNull(),
@@ -347,12 +513,18 @@ export const gameSuggestions = pgTable("game_suggestions", {
   totalVotes: integer("total_votes").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  creatorIdIdx: index("game_suggestions_creator_id_idx").on(table.creatorId),
+}));
 
 export const gameSuggestionBoosts = pgTable(
   "game_suggestion_boosts",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull()
+      .default(DEFAULT_CREATOR_ID),
     suggestionId: varchar("suggestion_id", { length: 64 })
       .references(() => gameSuggestions.id)
       .notNull(),
@@ -364,6 +536,7 @@ export const gameSuggestionBoosts = pgTable(
   },
   (table) => ({
     suggestionIdx: index("game_suggestion_boosts_suggestion_id_idx").on(table.suggestionId),
+    creatorIdIdx: index("game_suggestion_boosts_creator_id_idx").on(table.creatorId),
     viewerIdx: index("game_suggestion_boosts_viewer_id_idx").on(table.viewerId),
   }),
 );
@@ -409,6 +582,10 @@ export const psPlusCatalogSyncState = pgTable("ps_plus_catalog_sync_state", {
 
 export const videoSuggestions = pgTable("video_suggestions", {
   id: varchar("id", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 })
+    .references(() => creators.id)
+    .notNull()
+    .default(DEFAULT_CREATOR_ID),
   viewerId: varchar("viewer_id", { length: 64 })
     .references(() => users.id)
     .notNull(),
@@ -422,12 +599,18 @@ export const videoSuggestions = pgTable("video_suggestions", {
   totalVotes: integer("total_votes").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  creatorIdIdx: index("video_suggestions_creator_id_idx").on(table.creatorId),
+}));
 
 export const videoSuggestionBoosts = pgTable(
   "video_suggestion_boosts",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull()
+      .default(DEFAULT_CREATOR_ID),
     suggestionId: varchar("suggestion_id", { length: 64 })
       .references(() => videoSuggestions.id)
       .notNull(),
@@ -439,12 +622,17 @@ export const videoSuggestionBoosts = pgTable(
   },
   (table) => ({
     suggestionIdx: index("video_suggestion_boosts_suggestion_id_idx").on(table.suggestionId),
+    creatorIdIdx: index("video_suggestion_boosts_creator_id_idx").on(table.creatorId),
     viewerIdx: index("video_suggestion_boosts_viewer_id_idx").on(table.viewerId),
   }),
 );
 
 export const creatorSuggestions = pgTable("creator_suggestions", {
   id: varchar("id", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 })
+    .references(() => creators.id)
+    .notNull()
+    .default(DEFAULT_CREATOR_ID),
   viewerId: varchar("viewer_id", { length: 64 })
     .references(() => users.id)
     .notNull(),
@@ -458,12 +646,18 @@ export const creatorSuggestions = pgTable("creator_suggestions", {
   totalVotes: integer("total_votes").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  creatorIdIdx: index("creator_suggestions_creator_id_idx").on(table.creatorId),
+}));
 
 export const creatorSuggestionBoosts = pgTable(
   "creator_suggestion_boosts",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull()
+      .default(DEFAULT_CREATOR_ID),
     suggestionId: varchar("suggestion_id", { length: 64 })
       .references(() => creatorSuggestions.id)
       .notNull(),
@@ -475,6 +669,7 @@ export const creatorSuggestionBoosts = pgTable(
   },
   (table) => ({
     suggestionIdx: index("creator_suggestion_boosts_suggestion_id_idx").on(table.suggestionId),
+    creatorIdIdx: index("creator_suggestion_boosts_creator_id_idx").on(table.creatorId),
     viewerIdx: index("creator_suggestion_boosts_viewer_id_idx").on(table.viewerId),
   }),
 );
@@ -483,6 +678,10 @@ export const productRecommendations = pgTable(
   "product_recommendations",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull()
+      .default(DEFAULT_CREATOR_ID),
     slug: varchar("slug", { length: 160 }).notNull(),
     name: varchar("name", { length: 255 }).notNull(),
     category: varchar("category", { length: 32 }).notNull(),
@@ -499,6 +698,7 @@ export const productRecommendations = pgTable(
   },
   (table) => ({
     slugIdx: uniqueIndex("product_recommendations_slug_idx").on(table.slug),
+    creatorIdIdx: index("product_recommendations_creator_id_idx").on(table.creatorId),
     moderationStatusIdx: index("product_recommendations_moderation_status_idx").on(
       table.moderationStatus,
     ),
@@ -509,6 +709,10 @@ export const redemptions = pgTable(
   "redemptions",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull()
+      .default(DEFAULT_CREATOR_ID),
     viewerId: varchar("viewer_id", { length: 64 })
       .references(() => users.id)
       .notNull(),
@@ -521,6 +725,8 @@ export const redemptions = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 128 }).notNull(),
     bridgeAttemptCount: integer("bridge_attempt_count").default(0).notNull(),
     claimedByBridgeId: varchar("claimed_by_bridge_id", { length: 64 }),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    executionNote: varchar("execution_note", { length: 255 }),
     queuedAt: timestamp("queued_at", { withTimezone: true }).defaultNow().notNull(),
     executedAt: timestamp("executed_at", { withTimezone: true }),
     failedAt: timestamp("failed_at", { withTimezone: true }),
@@ -528,6 +734,7 @@ export const redemptions = pgTable(
   },
   (table) => ({
     viewerIdx: index("redemptions_viewer_id_idx").on(table.viewerId),
+    creatorIdIdx: index("redemptions_creator_id_idx").on(table.creatorId),
     statusQueuedIdx: index("redemptions_status_queued_at_idx").on(table.status, table.queuedAt),
   }),
 );
@@ -536,12 +743,17 @@ export const bridgeClients = pgTable(
   "bridge_clients",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull()
+      .default(DEFAULT_CREATOR_ID),
     machineKey: varchar("machine_key", { length: 128 }).notNull(),
     label: varchar("label", { length: 255 }).notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     machineKeyIdx: uniqueIndex("bridge_clients_machine_key_idx").on(table.machineKey),
+    creatorIdIdx: index("bridge_clients_creator_id_idx").on(table.creatorId),
   }),
 );
 
@@ -549,6 +761,10 @@ export const streamerbotEventLog = pgTable(
   "streamerbot_event_log",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 })
+      .references(() => creators.id)
+      .notNull()
+      .default(DEFAULT_CREATOR_ID),
     eventId: varchar("event_id", { length: 128 }).notNull(),
     eventType: varchar("event_type", { length: 64 }).notNull(),
     viewerExternalId: varchar("viewer_external_id", { length: 128 }),
@@ -558,6 +774,7 @@ export const streamerbotEventLog = pgTable(
   },
   (table) => ({
     eventIdIdx: uniqueIndex("streamerbot_event_id_idx").on(table.eventId),
+    creatorIdIdx: index("streamerbot_event_log_creator_id_idx").on(table.creatorId),
   }),
 );
 
@@ -565,6 +782,7 @@ export const quotes = pgTable(
   "quotes",
   {
     id: varchar("id", { length: 64 }).primaryKey(),
+    creatorId: varchar("creator_id", { length: 64 }).default(DEFAULT_CREATOR_ID).notNull().references(() => creators.id),
     quoteNumber: integer("quote_number").notNull(),
     body: text("body").notNull(),
     createdByViewerId: varchar("created_by_viewer_id", { length: 64 })
@@ -576,7 +794,7 @@ export const quotes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
-    quoteNumberIdx: uniqueIndex("quotes_quote_number_idx").on(table.quoteNumber),
+    quoteNumberIdx: uniqueIndex("quotes_creator_quote_number_idx").on(table.creatorId, table.quoteNumber),
   }),
 );
 
@@ -591,7 +809,8 @@ export const googleRiscDeliveries = pgTable("google_risc_deliveries", {
 });
 
 export const quoteOverlayState = pgTable("quote_overlay_state", {
-  slot: varchar("slot", { length: 32 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 }).default(DEFAULT_CREATOR_ID).notNull().references(() => creators.id),
+  slot: varchar("slot", { length: 32 }).notNull(),
   overlayId: varchar("overlay_id", { length: 64 }).notNull(),
   quoteNumber: integer("quote_number").notNull(),
   quoteBody: text("quote_body").notNull(),
@@ -606,19 +825,21 @@ export const quoteOverlayState = pgTable("quote_overlay_state", {
   cost: integer("cost").notNull(),
   activatedAt: timestamp("activated_at", { withTimezone: true }).defaultNow().notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [primaryKey({ columns: [table.creatorId, table.slot] })]);
 
 export const obsOverlayControl = pgTable("obs_overlay_control", {
-  key: varchar("key", { length: 64 }).primaryKey(),
+  creatorId: varchar("creator_id", { length: 64 }).default(DEFAULT_CREATOR_ID).notNull().references(() => creators.id),
+  key: varchar("key", { length: 64 }).notNull(),
   status: varchar("status", { length: 32 }).default("active").notNull(),
   pausedAt: timestamp("paused_at", { withTimezone: true }),
   resumedAt: timestamp("resumed_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   updatedBy: varchar("updated_by", { length: 255 }),
   lastError: text("last_error"),
-});
+}, (table) => [primaryKey({ columns: [table.creatorId, table.key] })]);
 
 export const quoteOverlayQueue = pgTable("quote_overlay_queue", {
+  creatorId: varchar("creator_id", { length: 64 }).default(DEFAULT_CREATOR_ID).notNull().references(() => creators.id),
   id: varchar("id", { length: 64 }).primaryKey(),
   quoteNumber: integer("quote_number").notNull(),
   quoteBody: text("quote_body").notNull(),
@@ -638,7 +859,7 @@ export const quoteOverlayQueue = pgTable("quote_overlay_queue", {
   processedAt: timestamp("processed_at", { withTimezone: true }),
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   failureReason: text("failure_reason"),
-});
+}, (table) => [index("quote_overlay_queue_creator_id_idx").on(table.creatorId)]);
 
 export const streamerbotCounters = pgTable("streamerbot_counters", {
   key: varchar("key", { length: 64 }).primaryKey(),

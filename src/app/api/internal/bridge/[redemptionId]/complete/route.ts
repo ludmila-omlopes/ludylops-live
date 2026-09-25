@@ -1,3 +1,5 @@
+import { guardVerifiedModules } from "@/lib/creators/module-access";
+import { defaultCreatorContext } from "@/lib/creators/context";
 import { fail, ok } from "@/lib/api";
 import { bridgeComplete } from "@/lib/db/repository";
 import { env } from "@/lib/env";
@@ -18,7 +20,9 @@ export async function POST(
   if (!valid) {
     return fail("Invalid signature.", 401);
   }
-  await bridgeCompleteSchema.parse(JSON.parse(raw));
+  const moduleDenial = await guardVerifiedModules(defaultCreatorContext, ["redemptions"]);
+  if (moduleDenial) return moduleDenial;
+  const payload = bridgeCompleteSchema.parse(JSON.parse(raw));
   const { redemptionId } = await params;
-  return ok(await bridgeComplete(redemptionId));
+  return ok(await bridgeComplete(redemptionId, payload.executionNote));
 }

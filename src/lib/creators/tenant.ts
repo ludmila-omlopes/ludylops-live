@@ -9,8 +9,9 @@ import {
   DEFAULT_CREATOR_MODULES,
   DEFAULT_CREATOR_SLUG,
 } from "@/lib/creators/defaults";
-import { findDemoCreatorTenantByHostname, findDemoCreatorTenantBySlug } from "@/lib/creators/demo-store";
-import { normalizeCreatorSlug, normalizeHostname } from "@/lib/creators/identity";
+import { findDemoCreatorTenantByHostname, findDemoCreatorTenantBySlug, listDemoCreatorTenants } from "@/lib/creators/demo-store";
+import { normalizeCreatorSlug, normalizeHostname, normalizePublicHostname } from "@/lib/creators/identity";
+import { isLegacyCommunityHost, isPlatformHost } from "./hosts";
 import { getDb } from "@/lib/db/client";
 import { creatorBranding, creatorDomains, creatorModules, creators } from "@/lib/db/schema";
 import type {
@@ -23,7 +24,7 @@ import type {
 
 type CreatorDb = Pick<NonNullable<ReturnType<typeof getDb>>, "select">;
 
-type ResolveCreatorOptions = {
+export type ResolveCreatorOptions = {
   request?: Request | null;
   hostname?: string | null;
   slug?: string | null;
@@ -248,6 +249,7 @@ async function findCreatorByHostname(db: CreatorDb, hostname: string) {
   return creatorRow ? serializeCreator(creatorRow) : null;
 }
 
+/** Legacy internal/admin compatibility loader. Never use for public or integration traffic. */
 export async function resolveCreatorFromRequest(
   input?: Request | ResolveCreatorOptions | null,
 ): Promise<CreatorTenantRecord> {
@@ -289,6 +291,68 @@ export async function resolveCreatorFromRequest(
   }
 }
 
+const LEGACY_PUBLIC_PATHS = new Set([
+  "/", "/apostas", "/contadores", "/indicacoes", "/jogos", "/me",
+  "/privacy", "/produtinhos", "/quotes", "/ranking", "/terms", "/videos",
+]);
+
+function publicRequestHostname(options: ResolveCreatorOptions) {
+  const request = options.request;
+  const value = options.hostname !== undefined
+    ? options.hostname
+    : request?.headers.get("x-forwarded-host") ?? request?.headers.get("host")
+      ?? (request ? new URL(request.url).host : null);
+  return normalizePublicHostname(value);
+}
+
+/**
+ * Request-time serving boundary: only active creators, no implicit default.
+ * See docs/creator-lifecycle.md for host/path precedence and integration adoption.
+ */
+export async function resolvePublicCreatorFromRequest(
+  input?: Request | ResolveCreatorOptions | null,
+): Promise<CreatorTenantRecord | null> {
+  const options: ResolveCreatorOptions = input instanceof Request ? { request: input } : input ?? {};
+  const request = options.request ?? null;
+  const hostname = publicRequestHostname(options);
+  if ((options.hostname !== undefined || request) && !hostname) return null;
+
+  const pathname = options.pathname ?? getRequestPathname(request);
+  const pathParts = pathname?.split("/");
+  const slugInputs = [
+    ...(options.slug !== undefined ? [options.slug] : []),
+    ...(request?.headers.has("x-creator-slug") ? [request.headers.get("x-creator-slug")] : []),
+    ...(pathParts?.[1] === "c" ? [pathParts[2]] : []),
+  ];
+  const slugs = slugInputs.map(normalizeCreatorSlug);
+  if (slugs.some((slug) => !slug) || new Set(slugs).size > 1) return null;
+  const explicitSlug = slugs[0] ?? null;
+  // Keep old /c links valid, but never choose a streamer implicitly on the hub.
+  const platformHost = isPlatformHost(hostname) || isLegacyCommunityHost(hostname);
+  const useDefault = !explicitSlug && isLegacyCommunityHost(hostname) && LEGACY_PUBLIC_PATHS.has(pathname ?? "");
+  if ((!hostname && !explicitSlug) || (platformHost && !explicitSlug && !useDefault)) return null;
+
+  const db = getDb();
+  if (!db) {
+    const bySlug = (slug: string) => findDemoCreatorTenantBySlug(slug)
+      ?? (slug === DEFAULT_CREATOR_SLUG ? defaultCreatorTenant : null);
+    const tenant = hostname && !platformHost
+      ? listDemoCreatorTenants().find((entry) => entry.domains.some((domain) => domain.hostname === hostname)) ?? null
+      : bySlug(explicitSlug ?? DEFAULT_CREATOR_SLUG);
+    return tenant?.creator.status === "active" && (!explicitSlug || tenant.creator.slug === explicitSlug)
+      ? tenant : null;
+  }
+
+  // Database/schema failures must propagate; a synthetic default could revive a disabled creator.
+  const creator = hostname && !platformHost
+    ? await findCreatorByHostname(db, hostname)
+    : await findCreatorBySlug(db, explicitSlug ?? DEFAULT_CREATOR_SLUG);
+  if (!creator || creator.status !== "active" || (explicitSlug && creator.slug !== explicitSlug)) return null;
+  return loadCreatorTenant(db, creator);
+}
+
 export async function requireCreator(input?: Request | ResolveCreatorOptions | null) {
-  return resolveCreatorFromRequest(input);
+  const tenant = await resolvePublicCreatorFromRequest(input);
+  if (!tenant) throw new Error("creator_unavailable");
+  return tenant;
 }

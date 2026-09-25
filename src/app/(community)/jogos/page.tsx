@@ -1,14 +1,17 @@
+import { requireModulePage } from '@/lib/creators/module-page-access';
 import { auth } from "@/auth";
 import { GameSuggestionList } from "@/components/game-suggestion-list";
-import { getPipetzPricing, getViewerDashboard, listGameSuggestions } from "@/lib/db/repository";
+import { getPipetzPricing, getViewerPoints, listGameSuggestions } from "@/lib/db/repository";
 import { adminEmails, isDemoMode } from "@/lib/env";
 
 export default async function JogosPage() {
+  await requireModulePage(["game_suggestions"]);
+
   const session = await auth();
   const activeViewerId = session?.user?.activeViewerId ?? null;
   const [suggestions, dashboard, pricing] = await Promise.all([
     listGameSuggestions(activeViewerId),
-    activeViewerId ? getViewerDashboard(activeViewerId) : Promise.resolve(null),
+    activeViewerId ? getViewerPoints(activeViewerId) : Promise.resolve(null),
     getPipetzPricing(),
   ]);
 

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   cookies: vi.fn(),
   isLive: vi.fn(),
+  tenant: vi.fn(),
 }));
 
 vi.mock("next/font/google", () => ({
@@ -14,7 +15,9 @@ vi.mock("next/font/google", () => ({
   Geist: () => ({ variable: "font-sans" }),
   IBM_Plex_Mono: () => ({ variable: "font-mono" }),
 }));
-vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
+vi.mock("next/headers", () => ({ cookies: mocks.cookies, headers: async () => new Headers({ host: "localhost" }) }));
+vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("not_found"); } }));
+vi.mock("@/lib/creators/tenant", () => ({ resolvePublicCreatorFromRequest: mocks.tenant }));
 vi.mock("@/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/streamerbot/live-status", () => ({
   isStreamerbotLivestreamActive: mocks.isLive,
@@ -33,6 +36,8 @@ vi.mock("@/components/obs-shell", () => ({
   ObsShell: ({ children }: { children: React.ReactNode }) =>
     React.createElement("obs-shell", null, children),
 }));
+
+import { DEFAULT_CREATOR_MODULES } from "@/lib/creators/defaults";
 
 import RootLayout from "@/app/layout";
 import BuilderLayout, { metadata as builderMetadata } from "@/app/(builder)/layout";
@@ -61,6 +66,7 @@ describe("product layouts", () => {
       user: { email: "owner@example.com", isLinked: false },
     });
     mocks.isLive.mockResolvedValue(true);
+    mocks.tenant.mockResolvedValue({ creator: { id: "creator_ludylops", status: "active" }, modules: DEFAULT_CREATOR_MODULES });
   });
 
   it("keeps the root neutral and limited to theme cookies", async () => {
@@ -112,6 +118,13 @@ describe("product layouts", () => {
     expect(mocks.isLive).not.toHaveBeenCalled();
   });
 
+  it.each([null, { creator: { id: "creator_other" } }])("blocks unscoped community dependencies for other or invalid creators", async tenant => {
+    mocks.tenant.mockResolvedValue(tenant);
+    await expect(CommunityLayout({ children: null })).rejects.toThrow("not_found");
+    expect(mocks.auth).not.toHaveBeenCalled();
+    expect(mocks.isLive).not.toHaveBeenCalled();
+  });
+
   it("keeps creator-public and OBS free of community providers", () => {
     const children = React.createElement("div", null, "public");
     const creatorResult = CreatorPublicLayout({ children });
@@ -126,7 +139,7 @@ describe("product layouts", () => {
 
   it("defines product-specific metadata", () => {
     expect(builderMetadata).toEqual({
-      title: "Comunidades",
+      title: { default: "Creator Hub", template: "%s · Creator Hub" },
       description: "Prepare o encontro da sua comunidade com a próxima live.",
     });
     expect(creatorMetadata).toEqual({ title: "Comunidade" });

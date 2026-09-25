@@ -1,3 +1,4 @@
+import { requireModulePage } from '@/lib/creators/module-page-access';
 import { redirect } from "next/navigation";
 
 import { PipetzBalanceCard } from "@/components/pipetz-balance-card";
@@ -9,6 +10,8 @@ import { getCatalog, getViewerDashboard, listViewerChannelsForGoogleAccount } fr
 import { requireSession } from "@/lib/auth/session";
 
 export default async function MePage() {
+  await requireModulePage(["points","redemptions"]);
+
   const session = await requireSession();
   const googleAccountId = session.user!.googleAccountId;
   const [dashboard, catalog, channels] = await Promise.all([

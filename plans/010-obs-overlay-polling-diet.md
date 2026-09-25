@@ -14,7 +14,8 @@
 
 ## Status
 
-- **Reconciliation**: planning update only; implementation remains pending. Issue #175 is synchronized from this file.
+- **State**: IMPLEMENTED on `codex/010-overlay-polling-diet`, based on `5d195d9` after PR #198; awaiting review/merge.
+- **Reconciliation (2026-09-22)**: the quote pilot added creator context to its URLs; that context and the existing 5s quote status loop are preserved. The other four pollers still matched the plan. See delivery notes below.
 
 - **Priority**: P2
 - **Effort**: S
@@ -30,7 +31,7 @@ The OBS overlays are Vercel serverless invocations + Neon queries on every poll,
 
 Configured steady-state upper rates for five open sources: about 9.2 requests/s today while live (5 quotes + 4 other data + 0.2 status), versus 5.47 after this plan (5 data + 0.2 quote status + 4/15 other status). Offline: about 4.2 before versus 0.47 after. Excludes initial requests/retries; self-rescheduling loops slow with request latency. These are request forecasts, not measured billing or query counts.
 
-## Current state
+## State before implementation
 
 All five overlay components are `"use client"` and poll `force-dynamic`, `no-store` endpoints under `/api/obs/*`.
 
@@ -104,7 +105,7 @@ In `obs-quote-overlay.tsx:28`, change `QUOTE_POLL_INTERVAL_MS` from `200` to `1_
 
 For each of bet/like-goal/subscriber/wheel, replicate the quote overlay's structure (`obs-quote-overlay.tsx:96-162` for status polling, `:164-219` for the gated data loop):
 
-1. Add `isLive` state + a live-status poll of `/api/obs/live-status` every `LIVE_STATUS_POLL_INTERVAL_MS = 15_000` (15s — these overlays tolerate a slower wake-up than quotes; a stream going live shows overlay data within ≤15s, acceptable).
+1. Add `isLive` state + a live-status poll of `/api/obs/live-status` every `LIVE_STATUS_POLL_INTERVAL_MS = 15_000` (15s — these overlays tolerate a slower wake-up than quotes; the next check starts within 15s after the previous response; total live detection also depends on the existing YouTube cache and network latency).
 2. Gate the existing 1s data poll on `isLive` (and keep the existing `isDemo` short-circuits exactly as they are). When not live, clear the overlay data state (mirror `setLiveOverlay(null)`).
 3. Extract the data interval into a named constant `…_POLL_INTERVAL_MS = 1_000` if not already named.
 4. Convert plain `setInterval` data loops to the self-rescheduling `setTimeout` + `cancelled` pattern to match the quote overlay (prevents overlapping requests on slow responses).
@@ -132,11 +133,11 @@ One judgment call made for you: when the live-status fetch **fails**, treat it a
 
 ## Done criteria
 
-- [ ] `QUOTE_POLL_INTERVAL_MS` is `1_000`
-- [ ] All four previously-ungated overlays poll data only when live; live-status at 15s
-- [ ] No `/api/obs/*` route handler modified (`git diff --stat` shows only the five components)
-- [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
-- [ ] `plans/README.md` status row updated
+- [x] `QUOTE_POLL_INTERVAL_MS` is `1_000`
+- [x] All four previously-ungated overlays poll data only when live; live-status at 15s
+- [x] No `/api/obs/*` route handler modified (runtime diff contains only the five components; tests and planning records are also included)
+- [x] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all exit 0
+- [x] `plans/README.md` status row updated
 
 ## STOP conditions
 
@@ -149,3 +150,15 @@ One judgment call made for you: when the live-status fetch **fails**, treat it a
 - Plan 013 (overlay delivery design spike) may replace this polling entirely with push; this plan is the cheap stopgap that is worth doing regardless.
 - When white-label ships per-creator overlays, these intervals multiply per creator — revisit the 1s live interval if creator count grows before 013 lands.
 - Reviewer focus: the `isLive` gating must not delay a *quote redemption* mid-live (quotes path unchanged except 200ms→1s), and demo modes must be pixel-identical.
+
+## Delivery notes — 2026-09-22
+
+- Quote polling changed only from 200ms to 1s. The mutating quote GET, queue, cache policy, status loop and creator prop are unchanged.
+- Bets, likes, subscribers and wheel now check status immediately and then every 15s after completion. Data polling starts after a positive result and reschedules 1s after each completed response. Failed/denied/invalid status clears live data and pauses the data loop.
+- Both reads propagate all explicit creator query values; repeated/invalid selectors remain available for server rejection. A previous creator status cannot start another creator's data loop. The server still rejects non-default unscoped overlays.
+- AbortController and cancellation guards prevent late state changes after offline, context changes or unmount. Existing clocks, subscriber duration/deduplication and demo cycles remain unchanged. Likes render no loading banner while offline.
+- Subscriber storage retains up to 20 recent alerts over a two-minute window; the 15s status cadence does not require sub-second alert expiry changes. Offline clears the displayed queue; seen IDs remain seen, as intended for already-consumed alerts.
+- The status endpoint reads a manual override or the existing YouTube status cache (15s, per server instance). It is not an API-free or zero-query endpoint: cold/expired cache entries can query YouTube. No endpoint, cache, bridge or Streamer.bot configuration changed. Request-rate forecasts above are not measured billing savings.
+- 765 tests passed, including 41 component tests using the existing Vitest/jsdom stack. Two pre-existing opt-in PostgreSQL tests were skipped. Lint, typecheck and isolated demo production build passed.
+- Edge browser inspection: five demo renders, no demo API requests or JavaScript errors; four normal overlays offline for more than 15s each made two status requests and zero data requests. Classic/obscur demo branches also passed component tests.
+- No database migration or Streamer.bot setup change. Live quote pickup can take roughly one additional second plus network time; activation after going live depends on the status cadence and its existing cache.

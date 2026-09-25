@@ -14,7 +14,7 @@
 - **Category**: direction / tech-debt
 - **Planned at**: commit `ec19f8f`, reconciled 2026-09-15; same file tree as master `f353ce2`.
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/178
-- **State**: TODO; reconciliation only.
+- **State**: IMPLEMENTED; documentation and local measurement complete, awaiting PR review/merge.
 - **Drift check**: `git diff --stat ec19f8f..HEAD -- src/components src/app/api/obs bridge package.json`
 
 ## Why this matters
@@ -24,7 +24,7 @@ replace transport. The previous plan made a broad SSE/managed-realtime/local
 bridge comparison a prerequisite for onboarding; this revision removes that
 gate. Isolation, permissions and configuration remain pilot release gates.
 
-## Current state
+## State at planning (before #175)
 
 - src/components/obs-quote-overlay.tsx polls quotes every 200 ms while live and
   live status every 5 s. Four other OBS overlays poll their data about once a
@@ -77,12 +77,12 @@ changes. Do not cache/dequeue real viewers' events to perform measurement.
 
 ## Done criteria
 
-- [ ] Complete poll inventory with separate live/offline scenarios.
-- [ ] Arithmetic is reproducible and counts status polls and bridge separately.
-- [ ] Measurements and forecasts are clearly distinguished.
-- [ ] Every quoted external price/limit has a current primary-source citation.
-- [ ] A bounded recommendation and review trigger are recorded.
-- [ ] No production code, shared data or infrastructure was changed.
+- [x] Complete poll inventory with separate live/offline scenarios.
+- [x] Arithmetic is reproducible and counts status polls and bridge separately.
+- [x] Measurements and forecasts are clearly distinguished.
+- [x] Every quoted external price/limit has a current primary-source citation.
+- [x] A bounded recommendation and review trigger are recorded.
+- [x] No production code, shared data or infrastructure was changed.
 
 ## Git workflow and maintenance
 
@@ -91,3 +91,15 @@ if an issue PR completes this revised deliverable. The larger comparison is
 deferred; completing this measurement does not imply a transport migration.
 Revisit when pilot costs/latency exceed the documented trigger or actual usage
 changes. Do not delay the two-creator pilot solely because telemetry is missing.
+
+## Delivery — 2026-09-22
+
+Completed against master 12ef75c, after PRs #199 and #200 merged.
+See [the decision and model](../docs/overlay-delivery-design.md) and
+[local request evidence](../docs/measurements/overlay-delivery-2026-09-22.json).
+Five-source offline observation and synthetic live client-cadence measurement
+completed with no observed HTTP/JavaScript errors. Query counts are static code
+analysis; production SQL, latency, capacity and money remain unknown.
+Retain polling while completing functional creator isolation. No infrastructure
+or production data changed. Validation covers arithmetic, local evidence, source
+links and documentation-only diff; no new application test/build was needed.

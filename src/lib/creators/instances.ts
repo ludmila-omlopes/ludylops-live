@@ -2,12 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import { asc, eq, inArray } from "drizzle-orm";
 
-import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import { DEFAULT_CREATOR_ID, DEFAULT_CREATOR_MODULES } from "@/lib/creators/defaults";
 import {
   creatorModuleCatalog,
   getCreatorModuleManifest,
 } from "@/lib/creators/modules";
 import { defaultCreatorTenant } from "@/lib/creators/tenant";
+import { listDemoCreatorTenants } from "./demo-store";
+import { planModuleTransition } from "./module-policy";
+import { creatorPlatformUrl } from "./platform";
 import { getDb } from "@/lib/db/client";
 import {
   creatorBranding,
@@ -27,7 +30,11 @@ import type {
   PlatformCreatorInstanceRecord,
 } from "@/lib/types";
 
-const creatorStatuses = ["active", "disabled", "archived"] as const satisfies readonly CreatorStatus[];
+const creatorStatuses = [
+  "active",
+  "disabled",
+  "archived",
+] as const satisfies readonly CreatorStatus[];
 const creatorModuleStatuses = [
   "installed",
   "disabled",
@@ -36,49 +43,6 @@ const creatorModuleStatuses = [
 
 function toIsoDate(value: Date | string) {
   return value instanceof Date ? value.toISOString() : value;
-}
-
-function isMissingCreatorSchemaError(error: unknown) {
-  const tableNames = [
-    '"creators"',
-    '"creator_domains"',
-    '"creator_branding"',
-    '"creator_modules"',
-    "creators",
-    "creator_domains",
-    "creator_branding",
-    "creator_modules",
-  ];
-  const queue: unknown[] = [error];
-  const visited = new Set<unknown>();
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current || visited.has(current)) {
-      continue;
-    }
-    visited.add(current);
-
-    const message = current instanceof Error ? current.message : typeof current === "string" ? current : "";
-    const normalized = message.toLowerCase();
-    const mentionsTable = tableNames.some((tableName) => normalized.includes(tableName));
-
-    if (
-      mentionsTable &&
-      (normalized.includes("does not exist") ||
-        normalized.includes("relation") ||
-        normalized.includes("table") ||
-        normalized.includes("failed query"))
-    ) {
-      return true;
-    }
-
-    if (typeof current === "object" && current && "cause" in current) {
-      queue.push((current as { cause?: unknown }).cause);
-    }
-  }
-
-  return false;
 }
 
 function serializeCreator(row: typeof creators.$inferSelect): CreatorRecord {
@@ -93,7 +57,9 @@ function serializeCreator(row: typeof creators.$inferSelect): CreatorRecord {
   };
 }
 
-function serializeCreatorBranding(row: typeof creatorBranding.$inferSelect): CreatorBrandingRecord {
+function serializeCreatorBranding(
+  row: typeof creatorBranding.$inferSelect,
+): CreatorBrandingRecord {
   return {
     creatorId: row.creatorId,
     logoUrl: row.logoUrl,
@@ -110,7 +76,9 @@ function serializeCreatorBranding(row: typeof creatorBranding.$inferSelect): Cre
   };
 }
 
-function serializeCreatorDomain(row: typeof creatorDomains.$inferSelect): CreatorDomainRecord {
+function serializeCreatorDomain(
+  row: typeof creatorDomains.$inferSelect,
+): CreatorDomainRecord {
   return {
     id: row.id,
     creatorId: row.creatorId,
@@ -120,7 +88,9 @@ function serializeCreatorDomain(row: typeof creatorDomains.$inferSelect): Creato
   };
 }
 
-function serializeCreatorModule(row: typeof creatorModules.$inferSelect): CreatorModuleRecord {
+function serializeCreatorModule(
+  row: typeof creatorModules.$inferSelect,
+): CreatorModuleRecord {
   return {
     id: row.id,
     creatorId: row.creatorId,
@@ -153,18 +123,6 @@ function publicUrlForDomain(hostname: string | null) {
   return hostname ? `https://${hostname}` : null;
 }
 
-function defaultPlatformCreatorInstance(): PlatformCreatorInstanceRecord {
-  const domain = primaryDomain(defaultCreatorTenant.domains);
-
-  return {
-    ...defaultCreatorTenant,
-    owner: null,
-    primaryDomain: domain,
-    publicUrl: publicUrlForDomain(domain),
-    moduleSummary: moduleSummary(defaultCreatorTenant.modules),
-  };
-}
-
 function buildInstance(input: {
   creator: CreatorRecord;
   owner: PlatformCreatorInstanceRecord["owner"];
@@ -187,12 +145,7 @@ function buildInstance(input: {
       : isDefaultCreator
         ? defaultCreatorTenant.domains
         : [];
-  const modules =
-    input.modules.length > 0
-      ? input.modules
-      : isDefaultCreator
-        ? defaultCreatorTenant.modules
-        : [];
+  const modules = input.modules;
   const domain = primaryDomain(domains);
 
   return {
@@ -202,7 +155,7 @@ function buildInstance(input: {
     domains,
     modules,
     primaryDomain: domain,
-    publicUrl: publicUrlForDomain(domain),
+    publicUrl: publicUrlForDomain(domain) ?? creatorPlatformUrl(input.creator.slug),
     moduleSummary: moduleSummary(modules),
   };
 }
@@ -211,79 +164,94 @@ export function isCreatorStatus(value: string): value is CreatorStatus {
   return creatorStatuses.includes(value as CreatorStatus);
 }
 
-export function isCreatorModuleStatus(value: string): value is CreatorModuleStatus {
+export function isCreatorModuleStatus(
+  value: string,
+): value is CreatorModuleStatus {
   return creatorModuleStatuses.includes(value as CreatorModuleStatus);
 }
 
-export async function listPlatformCreatorInstances(): Promise<PlatformCreatorInstanceRecord[]> {
+export async function listPlatformCreatorInstances(): Promise<
+  PlatformCreatorInstanceRecord[]
+> {
   const db = getDb();
-  if (isDemoMode || !db) {
-    return [defaultPlatformCreatorInstance()];
+  if (isDemoMode) {
+    return [
+      defaultCreatorTenant,
+      ...listDemoCreatorTenants().filter(
+        (entry) => entry.creator.id !== DEFAULT_CREATOR_ID,
+      ),
+    ].map((tenant) => buildInstance({ ...tenant, owner: null }));
+  }
+  if (!db) throw new Error("module_policy_unavailable");
+
+  const creatorRows = await db
+    .select({
+      id: creators.id,
+      slug: creators.slug,
+      displayName: creators.displayName,
+      ownerUserId: creators.ownerUserId,
+      status: creators.status,
+      createdAt: creators.createdAt,
+      updatedAt: creators.updatedAt,
+      ownerEmail: users.email,
+      ownerYoutubeDisplayName: users.youtubeDisplayName,
+      ownerYoutubeHandle: users.youtubeHandle,
+      ownerAvatarUrl: users.avatarUrl,
+    })
+    .from(creators)
+    .leftJoin(users, eq(creators.ownerUserId, users.id))
+    .orderBy(asc(creators.displayName));
+
+  if (creatorRows.length === 0) {
+    return [];
   }
 
-  try {
-    const creatorRows = await db
-      .select({
-        id: creators.id,
-        slug: creators.slug,
-        displayName: creators.displayName,
-        ownerUserId: creators.ownerUserId,
-        status: creators.status,
-        createdAt: creators.createdAt,
-        updatedAt: creators.updatedAt,
-        ownerEmail: users.email,
-        ownerYoutubeDisplayName: users.youtubeDisplayName,
-        ownerYoutubeHandle: users.youtubeHandle,
-        ownerAvatarUrl: users.avatarUrl,
-      })
-      .from(creators)
-      .leftJoin(users, eq(creators.ownerUserId, users.id))
-      .orderBy(asc(creators.displayName));
+  const creatorIds = creatorRows.map((row) => row.id);
+  const [domainRows, brandingRows, moduleRows] = await Promise.all([
+    db
+      .select()
+      .from(creatorDomains)
+      .where(inArray(creatorDomains.creatorId, creatorIds)),
+    db
+      .select()
+      .from(creatorBranding)
+      .where(inArray(creatorBranding.creatorId, creatorIds)),
+    db
+      .select()
+      .from(creatorModules)
+      .where(inArray(creatorModules.creatorId, creatorIds)),
+  ]);
 
-    if (creatorRows.length === 0) {
-      return [defaultPlatformCreatorInstance()];
-    }
+  return creatorRows.map((row) => {
+    const creator = serializeCreator(row);
+    const domains = domainRows
+      .filter((domain) => domain.creatorId === creator.id)
+      .map(serializeCreatorDomain)
+      .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
+    const modules = moduleRows
+      .filter((module) => module.creatorId === creator.id)
+      .map(serializeCreatorModule);
+    const branding = brandingRows.find(
+      (entry) => entry.creatorId === creator.id,
+    );
 
-    const creatorIds = creatorRows.map((row) => row.id);
-    const [domainRows, brandingRows, moduleRows] = await Promise.all([
-      db.select().from(creatorDomains).where(inArray(creatorDomains.creatorId, creatorIds)),
-      db.select().from(creatorBranding).where(inArray(creatorBranding.creatorId, creatorIds)),
-      db.select().from(creatorModules).where(inArray(creatorModules.creatorId, creatorIds)),
-    ]);
-
-    return creatorRows.map((row) => {
-      const creator = serializeCreator(row);
-      const domains = domainRows
-        .filter((domain) => domain.creatorId === creator.id)
-        .map(serializeCreatorDomain)
-        .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
-      const modules = moduleRows
-        .filter((module) => module.creatorId === creator.id)
-        .map(serializeCreatorModule);
-      const branding = brandingRows.find((entry) => entry.creatorId === creator.id);
-
-      return buildInstance({
-        creator,
-        owner: row.ownerUserId
-          ? {
-              id: row.ownerUserId,
-              email: row.ownerEmail,
-              youtubeDisplayName: row.ownerYoutubeDisplayName ?? row.ownerEmail ?? "Sem nome",
-              youtubeHandle: row.ownerYoutubeHandle,
-              avatarUrl: row.ownerAvatarUrl,
-            }
-          : null,
-        branding: branding ? serializeCreatorBranding(branding) : null,
-        domains,
-        modules,
-      });
+    return buildInstance({
+      creator,
+      owner: row.ownerUserId
+        ? {
+            id: row.ownerUserId,
+            email: row.ownerEmail,
+            youtubeDisplayName:
+              row.ownerYoutubeDisplayName ?? row.ownerEmail ?? "Sem nome",
+            youtubeHandle: row.ownerYoutubeHandle,
+            avatarUrl: row.ownerAvatarUrl,
+          }
+        : null,
+      branding: branding ? serializeCreatorBranding(branding) : null,
+      domains,
+      modules,
     });
-  } catch (error) {
-    if (isMissingCreatorSchemaError(error)) {
-      return [defaultPlatformCreatorInstance()];
-    }
-    throw error;
-  }
+  });
 }
 
 export async function updatePlatformCreatorStatus(input: {
@@ -291,15 +259,21 @@ export async function updatePlatformCreatorStatus(input: {
   status: CreatorStatus;
 }) {
   const db = getDb();
-  if (isDemoMode || !db) {
-    return input.creatorId === DEFAULT_CREATOR_ID
-      ? {
-          ...defaultCreatorTenant.creator,
-          status: input.status,
-          updatedAt: new Date().toISOString(),
-        }
-      : null;
+  if (isDemoMode) {
+    const tenant =
+      listDemoCreatorTenants().find(
+        (entry) => entry.creator.id === input.creatorId,
+      ) ??
+      (input.creatorId === DEFAULT_CREATOR_ID ? defaultCreatorTenant : null);
+    if (!tenant) return null;
+    tenant.creator = {
+      ...tenant.creator,
+      status: input.status,
+      updatedAt: new Date().toISOString(),
+    };
+    return tenant.creator;
   }
+  if (!db) throw new Error("module_policy_unavailable");
 
   const [updated] = await db
     .update(creators)
@@ -323,41 +297,97 @@ export async function updatePlatformCreatorModuleStatus(input: {
     return null;
   }
 
-  const db = getDb();
-  if (isDemoMode || !db) {
-    return input.creatorId === DEFAULT_CREATOR_ID
-      ? {
-          id: `creator_module_demo_${manifest.key}`,
-          creatorId: input.creatorId,
-          moduleKey: manifest.key,
-          status: input.status,
-          configJson: manifest.defaultConfig,
-          installedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-      : null;
-  }
+  const defaultConfig = input.creatorId === DEFAULT_CREATOR_ID
+    ? DEFAULT_CREATOR_MODULES.find((entry) => entry.moduleKey === manifest.key)!.configJson
+    : manifest.defaultConfig;
 
-  const now = new Date();
-  const [updated] = await db
-    .insert(creatorModules)
-    .values({
-      id: randomUUID(),
+  const db = getDb();
+  if (isDemoMode) {
+    const tenant =
+      listDemoCreatorTenants().find(
+        (entry) => entry.creator.id === input.creatorId,
+      ) ??
+      (input.creatorId === DEFAULT_CREATOR_ID ? defaultCreatorTenant : null);
+    if (!tenant) return null;
+    assertModuleTransition(tenant.modules, manifest.key, input.status);
+    const existing = tenant.modules.find(
+      (entry) => entry.moduleKey === manifest.key,
+    );
+    const updated = {
+      ...existing,
+      id: existing?.id ?? randomUUID(),
       creatorId: input.creatorId,
       moduleKey: manifest.key,
       status: input.status,
-      configJson: manifest.defaultConfig,
-      installedAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [creatorModules.creatorId, creatorModules.moduleKey],
-      set: {
-        status: input.status,
-        updatedAt: now,
-      },
-    })
-    .returning();
+      configJson: existing?.configJson ?? defaultConfig,
+      installedAt: existing?.installedAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    tenant.modules = [
+      ...tenant.modules.filter((entry) => entry.moduleKey !== manifest.key),
+      updated,
+    ];
+    return updated;
+  }
+  if (!db) throw new Error("module_policy_unavailable");
 
-  return updated ? serializeCreatorModule(updated) : null;
+  return db.transaction(async (tx) => {
+    const [creator] = await tx
+      .select({ id: creators.id })
+      .from(creators)
+      .where(eq(creators.id, input.creatorId))
+      .for("update");
+    if (!creator) return null;
+    const current = await tx
+      .select()
+      .from(creatorModules)
+      .where(eq(creatorModules.creatorId, input.creatorId));
+    assertModuleTransition(current, manifest.key, input.status);
+    const now = new Date();
+    const [updated] = await tx
+      .insert(creatorModules)
+      .values({
+        id: randomUUID(),
+        creatorId: input.creatorId,
+        moduleKey: manifest.key,
+        status: input.status,
+        configJson: defaultConfig,
+        installedAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [creatorModules.creatorId, creatorModules.moduleKey],
+        set: {
+          status: input.status,
+          updatedAt: now,
+        },
+      })
+      .returning();
+
+    return updated ? serializeCreatorModule(updated) : null;
+  });
+}
+
+export class ModuleTransitionError extends Error {
+  constructor(
+    public readonly details: ReturnType<typeof planModuleTransition>,
+  ) {
+    const labels = details.blocking
+      .map((key) => getCreatorModuleManifest(key)?.label ?? key)
+      .join(", ");
+    super(
+      details.kind === "missing_dependencies"
+        ? `Ative primeiro: ${labels}.`
+        : `Desative primeiro os recursos dependentes: ${labels}.`,
+    );
+  }
+}
+
+function assertModuleTransition(
+  rows: { moduleKey: string; status: string }[],
+  key: string,
+  status: string,
+) {
+  const plan = planModuleTransition(creatorModuleCatalog, rows, key, status);
+  if (!plan.allowed) throw new ModuleTransitionError(plan);
 }

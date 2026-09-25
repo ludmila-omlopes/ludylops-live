@@ -9,7 +9,7 @@
 
 ## Status
 
-- **State**: IN PROGRESS (2026-09-15): implementation and local validation complete in `.worktrees/issue-181`; [PR #191](https://github.com/ludmila-omlopes/ludylops-live/pull/191) awaiting integration. Validation: 362 tests (43 new), typecheck, lint, and build without a real database. Transaction/concurrency tests use an adapter simulation; no shared database was queried or changed.
+- **State**: DONE (2026-09-15): implementation and local validation complete in `.worktrees/issue-181`; integrated via [PR #191](https://github.com/ludmila-omlopes/ludylops-live/pull/191). Validation: 362 tests (43 new), typecheck, lint, and build without a real database. Transaction/concurrency tests use an adapter simulation; no shared database was queried or changed.
 
 - **Priority**: P1
 - **Effort**: S

@@ -1,9 +1,12 @@
+import { requireModulePage } from '@/lib/creators/module-page-access';
 import { CounterBoard } from "@/components/counter-board";
 import { getCurrentGame } from "@/lib/current-game";
 import { listStreamerbotCounters } from "@/lib/db/repository";
 import { slugify } from "@/lib/utils";
 
 export default async function ContadoresPage() {
+  await requireModulePage(["streamerbot"]);
+
   const [counters, currentGame] = await Promise.all([
     listStreamerbotCounters(),
     getCurrentGame(),

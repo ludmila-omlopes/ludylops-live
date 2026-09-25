@@ -5,18 +5,21 @@
 > editing `proxy.ts`. Preserve Auth.js protection for existing admin, owner, and
 > viewer routes.
 >
-> **Drift check (run first)**: `git diff --stat ec19f8f..HEAD -- proxy.ts src/lib/creators/identity.ts src/lib/creators/tenant.ts "src/app/(creator-public)/c" README.md`
+> **Drift check (run first)**: `git diff --stat 2565323..HEAD -- proxy.ts src/lib/creators/identity.ts src/lib/creators/tenant.ts src/app/c README.md`
 
 ## Status
 
-- **Reconciliation**: planning update only; implementation remains pending. Issue #182 is synchronized from this file.
+- **Implementation**: completed in `codex/016-creator-hostname-routing` on 2026-09-21; awaiting PR merge. No schema or infrastructure changes applied.
+- **Validation**: 586 tests across 59 files, typecheck, lint and production build passed. Read-only HTTP smoke against the compiled server verified a registered active creator through root/direct/forwarded-host requests, unknown-creator 404, apex behavior and unauthenticated admin/owner/viewer protection. Disabled/archived states are covered by automated resolver tests.
+- **Runtime correction**: moved `proxy.ts` to `src/proxy.ts` next to `src/app`; the root-level file was not included by Next. The compiled build now reports `Proxy (Middleware)`.
+- **Limits**: only the wildcard root opens the existing reservation page. DNS/TLS/Vercel setup remains external, documented in `docs/creator-hostname-routing.md`; module isolation, login callbacks and creator administration are not enabled by this rewrite.
 
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED
 - **Depends on**: plan 017
 - **Category**: bug / tech-debt
-- **Planned at**: commit `ec19f8f`, reconciled 2026-09-15 (same file tree as remote master `f353ce2`).
+- **Planned at**: commit `2565323`, 2026-07-13
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/182
 
 ## Why this matters
@@ -27,7 +30,7 @@ does not rewrite requests by hostname. Even with wildcard DNS/TLS configured,
 requesting a creator subdomain at `/` serves the ordinary root route instead of
 `/c/<slug>`.
 
-## Current state
+## State before implementation
 
 - `service.ts` inserts `${slug}.ludylops.live` into `creator_domains`.
 - `tenant.ts` can extract a creator slug from a subdomain, but its helpers are
@@ -46,14 +49,6 @@ requesting a creator subdomain at `/` serves the ordinary root route instead of
 | Build | `$env:NEXTAUTH_SECRET='ci-build-only-dummy-secret'; npm run build` | exit 0 |
 
 ## Scope
-
-This delivery only routes the wildcard root to the existing creator reservation
-page. It does not make module URLs, API fetches, login callbacks or creator
-administration tenant-aware. A controlled /c/{slug} pilot may precede this work,
-provided its own module requests carry verified context. Do not present a root
-rewrite as full product readiness. Future links must retain the selected
-creator; that navigation/configuration delivery remains unnumbered.
-
 
 **In scope**: a pure tested hostname-routing helper under `src/lib/creators/`,
 `proxy.ts`, focused tests, and a deployment runbook for wildcard DNS, Vercel
@@ -111,11 +106,11 @@ smoke check that validates the response/creator identity without changing DNS.
 
 ## Done criteria
 
-- [ ] Creator wildcard root requests render the creator landing route.
-- [ ] Auth.js route protection remains unchanged.
-- [ ] No database lookup occurs in the wildcard routing hot path.
-- [ ] DNS/TLS/Vercel requirements and smoke checks are documented.
-- [ ] Lint, typecheck, tests, and build pass.
+- [x] Creator wildcard root requests render the creator landing route.
+- [x] Existing Auth.js wrapper and route protection are preserved in the loaded proxy.
+- [x] No database lookup occurs in the wildcard routing hot path.
+- [x] DNS/TLS/Vercel requirements and smoke checks are documented.
+- [x] Lint, typecheck, tests, and build pass.
 
 ## STOP conditions
 

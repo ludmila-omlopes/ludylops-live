@@ -9,7 +9,7 @@
 
 ## Status
 
-- **Reconciliation**: implemented and locally validated on 2026-09-20; [PR #195](https://github.com/ludmila-omlopes/ludylops-live/pull/195) awaits integration after PR #194 brings the already implemented #172 schema to master. No shared/production database or production credential was changed.
+- **Reconciliation**: implemented and locally validated on 2026-09-20; integrated via [PR #195](https://github.com/ludmila-omlopes/ludylops-live/pull/195), after PR #194 integrated the #172 schema into master. No shared/production database or production credential was changed.
 
 - **Priority**: P1
 - **Effort**: L

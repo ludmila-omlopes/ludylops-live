@@ -11,14 +11,36 @@
 - **Priority**: P2; supporting work after the isolation pilot.
 - **Effort**: M
 - **Risk**: HIGH if a key or loader mixes creators; MED for stale public data.
-- **Depends on**: plan 009 / #173 for the context contract, plus actual isolation
-  of each selected loader. Ranking/economy, bets, current-game and live-state
-  follow-ups are not yet numbered; plan 009 alone does not deliver them.
+- **Depends on**: plan 009 / #173 for the context contract and plan 025 / #209
+  for the isolated public ranking, delivered in PR #210.
 - **Category**: perf
 - **Planned at**: commit `ec19f8f`, reconciled 2026-09-15; same file tree as master `f353ce2`.
 - **Issue**: https://github.com/ludmila-omlopes/ludylops-live/issues/176
-- **State**: TODO, deferred until at least one in-scope loader satisfies the
-  isolation gate. Planning update only.
+- **State**: IN PROGRESS — implemented and verified on `85da513`, awaiting merge.
+- **Reconciled**: 2026-09-23 against the updated issue and the ranking delivery.
+
+## Delivery evidence
+
+- The only adopted call site is `/c/[creatorSlug]/ranking`, backed by
+  `readCreatorRanking`: required creator context, scoped SQL, bounded public
+  projection and existing isolation tests. The legacy ranking remains global
+  and uncached. This replaces the original July proposal to cache global reads.
+- `readPublicCreatorRanking` checks current lifecycle, modules and economy
+  activation before every cache lookup. The underlying loader repeats policy
+  checks within its transaction when loading data.
+- `unstable_cache` is the installed, documented compatibility API for apps
+  without Cache Components. No global rendering configuration changes.
+- Creator ID, resource, revalidation interval and query arguments identify the
+  cached result; creator ID also scopes tags and loader input. Demo bypasses it.
+- 954 tests passed, including 8 new cache tests; 41 optional PostgreSQL tests
+  were skipped. Types, lint and production build passed without real credentials.
+- `node scripts/verify-public-cache-runtime.mjs` passed with a disposable Next
+  production build: repeated-request hit, A/B and limit separation, denial before
+  a warm cache, revalidation after 15 seconds and demo bypass. No database used.
+- The 15-second interval triggers background revalidation, not hard expiry.
+  The first expired request served version 1; subsequent requests served version 2.
+  See [eligibility, mechanism and freshness limits](../docs/public-creator-cache.md).
+- No migration, production activation or Streamer.bot configuration is required.
 
 ## Why this matters
 
@@ -32,6 +54,8 @@ serverless page invocations or guarantee a particular deployment-wide hit rate.
 
 ## Current state
 
+- The new creator ranking in `src/lib/creators/ranking.ts` qualifies. Its page
+  uses the cache adapter; its public API stays uncached with `no-store`.
 - src/app/(community)/page.tsx calls listBets(activeViewerId), not an anonymous
   list. Treat that existing result as personalized and leave it uncached.
 - src/app/(community)/ranking/page.tsx calls getLeaderboard() with no creator;
@@ -45,11 +69,10 @@ serverless page invocations or guarantee a particular deployment-wide hit rate.
 
 ## Scope
 
-**In scope**: new src/lib/cache.ts and src/lib/cache.test.ts, verified shared
-read call sites in src/app/(community)/page.tsx and
-src/app/(community)/ranking/page.tsx, and next.config.ts only if the selected
-documented API strictly requires it. Prefer a local wrapper without a global
-rendering-mode change. Report plan/index status.
+**In scope**: new src/lib/cache.ts and its tests, the creator-ranking cache
+adapter and its tests, the public creator ranking page, a reproducible isolated
+Next runtime probe and documentation. The originally listed community home and
+legacy ranking do not pass the eligibility gate. No next.config.ts change.
 
 **Out of scope**: repository isolation implementation, personal/session reads,
 anonymous suggestion-list stretch goals, admin caching, API response caching,
@@ -117,12 +140,12 @@ and expiry evidence, or explicitly report an unverified runtime gate.
 
 ## Done criteria
 
-- [ ] At least one adopted loader was already demonstrably isolated by creator.
-- [ ] The helper requires creatorId and keys/tags/loaders consistently use it.
-- [ ] A/B separation, denial checks and demo bypass are tested.
-- [ ] No personal/session result or mutating GET is cached.
-- [ ] Runtime hit/expiry behavior has been verified in a test environment.
-- [ ] Gates pass; the report names adopted and deferred call sites.
+- [x] At least one adopted loader was already demonstrably isolated by creator.
+- [x] The helper requires creatorId and keys/tags/loaders consistently use it.
+- [x] A/B separation, denial checks and demo bypass are tested.
+- [x] No personal/session result or mutating GET is cached.
+- [x] Runtime hit/revalidation behavior has been verified in a test environment.
+- [x] Gates pass; the report names adopted and deferred call sites.
 
 ## STOP conditions
 

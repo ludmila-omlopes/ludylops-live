@@ -1,8 +1,12 @@
+import { guardModuleRequest } from '@/lib/creators/module-access';
 import { fail, isTrustedAppMutationRequest, ok, requireLinkedApiSession } from "@/lib/api";
 import { redeemItem } from "@/lib/db/repository";
 import { redeemSchema } from "@/lib/streamerbot/schemas";
 
 export async function POST(request: Request) {
+  const moduleDenial = await guardModuleRequest(request, ["redemptions"]);
+  if (moduleDenial) return moduleDenial;
+
   if (!isTrustedAppMutationRequest(request)) {
     return fail("Forbidden", 403);
   }

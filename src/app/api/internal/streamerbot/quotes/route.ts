@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { getPipetzPricing, runQuoteCommandFromChat } from "@/lib/db/repository";
-import { env } from "@/lib/env";
 import { streamerbotQuoteCommandSchema } from "@/lib/streamerbot/schemas";
-import { verifySignedRequest } from "@/lib/streamerbot/security";
+import { authenticateStreamerbotRequest, authorizeStreamerbotOperation } from "@/lib/streamerbot/authenticate";
+import { streamerbotQuoteModuleIsEnabled } from "@/lib/streamerbot/credentials";
 
 function formatQuoteReply(input: { quoteNumber: number; body: string }) {
   return `Quote #${input.quoteNumber}: "${input.body}"`;
@@ -31,11 +31,11 @@ async function mapChatQuoteReply(input: {
     case "viewer_external_id_required":
       return "Não consegui identificar quem executou o comando.";
     case "livestream_not_live":
-      return "Essa quote so pode ir para o OBS enquanto a live estiver acontecendo.";
+      return "Essa quote só pode ir para o OBS enquanto a live estiver acontecendo.";
     case "saldo_insuficiente":
       return `${prefix}você precisa de ${(await getPipetzPricing()).quoteOverlayCost} pipetz para colocar a quote no OBS.`;
     case "quote_overlay_busy":
-      return "Ja tem uma quote ocupando o overlay. Tenta de novo em alguns segundos.";
+      return "Já tem uma quote ocupando o overlay. Tenta de novo em alguns segundos.";
     default:
       if (input.action === "create") {
         return "Não consegui salvar a quote agora.";
@@ -68,35 +68,19 @@ function readPayloadContext(raw: string) {
 }
 
 export async function POST(request: Request) {
-  const raw = await request.text();
-  const timestamp = request.headers.get("x-timestamp");
-  const signature = request.headers.get("x-signature");
-
-  const valid = verifySignedRequest({
-    body: raw,
-    timestamp,
-    signature,
-    secret: env.STREAMERBOT_SHARED_SECRET,
-  });
-  if (!valid) {
-    console.warn("[streamerbot/quotes] Invalid signature.", {
-      hasSecret: Boolean(env.STREAMERBOT_SHARED_SECRET),
-      hasTimestamp: Boolean(timestamp),
-      hasSignature: Boolean(signature),
-    });
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Invalid signature.",
-        replyMessage: "Assinatura inválida no comando de quotes.",
-      },
-      { status: 401 },
-    );
-  }
+  const authentication = await authenticateStreamerbotRequest(request);
+  if (!authentication.ok) return authentication.response;
+  const raw = authentication.raw;
 
   try {
     const payload = streamerbotQuoteCommandSchema.parse(JSON.parse(raw));
-    const result = await runQuoteCommandFromChat(payload);
+    const operation = payload.action === "show" ? "quotes.legacy" : payload.action === "create" ? "quotes.create" : "quotes.get";
+    const denied = await authorizeStreamerbotOperation(authentication, operation);
+    if (denied) return denied;
+    if (!await streamerbotQuoteModuleIsEnabled(authentication.creatorId)) {
+      return NextResponse.json({ ok: false, error: "creator_unavailable", replyMessage: "As frases estão indisponíveis para este streamer." }, { status: 403 });
+    }
+    const result = await runQuoteCommandFromChat({ creatorId: authentication.creatorId }, payload);
     const replyMessage =
       result.action === "create"
         ? `Quote #${result.quote.quoteNumber} salva: "${result.quote.body}"`

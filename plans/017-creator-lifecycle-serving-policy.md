@@ -8,7 +8,7 @@
 
 ## Status
 
-- **State**: IN PROGRESS (2026-09-20): implementation and local validation complete in `.worktrees/issue-183`; [PR #192](https://github.com/ludmila-omlopes/ludylops-live/pull/192) awaiting integration. Public creator resolution serves only active creators, while administrative recovery remains available. Validation: 64 focused tests, 362 full-suite tests, typecheck, lint, and a demo-environment build passed. Lifecycle persistence tests use a simulated database adapter; manual validation in a disposable database remains pending. No shared database was queried or changed.
+- **State**: DONE (2026-09-20): implementation and local validation complete in `.worktrees/issue-183`; integrated via [PR #192](https://github.com/ludmila-omlopes/ludylops-live/pull/192). Public creator resolution serves only active creators, while administrative recovery remains available. Validation: 64 focused tests, 362 full-suite tests, typecheck, lint, and a demo-environment build passed. Lifecycle persistence tests use a simulated database adapter; manual validation in a disposable database remains pending. No shared database was queried or changed.
 
 - **Priority**: P1
 - **Effort**: M

@@ -1,37 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { ok } from "@/lib/api";
-import { env } from "@/lib/env";
 import { wheelSpinRequestSchema } from "@/lib/streamerbot/schemas";
-import { verifySignedRequest } from "@/lib/streamerbot/security";
+import { authenticateStreamerbotRequest, authorizeStreamerbotOperation } from "@/lib/streamerbot/authenticate";
 import { triggerWheelSpin } from "@/lib/wheel";
 
 export async function POST(request: Request) {
-  const raw = await request.text();
-  const timestamp = request.headers.get("x-timestamp");
-  const signature = request.headers.get("x-signature");
-
-  const valid = verifySignedRequest({
-    body: raw,
-    timestamp,
-    signature,
-    secret: env.STREAMERBOT_SHARED_SECRET,
-  });
-  if (!valid) {
-    console.warn("[streamerbot/wheel] Invalid signature.", {
-      hasSecret: Boolean(env.STREAMERBOT_SHARED_SECRET),
-      hasTimestamp: Boolean(timestamp),
-      hasSignature: Boolean(signature),
-    });
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Invalid signature.",
-        replyMessage: "Assinatura inválida no comando da roleta.",
-      },
-      { status: 401 },
-    );
-  }
+  const authentication = await authenticateStreamerbotRequest(request);
+  if (!authentication.ok) return authentication.response;
+  const denied = await authorizeStreamerbotOperation(authentication, "wheel");
+  if (denied) return denied;
+  const raw = authentication.raw;
 
   try {
     const payload = wheelSpinRequestSchema.parse(JSON.parse(raw || "{}"));

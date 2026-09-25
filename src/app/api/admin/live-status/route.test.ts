@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/lib/creators/tenant", async original => ({
+  ...await original<typeof import("@/lib/creators/tenant")>(),
+  resolvePublicCreatorFromRequest: async () => (await import("@/lib/creators/tenant")).defaultCreatorTenant,
+}));
+
 const requireAdminApiSessionMock = vi.hoisted(() => vi.fn());
 const isTrustedAppMutationRequestMock = vi.hoisted(() => vi.fn());
 const setStreamerbotLivestreamManualOverrideMock = vi.hoisted(() => vi.fn());

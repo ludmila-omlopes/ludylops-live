@@ -58,8 +58,13 @@ export const streamerbotGlobalVariables = [
     required: true,
   },
   {
-    name: "lojaneon.streamerbotSharedSecret",
-    description: "Segredo compartilhado usado para assinar requisições HMAC enviadas ao app.",
+    name: "lojaneon.streamerbotCredentialId",
+    description: "ID público da credencial exclusiva deste streamer.",
+    required: true,
+  },
+  {
+    name: "lojaneon.streamerbotCredentialSecret",
+    description: "Segredo recebido na emissão da credencial. Não compartilhe em chat, capturas ou exportações.",
     required: true,
   },
   {
@@ -90,6 +95,36 @@ export const streamerbotGlobalVariables = [
 ];
 
 export const streamerbotScriptDefinitions: StreamerbotScriptDefinition[] = [
+  {
+    id: "community-chat-reward",
+    filename: "community-chat-reward.cs",
+    title: "Ganhos por mensagem da comunidade",
+    description: "Recompensa a participação no chat com a moeda e o intervalo definidos pelo streamer do beta.",
+    category: "live",
+    trigger: "YouTube > Chat > Message",
+    setupInstructions: "Use uma action dedicada com Execute C# Code e a credencial exclusiva deste streamer. O trigger fornece userId, broadcast.id e messageId. Configure e ative os ganhos por mensagem após a ativação da moeda. Não substitua as ações legadas da Ludylops. Em um reenvio, preserve os IDs originais. chatRewardResponse informa credited, cooldown ou paused; HTTP 200 também pode indicar que nenhum crédito era devido.",
+    sortOrder: 6,
+  },
+  {
+    id: "community-currency",
+    filename: "community-currency.cs",
+    title: "Moeda da comunidade",
+    description: "Credita, debita ou estorna a moeda exclusiva de um streamer do beta.",
+    category: "pipetz",
+    trigger: "Action controlada pelo streamer",
+    setupInstructions: "Após a ativação da moeda, configure a credencial exclusiva do streamer e os argumentos currencyOperation, currencyViewerChannelId, currencyOperationKey, currencyReason e currencyAmount (ou currencyRefundOf no estorno). Reutilize a mesma chave e valores em uma repetição. Não conecte esta action a comandos públicos sem permissão. O endpoint da Ludylops continua separado.",
+    sortOrder: 5,
+  },
+  {
+    id: "check-credential",
+    filename: "check-credential.cs",
+    title: "Testar credencial",
+    description: "Confirma a autenticação sem alterar pontos, apostas ou conteúdo da live.",
+    category: "live",
+    trigger: "Execução manual",
+    setupInstructions: "Configure as variáveis persistidas de ID e segredo e execute esta action manualmente. O log informa o streamer autenticado e se os comandos estão disponíveis.",
+    sortOrder: 0,
+  },
   {
     id: "channel-subscription-reward",
     filename: "channel-subscription-reward.cs",
@@ -214,6 +249,16 @@ export const streamerbotScriptDefinitions: StreamerbotScriptDefinition[] = [
     setupInstructions:
       "Este script não chama o app. Personalize as linhas com lojaneon.commandsListPublic1, lojaneon.commandsListPublic2 e lojaneon.commandsListMod se quiser textos diferentes.",
     sortOrder: 110,
+  },
+  {
+    id: "periodic-chat-messages",
+    filename: "periodic-chat-messages.cs",
+    title: "Mensagens periódicas",
+    description: "Envia os lembretes ativos da comunidade ao chat da transmissão configurada.",
+    category: "chat",
+    trigger: "Core → Timed Actions, a cada 15 segundos",
+    setupInstructions: "Use um timer repetido com Lines = 0 e uma fila de ações bloqueante. Configure a credencial do streamer e lojaneon.periodicYoutubeChannelId com o ID UC do canal. O script só envia quando há exatamente uma transmissão desse canal monitorada com status live. Veja docs/periodic-chat-messages.md.",
+    sortOrder: 120,
   },
 ];
 

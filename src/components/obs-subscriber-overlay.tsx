@@ -6,6 +6,9 @@ import { useEffect, useRef, useState } from "react";
 import { getObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-style";
 import type { SubscriberAlertRecord } from "@/lib/types";
 
+const SUBSCRIBER_POLL_INTERVAL_MS = 1_000;
+const LIVE_STATUS_POLL_INTERVAL_MS = 15_000;
+
 const DEFAULT_DURATION_MS = 7000;
 
 const DEMO_ALERTS: SubscriberAlertRecord[] = [
@@ -103,6 +106,10 @@ async function playAlertSound(soundUrl: string | null, volume: number) {
 export function ObsSubscriberOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
+  const creatorQuery = new URLSearchParams(searchParams.getAll("creator").map(slug => ["creator", slug])).toString();
+  const creatorSuffix = creatorQuery ? `?${creatorQuery}` : "";
+  const [liveStatus, setLiveStatus] = useState<{ creatorSuffix: string; isLive: boolean } | null>(null);
+  const isLive = liveStatus?.creatorSuffix === creatorSuffix && liveStatus.isLive;
   const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
   const durationMs = clampDuration(readParam(searchParams, ["durationMs", "duration"]));
   const imageUrl = readParam(searchParams, ["imageUrl", "image"]);
@@ -112,21 +119,61 @@ export function ObsSubscriberOverlay({ initialStyle = "classic" }: { initialStyl
   const rawVolume = Number(searchParams.get("volume") ?? "0.8");
   const volume = Number.isFinite(rawVolume) ? Math.min(Math.max(rawVolume, 0), 1) : 0.8;
   const [alerts, setAlerts] = useState<SubscriberAlertRecord[]>(isDemo ? DEMO_ALERTS : []);
-  const currentAlert = alerts[0] ?? null;
+  const currentAlert = isDemo || isLive ? alerts[0] ?? null : null;
   const seenEventIds = useRef(new Set<string>());
   const lastDemoCycleAt = useRef(0);
 
   useEffect(() => {
-    if (isDemo) {
+    if (isDemo) return undefined;
+    let cancelled = false;
+    let timeout: number | undefined;
+    const controller = new AbortController();
+
+    async function loadLiveStatus() {
+      let nextIsLive = false;
+      try {
+        const response = await fetch(`/api/obs/live-status${creatorSuffix}`, {
+          cache: "no-store", signal: controller.signal,
+        });
+        if (response.ok) {
+          const payload = await response.json() as { ok?: boolean; data?: { isLive?: boolean } };
+          nextIsLive = payload.ok === true && payload.data?.isLive === true;
+        }
+      } catch {
+        // Failed status checks pause data polling until the next successful check.
+      }
+      if (!cancelled) {
+        setLiveStatus({ creatorSuffix, isLive: nextIsLive });
+        if (!nextIsLive) setAlerts([]);
+      }
+    }
+
+    function schedule() {
+      timeout = window.setTimeout(() => {
+        void loadLiveStatus().finally(() => { if (!cancelled) schedule(); });
+      }, LIVE_STATUS_POLL_INTERVAL_MS);
+    }
+    void loadLiveStatus().finally(() => { if (!cancelled) schedule(); });
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [isDemo, creatorSuffix]);
+
+  useEffect(() => {
+    if (isDemo || !isLive) {
       return undefined;
     }
 
     let cancelled = false;
+    let timeout: number | undefined;
+    const controller = new AbortController();
 
     async function loadAlerts() {
       try {
-        const response = await fetch("/api/obs/subscribers/current", {
-          cache: "no-store",
+        const response = await fetch(`/api/obs/subscribers/current${creatorSuffix}`, {
+          cache: "no-store", signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -152,16 +199,19 @@ export function ObsSubscriberOverlay({ initialStyle = "classic" }: { initialStyl
       }
     }
 
-    void loadAlerts();
-    const interval = window.setInterval(() => {
-      void loadAlerts();
-    }, 1000);
+    function schedule() {
+      timeout = window.setTimeout(() => {
+        void loadAlerts().finally(() => { if (!cancelled) schedule(); });
+      }, SUBSCRIBER_POLL_INTERVAL_MS);
+    }
+    void loadAlerts().finally(() => { if (!cancelled) schedule(); });
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      controller.abort();
+      if (timeout !== undefined) window.clearTimeout(timeout);
     };
-  }, [isDemo]);
+  }, [isDemo, isLive, creatorSuffix]);
 
   useEffect(() => {
     if (!isDemo) {

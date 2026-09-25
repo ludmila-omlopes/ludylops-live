@@ -12,6 +12,7 @@ export const CREATOR_SLUG_RESERVED_WORDS = new Set([
   "jogos",
   "me",
   "obs",
+  "owner",
   "privacy",
   "produtinhos",
   "quotes",
@@ -42,6 +43,18 @@ export function normalizeCreatorSlug(value?: string | null) {
   return /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/u.test(slug) || /^[a-z0-9]$/u.test(slug)
     ? slug
     : null;
+}
+
+/** Strict request-host parsing, shared by public resolution and wildcard routing. */
+export function normalizePublicHostname(value?: string | null) {
+  const host = value?.split(",")[0]?.trim().toLowerCase();
+  if (!host || !/^(?:\[::1\]|::1|[a-z0-9-]+(?:\.[a-z0-9-]+)*)(?::[0-9]+)?$/u.test(host)) return null;
+  const hostname = host === "::1" ? host : normalizeHostname(host);
+  if (hostname !== "::1" && hostname?.split(".").some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(label))) return null;
+  if (host !== "::1") {
+    try { new URL(`http://${host}`); } catch { return null; }
+  }
+  return hostname;
 }
 
 export function creatorSlugFromInput(input: { slug?: string | null; displayName?: string | null }) {

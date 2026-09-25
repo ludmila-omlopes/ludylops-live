@@ -1,103 +1,48 @@
-import { notFound } from "next/navigation";
-import { ArrowRight, CheckCircle2, CirclePlay } from "lucide-react";
-
-import { getEnabledCreatorModules, getCreatorModuleManifest } from "@/lib/creators/modules";
+import { notFound, redirect } from "next/navigation";
+import { headers } from "next/headers";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { getCreatorAreaBySlug } from "@/lib/creators/service";
+import { creatorHomeLinks } from "@/lib/creators/home";
+import { creatorColorInk, safeCreatorColor } from "@/lib/creators/profile";
+import { DEFAULT_CREATOR_ID, DEFAULT_CREATOR_DOMAIN } from "@/lib/creators/defaults";
 
-type CreatorPageProps = {
-  params: Promise<{
-    creatorSlug: string;
-  }>;
-};
-
-export default async function CreatorAreaPage({ params }: CreatorPageProps) {
+export default async function CreatorAreaPage({ params }: { params: Promise<{ creatorSlug: string }> }) {
   const { creatorSlug } = await params;
-  const tenant = await getCreatorAreaBySlug(creatorSlug);
-
-  if (!tenant) {
-    notFound();
-  }
-
-  const modules = getEnabledCreatorModules(tenant.modules)
-    .map((module) => getCreatorModuleManifest(module.moduleKey))
-    .filter((module) => module !== null);
-  const primaryModules = modules.slice(0, 6);
-
-  return (
-    <div className="flex w-full flex-col">
-      <section
-        className="relative overflow-hidden border-b-[3px] border-[var(--color-ink)] px-4 py-12 text-[var(--color-ink)] sm:px-6 lg:px-10"
-        style={{
-          background: `linear-gradient(135deg, ${tenant.branding.primaryColor}, ${tenant.branding.accentColor})`,
-        }}
-      >
-        <div className="mx-auto grid w-full max-w-[1280px] gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
-          <div>
-            <div className="flex size-20 items-center justify-center border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] text-3xl font-black uppercase shadow-[5px_5px_0_var(--shadow-color)]">
-              {tenant.creator.displayName.slice(0, 1)}
-            </div>
-            <h1
-              className="mt-6 max-w-4xl break-words text-5xl uppercase leading-[0.9] text-pretty sm:text-6xl"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              {tenant.creator.displayName}
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg font-bold leading-8 text-[var(--color-accent-ink)]">
-              A comunidade já tem endereço reservado para lives, pontos, desafios e interações ao vivo.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <a
-                href={`https://${tenant.creator.slug}.ludylops.live`}
-                className="btn-brutal ink-button px-5 py-3 text-xs text-[var(--color-accent-ink)]"
-              >
-                <CirclePlay className="size-4" aria-hidden="true" />
-                Abrir subdomínio
-              </a>
-            </div>
-          </div>
-
-          <div className="border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5 shadow-[6px_6px_0_var(--shadow-color)]">
-            <h2
-              className="text-2xl uppercase leading-none text-[var(--color-ink)]"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Módulos preparados
-            </h2>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {primaryModules.map((module) => (
-                <div key={module.key} className="flex min-w-0 items-center gap-3 border-[2px] border-[var(--color-ink)] bg-[var(--color-paper-pink)] p-3">
-                  <CheckCircle2 className="size-5 shrink-0 text-[var(--color-ink)]" aria-hidden="true" />
-                  <span className="break-words text-sm font-black uppercase leading-tight text-[var(--color-ink)]">
-                    {module.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-5 text-sm font-medium leading-6 text-[var(--color-ink-soft)]">
-              A operação completa entra quando pontos, apostas e sugestões estiverem separados para esta comunidade.
-            </p>
-          </div>
+  const requestHeaders = await headers();
+  const tenant = await getCreatorAreaBySlug(creatorSlug, { hostname: requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") });
+  if (!tenant) notFound();
+  if (tenant.creator.id === DEFAULT_CREATOR_ID) redirect(`https://${DEFAULT_CREATOR_DOMAIN}`);
+  const links = creatorHomeLinks(tenant);
+  const primary = safeCreatorColor(tenant.branding.primaryColor, "#c7a2e9");
+  const accent = safeCreatorColor(tenant.branding.accentColor, "#40a9ff");
+  return <div className="flex w-full flex-col">
+    <header className="relative overflow-hidden px-4 pb-14 pt-12 sm:px-6 sm:pb-20 lg:px-10"
+      style={{ backgroundColor: primary, color: creatorColorInk(primary) }}>
+      <div className="mx-auto w-full max-w-[1200px]">
+        <div aria-hidden="true" className="flex size-16 items-center justify-center border-[3px] border-current text-3xl font-black uppercase">
+          {Array.from(tenant.creator.displayName)[0]}
         </div>
-      </section>
-
-      <section className="bg-[var(--color-paper)] px-4 py-10 sm:px-6 lg:px-10">
-        <div className="mx-auto grid w-full max-w-[1280px] gap-4 sm:grid-cols-3">
-          {modules.slice(0, 3).map((module) => (
-            <article key={module.key} className="border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5 shadow-[5px_5px_0_var(--shadow-color)]">
-              <h3 className="text-xl font-black uppercase leading-tight text-[var(--color-ink)]">{module.label}</h3>
-              <p className="mt-3 text-sm font-medium leading-6 text-[var(--color-ink-soft)]">
-                Preparado para entrar no fluxo da live quando esta comunidade tiver dados próprios.
-              </p>
-              {module.publicRoutes[0] ? (
-                <div className="mt-4 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--color-ink-soft)]">
-                  {module.publicRoutes[0]}
-                  <ArrowRight className="size-4" aria-hidden="true" />
-                </div>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
+        <h1 className="mt-8 max-w-4xl break-words text-5xl uppercase leading-[0.95] text-pretty sm:text-7xl"
+          style={{ fontFamily: "var(--font-display)" }}>{tenant.creator.displayName}</h1>
+        <p className="mt-6 max-w-xl text-lg font-medium leading-8">Cada live rende uma história. Essa comunidade faz parte dela.</p>
+      </div>
+    </header>
+    <div aria-hidden="true" className="h-4 border-y-[3px] border-[var(--color-ink)]" style={{ backgroundColor: accent }} />
+    <section className="bg-[var(--color-paper)] px-4 pb-16 pt-10 sm:px-6 lg:px-10">
+      <div className="mx-auto grid w-full max-w-[1200px] gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:gap-16">
+        <h2 className="max-w-xs text-3xl font-black leading-tight">Entre uma live e outra.</h2>
+        {links.length ? <nav aria-label="Participar da comunidade" className="border-t-[3px] border-[var(--color-ink)]">
+          {links.map((link) => <Link key={link.href} href={link.href}
+            className="group flex min-w-0 items-center justify-between gap-5 border-b-2 border-[var(--color-ink)] py-6 transition-colors hover:bg-[var(--color-paper-pink)] focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-4">
+            <span className="min-w-0">
+              <span className="block break-words text-xl font-black sm:text-2xl">{link.label}</span>
+              <span className="mt-2 block break-words text-sm leading-6 text-[var(--color-ink-soft)]">{link.description}</span>
+            </span>
+            <ArrowUpRight aria-hidden="true" className="size-6 shrink-0 transition-transform motion-safe:group-hover:-translate-y-1 motion-safe:group-hover:translate-x-1" />
+          </Link>)}
+        </nav> : <p className="max-w-lg text-lg leading-8">Até o próximo encontro na live.</p>}
+      </div>
+    </section>
+  </div>;
 }

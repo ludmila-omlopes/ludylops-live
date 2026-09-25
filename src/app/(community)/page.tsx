@@ -25,6 +25,8 @@ import {
 } from "@/lib/auth/session-state";
 import { getCurrentGame } from "@/lib/current-game";
 import { listBets } from "@/lib/db/repository";
+import { resolveLegacyModulePage } from "@/lib/creators/module-page-access";
+import { getEnabledModuleNav } from "@/lib/creators/modules";
 import { getHomeHeroCopy } from "@/lib/home-hero-copy";
 import { isStreamerbotLivestreamActive } from "@/lib/streamerbot/live-status";
 import type { BetWithOptionsRecord, CurrentGameRecord } from "@/lib/types";
@@ -193,9 +195,13 @@ function HeroAvatar({ className }: { className?: string }) {
 function HeroActions({
   hasUsableSession,
   isLive,
+  allowedPaths,
+  pointsEnabled,
 }: {
   hasUsableSession: boolean;
   isLive: boolean;
+  allowedPaths: string[];
+  pointsEnabled: boolean;
 }) {
   const actionSpacing = isLive ? "mt-8" : "mt-4";
 
@@ -213,18 +219,18 @@ function HeroActions({
             Ir pro canal
           </a>
         ) : null}
-        <Link href="/apostas" className="btn-brutal accent-button px-6 py-3 text-sm">
+        {allowedPaths.includes("/apostas") ? <Link href="/apostas" className="btn-brutal accent-button px-6 py-3 text-sm">
           <Ticket className="size-4" aria-hidden="true" />
           Abrir Apostas
-        </Link>
-        <Link href="/me" className="btn-brutal ink-button px-6 py-3 text-sm">
+        </Link> : null}
+        {allowedPaths.includes("/me") ? <Link href="/me" className="btn-brutal ink-button px-6 py-3 text-sm">
           <Sparkles className="size-4" aria-hidden="true" />
           Minha Área
-        </Link>
-        <Link href="/jogos" className="btn-brutal bg-[var(--color-mint)] px-6 py-3 text-sm text-[var(--color-accent-ink)]">
+        </Link> : null}
+        {allowedPaths.includes("/jogos") ? <Link href="/jogos" className="btn-brutal bg-[var(--color-mint)] px-6 py-3 text-sm text-[var(--color-accent-ink)]">
           <Gamepad2 className="size-4" aria-hidden="true" />
           Sugerir Jogo
-        </Link>
+        </Link> : null}
       </div>
     );
   }
@@ -246,7 +252,7 @@ function HeroActions({
     );
   }
 
-  return (
+  return pointsEnabled ? (
     <div className={cn(actionSpacing, "flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center")}>
       <Link
         href="#pipetz"
@@ -256,7 +262,7 @@ function HeroActions({
         Como funcionam os pipetz
       </Link>
     </div>
-  );
+  ) : null;
 }
 
 function OfflineChannelCallout() {
@@ -314,12 +320,16 @@ function OfflineChannelCallout() {
 }
 
 function HomeHero({
+  allowedPaths,
+  pointsEnabled,
   accountProtectionStatus,
   currentGame,
   hasUsableSession,
   isLive,
   viewerName,
 }: {
+  allowedPaths: string[];
+  pointsEnabled: boolean;
   accountProtectionStatus: AccountProtectionStatus | null;
   currentGame: CurrentGameRecord | null;
   hasUsableSession: boolean;
@@ -378,7 +388,7 @@ function HomeHero({
           ) : null}
 
           {!isLive ? <OfflineChannelCallout /> : null}
-          <HeroActions hasUsableSession={hasUsableSession} isLive={isLive} />
+          <HeroActions hasUsableSession={hasUsableSession} isLive={isLive} allowedPaths={allowedPaths} pointsEnabled={pointsEnabled} />
           <HeroGameLabel game={currentGame} isLive={isLive} />
         </div>
       </div>
@@ -556,7 +566,9 @@ function CampaignSection({ game }: { game: CurrentGameRecord | null }) {
   );
 }
 
-function BetweenLivesSection() {
+function BetweenLivesSection({ allowedPaths }: { allowedPaths: string[] }) {
+  const links = BETWEEN_LIVES_LINKS.filter(link => allowedPaths.includes(link.href));
+  if (!links.length) return null;
   return (
     <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-9 sm:py-12">
       <div className="mx-auto w-full max-w-[1520px] px-4 sm:px-6 lg:px-10">
@@ -574,7 +586,7 @@ function BetweenLivesSection() {
         </div>
 
         <div className="mt-7 grid gap-4 sm:grid-cols-3">
-          {BETWEEN_LIVES_LINKS.map((link) => {
+          {links.map((link) => {
             const Icon = link.icon;
 
             return (
@@ -603,6 +615,8 @@ function BetweenLivesSection() {
 }
 
 export default async function Home({ searchParams }: HomePageProps) {
+  const { tenant, can } = await resolveLegacyModulePage();
+  const allowedPaths = getEnabledModuleNav(tenant.modules).map(item => item.href);
   const session = await auth();
   const resolvedSearchParams = await searchParams;
   const accountProtectionStatus =
@@ -610,9 +624,9 @@ export default async function Home({ searchParams }: HomePageProps) {
   const hasUsableSession = hasUsableAppSession(session) && !accountProtectionStatus;
   const activeViewerId = hasUsableSession ? session?.user?.activeViewerId ?? null : null;
   const [bets, isLive, currentGame] = await Promise.all([
-    listBets(activeViewerId),
-    isStreamerbotLivestreamActive(),
-    getCurrentGame(),
+    can("bets") ? listBets(activeViewerId) : [],
+    can("streamerbot") ? isStreamerbotLivestreamActive() : false,
+    can("streamerbot") ? getCurrentGame() : null,
   ]);
   const activeBet = bets.find((bet) => bet.status === "open");
   const viewerName = hasUsableSession ? session?.user?.activeViewerDisplayName ?? session?.user?.name ?? null : null;
@@ -620,6 +634,8 @@ export default async function Home({ searchParams }: HomePageProps) {
   return (
     <div className="flex w-full flex-col overflow-x-hidden">
       <HomeHero
+        allowedPaths={allowedPaths}
+        pointsEnabled={can("points")}
         accountProtectionStatus={accountProtectionStatus}
         currentGame={currentGame}
         hasUsableSession={hasUsableSession}
@@ -627,10 +643,10 @@ export default async function Home({ searchParams }: HomePageProps) {
         viewerName={viewerName}
       />
 
-      <PipetzSection />
-      <LiveBetSpotlight activeBet={activeBet} loggedIn={hasUsableSession} />
+      {can("points") ? <PipetzSection /> : null}
+      {can("bets") ? <LiveBetSpotlight activeBet={activeBet} loggedIn={hasUsableSession} /> : null}
       <CampaignSection game={currentGame} />
-      <BetweenLivesSection />
+      <BetweenLivesSection allowedPaths={allowedPaths} />
     </div>
   );
 }

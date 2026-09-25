@@ -47,7 +47,7 @@ export const DEFAULT_CREATOR_MODULES: CreatorModuleRecord[] = creatorModuleCatal
   creatorId: DEFAULT_CREATOR_ID,
   moduleKey: module.key,
   status: "installed",
-  configJson: module.defaultConfig,
+  configJson: module.key === "points" ? { currencyLabel: "pipetz" } : module.defaultConfig,
   installedAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 }));

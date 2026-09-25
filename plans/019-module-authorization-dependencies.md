@@ -8,7 +8,8 @@
 
 ## Status
 
-- **Reconciliation**: planning update only; implementation remains pending. Issue #185 is synchronized from this file.
+- **State**: IMPLEMENTED on `codex/019-module-authorization-dependencies`, based on merged quote pilot `f85aaf3` (2026-09-22); PR #198 open for review/merge.
+- **Implementation and coverage**: [docs/module-authorization.md](../docs/module-authorization.md). The selected transition policy rejects invalid changes and names blockers; no automatic cascade. PostgreSQL row locks serialize concurrent mutations. No new migration.
 
 - **Priority**: P1
 - **Effort**: L
@@ -26,7 +27,7 @@ Direct public pages, APIs, OBS routes, and Streamer.bot endpoints remain
 callable. Status updates also permit impossible states such as bets installed
 without points or Streamer.bot.
 
-## Current state
+## State before implementation
 
 - `modules.ts:getEnabledCreatorModules` checks only the row's own installed
   status; `requiredCapabilities` is unused for authorization.
@@ -138,14 +139,14 @@ duplicate dependency logic in React components.
 
 ## Done criteria
 
-- [ ] Module state is enforced server-side at every cataloged entry-point class.
-- [ ] Unscoped modules/actions stay unavailable to non-default creators even if installed.
-- [ ] Coverage matrix distinguishes authorization, data isolation and product readiness.
-- [ ] Dependency-invalid states cannot be newly persisted.
-- [ ] Existing invalid states fail closed and are visible to operators.
-- [ ] Catalog routes are validated against actual routes.
-- [ ] Navigation and authorization share one policy.
-- [ ] Lint, typecheck, tests, and build pass.
+- [x] Module state is enforced server-side at every cataloged entry-point class.
+- [x] Unscoped modules/actions stay unavailable to non-default creators even if installed.
+- [x] Coverage matrix distinguishes authorization, data isolation and product readiness.
+- [x] Dependency-invalid states cannot be newly persisted.
+- [x] Existing invalid states fail closed and are visible to operators.
+- [x] Catalog routes are validated against actual routes.
+- [x] Navigation and authorization share one policy.
+- [x] Lint, typecheck, tests, and build pass.
 
 ## STOP conditions
 

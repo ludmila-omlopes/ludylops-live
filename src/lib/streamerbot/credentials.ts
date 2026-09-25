@@ -1,0 +1,227 @@
+import { randomBytes } from "node:crypto";
+import { and, desc, eq } from "drizzle-orm";
+
+import { getDb } from "@/lib/db/client";
+import {
+  creators,
+  creatorModules,
+  streamerbotCredentials,
+} from "@/lib/db/schema";
+import { env } from "@/lib/env";
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import {
+  canUseModules,
+  loadModuleTenant,
+  modulesAreAvailable,
+} from "@/lib/creators/module-access";
+import { encryptCredentialSecret } from "@/lib/streamerbot/credential-crypto";
+
+export type CredentialRecord = typeof streamerbotCredentials.$inferSelect;
+export type CredentialAuthority = { kind: "platform" } | { kind: "owner"; viewerId: string };
+
+function authorizeCreator(creator: typeof creators.$inferSelect | undefined, authority: CredentialAuthority) {
+  if (!creator || (authority.kind === "owner" &&
+    (!authority.viewerId || creator.id === DEFAULT_CREATOR_ID || creator.ownerUserId !== authority.viewerId))) {
+    throw new CredentialOperationError(404, "Streamer não encontrado.");
+  }
+  return creator;
+}
+export type CredentialSummary = Pick<
+  CredentialRecord,
+  "id" | "status" | "createdAt" | "retiringUntil" | "revokedAt" | "lastUsedAt"
+>;
+export class CredentialOperationError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+function database() {
+  const db = getDb();
+  if (!db)
+    throw new CredentialOperationError(
+      503,
+      "Credenciais exigem um banco configurado.",
+    );
+  return db;
+}
+
+export function credentialIsUsable(record: CredentialRecord, now = Date.now()) {
+  return (
+    !record.revokedAt &&
+    (record.status === "active" ||
+      (record.status === "retiring" &&
+        record.retiringUntil !== null &&
+        record.retiringUntil.getTime() > now))
+  );
+}
+
+export async function findStreamerbotCredential(id: string) {
+  const [row] = await database()
+    .select()
+    .from(streamerbotCredentials)
+    .where(eq(streamerbotCredentials.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
+/** Strict policy by verified ID; never resolve integration authority from host/slug. */
+export async function streamerbotCreatorIsEnabled(creatorId: string) {
+  return modulesAreAvailable(await loadModuleTenant({ creatorId }), [
+    "streamerbot",
+  ]);
+}
+
+export async function streamerbotQuoteModuleIsEnabled(creatorId: string) {
+  return canUseModules(
+    await loadModuleTenant({ creatorId }),
+    ["quotes"],
+    "quotes.read",
+  );
+}
+
+export async function markStreamerbotCredentialUsed(id: string, now: Date) {
+  await database()
+    .update(streamerbotCredentials)
+    .set({ lastUsedAt: now })
+    .where(eq(streamerbotCredentials.id, id));
+}
+
+const publicColumns = {
+  id: streamerbotCredentials.id,
+  status: streamerbotCredentials.status,
+  createdAt: streamerbotCredentials.createdAt,
+  retiringUntil: streamerbotCredentials.retiringUntil,
+  revokedAt: streamerbotCredentials.revokedAt,
+  lastUsedAt: streamerbotCredentials.lastUsedAt,
+};
+
+export async function listStreamerbotCredentials(
+  creatorId: string,
+): Promise<CredentialSummary[]> {
+  return database()
+    .select(publicColumns)
+    .from(streamerbotCredentials)
+    .where(eq(streamerbotCredentials.creatorId, creatorId))
+    .orderBy(desc(streamerbotCredentials.createdAt));
+}
+
+export async function issueStreamerbotCredential(
+  creatorId: string,
+  rotateId?: string,
+  authority: CredentialAuthority = { kind: "platform" },
+) {
+  const id = `sbc_${randomBytes(16).toString("hex")}`;
+  const secret = randomBytes(32).toString("base64url");
+  const now = new Date();
+  const retiringUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  await database().transaction(async (tx) => {
+    // Serialize provisioning/rotation for this creator, including concurrent first issuance.
+    const [creator] = await tx
+      .select()
+      .from(creators)
+      .where(eq(creators.id, creatorId))
+      .for("update");
+    const authorized = authorizeCreator(creator, authority);
+    const modules = await tx
+      .select()
+      .from(creatorModules)
+      .where(eq(creatorModules.creatorId, creatorId))
+      .for("share");
+    if (!modulesAreAvailable({ creator: authorized, modules }, ["streamerbot"]))
+      throw new CredentialOperationError(
+        409,
+        "Ative o streamer e a integração com Streamer.bot antes de criar uma credencial.",
+      );
+    const active = await tx
+      .select({ id: streamerbotCredentials.id })
+      .from(streamerbotCredentials)
+      .where(
+        and(
+          eq(streamerbotCredentials.creatorId, creatorId),
+          eq(streamerbotCredentials.status, "active"),
+        ),
+      );
+    if (
+      rotateId
+        ? active.length !== 1 || active[0].id !== rotateId
+        : active.length > 0
+    ) {
+      throw new CredentialOperationError(
+        409,
+        "As credenciais mudaram. Atualize a lista e tente novamente.",
+      );
+    }
+    // Encrypt after authorization, before any write. Failure preserves the old credential.
+    const encryptedSecret = encryptCredentialSecret(secret, id, creatorId, env.STREAMERBOT_CREDENTIAL_ENCRYPTION_KEY);
+    if (rotateId)
+      await tx
+        .update(streamerbotCredentials)
+        .set({ status: "retiring", retiringUntil })
+        .where(
+          and(
+            eq(streamerbotCredentials.id, rotateId),
+            eq(streamerbotCredentials.creatorId, creatorId),
+          ),
+        );
+    await tx
+      .insert(streamerbotCredentials)
+      .values({
+        id,
+        creatorId,
+        encryptedSecret,
+        status: "active",
+        createdAt: now,
+      });
+  });
+  return {
+    id,
+    secret,
+    creatorId,
+    retiringUntil: rotateId ? retiringUntil.toISOString() : null,
+  };
+}
+
+export async function revokeStreamerbotCredential(
+  creatorId: string,
+  id: string,
+  authority: CredentialAuthority = { kind: "platform" },
+) {
+  return database().transaction(async (tx) => {
+    // Same lock/order as rotation so revocation cannot be lost to a concurrent rotation.
+    const [creator] = await tx
+      .select()
+      .from(creators)
+      .where(eq(creators.id, creatorId))
+      .for("update");
+    authorizeCreator(creator, authority);
+    const [row] = await tx
+      .update(streamerbotCredentials)
+      .set({ status: "revoked", revokedAt: new Date() })
+      .where(
+        and(
+          eq(streamerbotCredentials.creatorId, creatorId),
+          eq(streamerbotCredentials.id, id),
+        ),
+      )
+      .returning(publicColumns);
+    if (!row)
+      throw new CredentialOperationError(404, "Credencial não encontrada.");
+    return row;
+  });
+}
+
+/** Authorization and metadata share one snapshot protected against owner/status changes. */
+export async function listOwnedStreamerbotCredentials(creatorId: string, viewerId: string) {
+  return database().transaction(async (tx) => {
+    const [creator] = await tx.select().from(creators).where(eq(creators.id, creatorId)).for("share");
+    const authorized = authorizeCreator(creator, { kind: "owner", viewerId });
+    const modules = await tx.select().from(creatorModules).where(eq(creatorModules.creatorId, creatorId)).for("share");
+    const credentials = await tx.select(publicColumns).from(streamerbotCredentials)
+      .where(eq(streamerbotCredentials.creatorId, creatorId)).orderBy(desc(streamerbotCredentials.createdAt));
+    return { credentials, canIssue: modulesAreAvailable({ creator: authorized, modules }, ["streamerbot"]) };
+  });
+}

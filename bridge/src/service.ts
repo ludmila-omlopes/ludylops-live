@@ -1,7 +1,7 @@
 import type { BridgeConfig } from "./config";
 import type { BridgeLogger } from "./logger";
 import { HostedApiClient } from "./api-client";
-import { StreamerbotClient } from "./streamerbot";
+import { ActionRejectedError, StreamerbotClient } from "./streamerbot";
 import type { RedemptionPayload } from "./types";
 import os from "node:os";
 
@@ -16,6 +16,7 @@ export class BridgeService {
   private lastPollAt: string | null = null;
   private inFlight = 0;
   private consecutivePollFailures = 0;
+  private readonly confirmations = new Map<string, { kind: "complete" | "fail"; note: string }>();
 
   constructor(
     private readonly config: BridgeConfig,
@@ -63,6 +64,10 @@ export class BridgeService {
   private async runPollLoop() {
     while (this.running) {
       try {
+        // Retrying the receipt never executes the action or turns a successful dispatch into a refund.
+        for (const [id, receipt] of this.confirmations) {
+          await this.confirm(id, receipt);
+        }
         const queue = await this.apiClient.pullQueue({
           bridgeId: this.config.BRIDGE_MACHINE_KEY,
         });
@@ -115,10 +120,9 @@ export class BridgeService {
 
       await this.streamerbotClient.executeRedemption(redemption);
 
-      await this.apiClient.completeRedemption(redemption.id, {
-        bridgeId: this.config.BRIDGE_MACHINE_KEY,
-        executionNote: `Executed ${redemption.item?.slug ?? redemption.catalogItemId} via local bridge`,
-      });
+      const receipt = { kind: "complete" as const, note: "Streamer.bot aceitou a ação via HTTP. As subações não foram verificadas." };
+      this.confirmations.set(redemption.id, receipt);
+      await this.confirm(redemption.id, receipt);
 
       this.logger.info("Redemption completed", {
         redemptionId: redemption.id,
@@ -126,10 +130,13 @@ export class BridgeService {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown execution error";
 
-      await this.apiClient.failRedemption(redemption.id, {
-        bridgeId: this.config.BRIDGE_MACHINE_KEY,
-        failureReason: message,
-      });
+      if (!this.confirmations.has(redemption.id)) {
+        if (!this.config.STREAMERBOT_CREDENTIAL_ID || error instanceof ActionRejectedError) {
+          const receipt = { kind: "fail" as const, note: message.slice(0, 255) };
+          this.confirmations.set(redemption.id, receipt);
+          await this.confirm(redemption.id, receipt);
+        } else this.logger.error("Action outcome unknown; inspect Streamer.bot before reconciling. No automatic refund or re-execution.", { redemptionId: redemption.id });
+      }
 
       this.logger.error("Redemption failed", {
         redemptionId: redemption.id,
@@ -138,5 +145,12 @@ export class BridgeService {
     } finally {
       this.inFlight -= 1;
     }
+  }
+
+  private async confirm(id: string, receipt: { kind: "complete" | "fail"; note: string }) {
+    const body = { bridgeId: this.config.BRIDGE_MACHINE_KEY };
+    if (receipt.kind === "complete") await this.apiClient.completeRedemption(id, { ...body, executionNote: receipt.note });
+    else await this.apiClient.failRedemption(id, { ...body, failureReason: receipt.note });
+    this.confirmations.delete(id);
   }
 }
