@@ -25,7 +25,7 @@ O login Google usa o hostname em que foi iniciado. Antes de disponibilizar a pla
 https://ludylops-youtube-dashboard.vercel.app/api/auth/callback/google
 ```
 
-Em 25/09/2026, a tentativa nesse alias retornou `redirect_uri_mismatch`; o cliente de produção tinha somente o retorno de `ludylops.live`. Essa configuração externa é requisito para validar o login completo. Não é necessário gerar outro segredo. As sessões são próprias de cada host: o usuário pode precisar entrar novamente ao trocar de domínio.
+Em 25/09/2026, o retorno adicional foi salvo no cliente de produção, preservando o retorno de `ludylops.live`. A verificação posterior chegou à tela de login do Google (HTTP 200), sem `redirect_uri_mismatch`. Isso valida a aceitação do endereço de retorno; o login completo e a criação de sessão com uma conta ainda precisam ser conferidos após a implantação. A tela do Google ainda identifica o aplicativo como “Pipetz by Ludylops”. Não foi necessário gerar outro segredo. As sessões são próprias de cada host: o usuário pode precisar entrar novamente ao trocar de domínio.
 
 ## Limite desta etapa
 
