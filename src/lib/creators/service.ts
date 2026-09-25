@@ -9,7 +9,8 @@ import {
   formatCreateCreatorAreaError,
   type CreateCreatorAreaInput,
 } from "@/lib/creators/area-form";
-import { DEFAULT_CREATOR_BRANDING, DEFAULT_CREATOR_DOMAIN } from "@/lib/creators/defaults";
+import { DEFAULT_CREATOR_BRANDING, DEFAULT_CREATOR_DOMAIN, DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
+import { creatorPlatformUrl } from "./platform";
 import {
   buildDemoCreatorModules,
   findDemoCreatorTenantBySlug,
@@ -20,7 +21,7 @@ import { creatorSlugFromInput, isReservedCreatorSlug, normalizeCreatorSlug } fro
 import { creatorModuleCatalog } from "@/lib/creators/modules";
 import { resolveCreatorFromRequest, resolvePublicCreatorFromRequest, type ResolveCreatorOptions } from "@/lib/creators/tenant";
 import { getDb } from "@/lib/db/client";
-import { creatorBranding, creatorDomains, creatorModules, creators } from "@/lib/db/schema";
+import { creatorBranding, creatorModules, creators } from "@/lib/db/schema";
 import type { CreatorRecord, CreatorTenantRecord } from "@/lib/types";
 
 // Client-safe validation/formatting lives in area-form.ts so the "use client"
@@ -36,7 +37,7 @@ export {
 
 export type CreatorAreaSummary = CreatorRecord & {
   publicPath: string;
-  publicHostname: string;
+  publicUrl: string;
 };
 
 function nowIso() {
@@ -63,7 +64,7 @@ function toAreaSummary(creator: CreatorRecord): CreatorAreaSummary {
   return {
     ...creator,
     publicPath: `/c/${creator.slug}`,
-    publicHostname: `${creator.slug}.${DEFAULT_CREATOR_DOMAIN}`,
+    publicUrl: creator.id === DEFAULT_CREATOR_ID ? `https://${DEFAULT_CREATOR_DOMAIN}` : creatorPlatformUrl(creator.slug),
   };
 }
 
@@ -107,15 +108,7 @@ function buildDemoTenant(input: {
       accentColor: input.accentColor,
       updatedAt: now,
     },
-    domains: [
-      {
-        id: `domain_${input.slug}`.slice(0, 64),
-        creatorId,
-        hostname: `${input.slug}.${DEFAULT_CREATOR_DOMAIN}`,
-        isPrimary: true,
-        createdAt: now,
-      },
-    ],
+    domains: [],
     modules: buildDemoCreatorModules(creatorId, input.currencyLabel),
   };
 }
@@ -146,7 +139,6 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
 
   try {
     const creatorId = `creator_${randomUUID()}`.slice(0, 64);
-    const domainId = `creator_domain_${randomUUID()}`.slice(0, 64);
 
     await db.transaction(async (tx) => {
       await tx.insert(creators).values({
@@ -155,13 +147,6 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
         displayName: parsed.displayName,
         ownerUserId,
         status: "active",
-      });
-
-      await tx.insert(creatorDomains).values({
-        id: domainId,
-        creatorId,
-        hostname: `${parsed.slug}.${DEFAULT_CREATOR_DOMAIN}`,
-        isPrimary: true,
       });
 
       await tx.insert(creatorBranding).values({

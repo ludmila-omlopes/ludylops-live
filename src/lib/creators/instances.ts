@@ -10,6 +10,7 @@ import {
 import { defaultCreatorTenant } from "@/lib/creators/tenant";
 import { listDemoCreatorTenants } from "./demo-store";
 import { planModuleTransition } from "./module-policy";
+import { creatorPlatformUrl } from "./platform";
 import { getDb } from "@/lib/db/client";
 import {
   creatorBranding,
@@ -154,7 +155,7 @@ function buildInstance(input: {
     domains,
     modules,
     primaryDomain: domain,
-    publicUrl: publicUrlForDomain(domain),
+    publicUrl: publicUrlForDomain(domain) ?? creatorPlatformUrl(input.creator.slug),
     moduleSummary: moduleSummary(modules),
   };
 }

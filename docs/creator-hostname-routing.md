@@ -1,5 +1,7 @@
 # Subdomínios de criadores
 
+Esta documentação descreve a compatibilidade dos subdomínios antigos. Novas comunidades usam `/c/<slug>` no [Creator Hub](creator-hub.md), sem criar subdomínios de `ludylops.live`. A raiz dos hosts da plataforma abre o Creator Hub.
+
 ## Comportamento da aplicação
 
 O ponto de entrada é `src/proxy.ts`, ao lado de `src/app`. O antigo arquivo na raiz não era carregado pelo build deste projeto; o build deve listar `Proxy (Middleware)`.

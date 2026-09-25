@@ -13,11 +13,11 @@ import { CreatorSetup } from "@/components/creator-setup";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { CreatorLandingCta } from "@/components/creator-landing-cta";
 import { canCreateCreatorArea } from "@/lib/creators/access";
-import { PLATFORM_NAME, resolveCreatorLandingState } from "@/lib/creators/platform";
+import { resolveCreatorLandingState } from "@/lib/creators/platform";
 import { listCreatorAreasForOwner } from "@/lib/creators/service";
 
 export const metadata: Metadata = {
-  title: `${PLATFORM_NAME} — crie a área da sua comunidade`,
+  title: "Sua comunidade",
 };
 
 type CommunityStep = {
@@ -123,7 +123,7 @@ export default async function CreateCreatorAreaPage() {
               {creatorAreas.map((creator) => (
                 <div key={creator.id}>
                 <Link
-                  href={creator.publicPath}
+                  href={creator.publicUrl}
                   className="group flex items-center justify-between gap-3 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-4 shadow-[4px_4px_0_var(--shadow-color)] transition-transform hover:-translate-y-0.5"
                 >
                   <span className="min-w-0">
@@ -131,7 +131,7 @@ export default async function CreateCreatorAreaPage() {
                       {creator.displayName}
                     </span>
                     <span className="mt-1 block break-all text-sm font-bold text-[var(--color-ink-soft)]">
-                      {creator.publicHostname}
+                      {creator.publicUrl}
                     </span>
                   </span>
                   <span aria-hidden="true" className="text-xl font-black">

@@ -185,9 +185,7 @@ export function PlatformOwnerCreatorList({
                 Instâncias de criadores
               </h2>
               <p className="mt-2 max-w-3xl text-sm font-bold leading-6 text-[var(--color-ink-soft)]">
-                Controle global de criadores, domínios, branding básico e módulos instalados.
-                Dados operacionais ainda precisam de `creatorId` antes de múltiplas comunidades
-                reais dividirem o mesmo deploy.
+                Defina quais recursos cada comunidade pode usar e acompanhe os criadores convidados.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 text-center">
@@ -266,7 +264,7 @@ export function PlatformOwnerCreatorList({
                             rel="noreferrer"
                             className="inline-flex items-center gap-1 text-[var(--color-ink)] underline decoration-[3px] underline-offset-4"
                           >
-                            {instance.primaryDomain}
+                            {instance.primaryDomain ?? instance.publicUrl}
                             <ExternalLink className="size-3.5" aria-hidden />
                           </a>
                         ) : (

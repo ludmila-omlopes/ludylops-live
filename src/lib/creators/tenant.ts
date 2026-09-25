@@ -11,6 +11,7 @@ import {
 } from "@/lib/creators/defaults";
 import { findDemoCreatorTenantByHostname, findDemoCreatorTenantBySlug, listDemoCreatorTenants } from "@/lib/creators/demo-store";
 import { normalizeCreatorSlug, normalizeHostname, normalizePublicHostname } from "@/lib/creators/identity";
+import { isLegacyCommunityHost, isPlatformHost } from "./hosts";
 import { getDb } from "@/lib/db/client";
 import { creatorBranding, creatorDomains, creatorModules, creators } from "@/lib/db/schema";
 import type {
@@ -295,22 +296,6 @@ const LEGACY_PUBLIC_PATHS = new Set([
   "/privacy", "/produtinhos", "/quotes", "/ranking", "/terms", "/videos",
 ]);
 
-function publicPlatformHostnames() {
-  const hosts = new Set([DEFAULT_CREATOR_DOMAIN, `www.${DEFAULT_CREATOR_DOMAIN}`, ...LOCAL_HOSTNAMES]);
-  for (const value of [process.env.APP_URL, process.env.NEXT_PUBLIC_APP_URL, process.env.VERCEL_URL]) {
-    if (!value) continue;
-    try {
-      const url = new URL(value.includes("://") ? value : `https://${value}`);
-      if (url.protocol !== "http:" && url.protocol !== "https:") continue;
-      const hostname = normalizeHostname(url.host);
-      if (hostname) hosts.add(hostname);
-    } catch {
-      // An invalid deployment URL never expands the allowlist.
-    }
-  }
-  return hosts;
-}
-
 function publicRequestHostname(options: ResolveCreatorOptions) {
   const request = options.request;
   const value = options.hostname !== undefined
@@ -342,8 +327,9 @@ export async function resolvePublicCreatorFromRequest(
   const slugs = slugInputs.map(normalizeCreatorSlug);
   if (slugs.some((slug) => !slug) || new Set(slugs).size > 1) return null;
   const explicitSlug = slugs[0] ?? null;
-  const platformHost = Boolean(hostname && publicPlatformHostnames().has(hostname));
-  const useDefault = !explicitSlug && platformHost && LEGACY_PUBLIC_PATHS.has(pathname ?? "");
+  // Keep old /c links valid, but never choose a streamer implicitly on the hub.
+  const platformHost = isPlatformHost(hostname) || isLegacyCommunityHost(hostname);
+  const useDefault = !explicitSlug && isLegacyCommunityHost(hostname) && LEGACY_PUBLIC_PATHS.has(pathname ?? "");
   if ((!hostname && !explicitSlug) || (platformHost && !explicitSlug && !useDefault)) return null;
 
   const db = getDb();

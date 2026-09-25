@@ -139,7 +139,7 @@ describe("product layouts", () => {
 
   it("defines product-specific metadata", () => {
     expect(builderMetadata).toEqual({
-      title: "Comunidades",
+      title: { default: "Creator Hub", template: "%s · Creator Hub" },
       description: "Prepare o encontro da sua comunidade com a próxima live.",
     });
     expect(creatorMetadata).toEqual({ title: "Comunidade" });

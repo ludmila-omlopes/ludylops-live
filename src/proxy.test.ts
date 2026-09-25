@@ -25,7 +25,7 @@ describe("proxy composition", () => {
     expect(mocks.authenticatedProxy).not.toHaveBeenCalled();
   });
 
-  it.each(["ludylops.live", "www.ludylops.live", "localhost:3000", "admin.ludylops.live"])("passes through the root of %s without session work", async host => {
+  it.each(["ludylops.live", "www.ludylops.live", "admin.ludylops.live"])("passes through the root of %s without session work", async host => {
     const response = await proxy(new NextRequest(`http://${host}/`), event);
     expect(response?.headers.get("x-middleware-next")).toBe("1");
     expect(response?.headers.get("x-middleware-rewrite")).toBeNull();
@@ -44,6 +44,18 @@ describe("proxy composition", () => {
 
   it("matches the new public root", () => {
     expect(unstable_doesProxyMatch({ config, nextConfig: {}, url: "https://mari.ludylops.live/" })).toBe(true);
+  });
+
+  it.each(["localhost:3000", "ludylops-youtube-dashboard.vercel.app"])("opens the hub at %s without selecting a community", async host => {
+    const response = await proxy(new NextRequest(`https://${host}/?ref=invite`), event);
+    expect(response?.headers.get("x-middleware-rewrite")).toBe(`https://${host}/criar-area?ref=invite`);
+    expect(response?.headers.get("location")).toBeNull();
+    expect(mocks.authenticatedProxy).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to the hub when the forwarded host is invalid", async () => {
+    const response = await proxy(new NextRequest("https://ludylops-youtube-dashboard.vercel.app/", { headers: { "x-forwarded-host": "invalid/path" } }), event);
+    expect(response?.headers.get("x-middleware-rewrite")).toBeNull();
   });
 
   it.each(["/c/mari", "/c/mari/", "/api/auth/callback/google", "/api/quotes", "/api/health", "/api/internal/streamerbot/quotes", "/_next/static/a.js", "/_next/image", "/favicon.ico", "/robots.txt", "/quotes", "/obs/quotes", "/administrator", "/ownership"])("excludes %s from proxy execution", pathname => {

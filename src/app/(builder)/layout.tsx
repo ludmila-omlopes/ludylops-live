@@ -6,9 +6,10 @@ import { BuilderChrome } from "@/components/builder-chrome";
 import { Providers } from "@/components/providers";
 import { isDemoMode, platformOwnerEmails } from "@/lib/env";
 import { isThemeMode, themeCookieKey } from "@/lib/theme";
+import { PLATFORM_NAME } from "@/lib/creators/platform";
 
 export const metadata: Metadata = {
-  title: "Comunidades",
+  title: { default: PLATFORM_NAME, template: `%s · ${PLATFORM_NAME}` },
   description: "Prepare o encontro da sua comunidade com a próxima live.",
 };
 
