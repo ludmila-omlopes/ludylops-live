@@ -1,6 +1,6 @@
 import type { CreatorTenantRecord } from "@/lib/types";
 import { env, isDemoMode } from "@/lib/env";
-import { DEFAULT_CREATOR_ID } from "./defaults";
+import { DEFAULT_CREATOR_ID, DEFAULT_CREATOR_DOMAIN } from "./defaults";
 import { getCurrencyLabel } from "./currency";
 import { canUseModules } from "./module-access";
 
@@ -20,5 +20,5 @@ export function creatorHomeLinks(tenant: CreatorTenantRecord) {
     links.push({ href: legacy ? "/quotes" : `${prefix}/quotes`, label: "Frases da live", description: "As pérolas e as histórias que ficaram na memória." });
   if (canUseModules(tenant, ["product_recommendations"], legacy ? "legacy" : "recommendations"))
     links.push({ href: legacy ? "/produtinhos" : `${prefix}/produtinhos`, label: "Produtos indicados", description: "Escolhas para o setup, o jogo e o dia a dia." });
-  return links;
+  return legacy ? links.map(link => ({ ...link, href: `https://${DEFAULT_CREATOR_DOMAIN}${link.href}` })) : links;
 }

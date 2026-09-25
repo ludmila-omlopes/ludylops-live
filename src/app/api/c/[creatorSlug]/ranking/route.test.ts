@@ -29,6 +29,9 @@ describe("public community ranking API", () => {
     expect((await (await request("canal-b")).json()).data.entries[0].currentBalance).toBe(90);
   });
   it("accepts the registered host and rejects mismatched, unknown or forged creator selectors", async () => {
+    for (const tenant of globalThis.__creatorTenantStore!) {
+      tenant.domains = [{ id: `${tenant.creator.id}-domain`, creatorId: tenant.creator.id, hostname: `${tenant.creator.slug}.ludylops.live`, isPrimary: true, createdAt: new Date().toISOString() }];
+    }
     expect((await request("canal-a", "", "canal-a.ludylops.live")).status).toBe(200);
     expect((await request("canal-a", "", "canal-b.ludylops.live")).status).toBe(404);
     expect((await request("canal-a", "", "unknown.invalid")).status).toBe(404);

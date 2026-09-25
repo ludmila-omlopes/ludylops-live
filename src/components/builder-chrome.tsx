@@ -8,6 +8,7 @@ import { AuthButtons } from "@/components/auth-buttons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import type { ThemeMode } from "@/lib/theme";
+import { PLATFORM_NAME } from "@/lib/creators/platform";
 
 export function BuilderChrome({
   children,
@@ -27,11 +28,11 @@ export function BuilderChrome({
     <div className="flex min-h-screen flex-col">
       <header
         className="sticky top-0 z-40 border-b-[3px] border-[var(--color-ink)] bg-[var(--color-header-surface)]"
-        aria-label="Comunidades"
+        aria-label={PLATFORM_NAME}
       >
         <div className="mx-auto flex w-full max-w-[1500px] items-center gap-4 px-4 py-3 sm:px-6 lg:px-10">
           <Link href="/criar-area" className="shrink-0 text-xl font-black uppercase text-[var(--color-ink)]">
-            Comunidades
+            {PLATFORM_NAME}
           </Link>
 
           <nav className="ml-auto hidden items-center gap-2 md:flex" aria-label="Navegação de comunidades">
@@ -57,12 +58,6 @@ export function BuilderChrome({
                 Administrar comunidades
               </Link>
             ) : null}
-            <Link
-              href="/"
-              className="rounded-[var(--radius)] border border-transparent px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--color-ink-soft)] hover:border-[var(--color-ink)]"
-            >
-              Ludylops
-            </Link>
             <ThemeToggle initialTheme={initialTheme} />
             <AuthButtons />
           </nav>
@@ -101,13 +96,6 @@ export function BuilderChrome({
                   Administrar comunidades
                 </Link>
               ) : null}
-              <Link
-                href="/"
-                onClick={() => setMobileOpen(false)}
-                className="border-[2px] border-[var(--color-ink)] px-4 py-3 text-sm font-extrabold uppercase"
-              >
-                Ludylops
-              </Link>
             </nav>
             <div className="mt-4 border-t-[2px] border-[var(--color-ink)] pt-4">
               <AuthButtons />

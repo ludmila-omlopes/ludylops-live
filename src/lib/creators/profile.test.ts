@@ -74,6 +74,6 @@ describe("usable community home links", () => {
   });
   it("keeps legacy links available independently of new-economy activation", () => {
     state.demo = false; state.env.CREATOR_ECONOMY_ENABLED = "false";
-    expect(creatorHomeLinks(defaultCreatorTenant).map((l) => l.href)).toEqual(["/me", "/ranking", "/quotes", "/produtinhos"]);
+    expect(creatorHomeLinks(defaultCreatorTenant).map((l) => l.href)).toEqual(["/me", "/ranking", "/quotes", "/produtinhos"].map(path => `https://ludylops.live${path}`));
   });
 });

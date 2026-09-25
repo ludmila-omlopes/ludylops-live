@@ -36,8 +36,8 @@ describe("BuilderChrome", () => {
 
     expect(markup).toContain('href="/criar-area"');
     expect(markup).toContain("Criar área");
-    expect(markup).toContain('href="/"');
-    expect(markup).toContain("Ludylops");
+    expect(markup).toContain("Creator Hub");
+    expect(markup).not.toContain("Ludylops");
     expect(markup).not.toContain('href="/owner"');
   });
 

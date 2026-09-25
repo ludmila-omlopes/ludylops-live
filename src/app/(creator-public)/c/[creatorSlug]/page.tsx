@@ -1,16 +1,18 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { getCreatorAreaBySlug } from "@/lib/creators/service";
 import { creatorHomeLinks } from "@/lib/creators/home";
 import { creatorColorInk, safeCreatorColor } from "@/lib/creators/profile";
+import { DEFAULT_CREATOR_ID, DEFAULT_CREATOR_DOMAIN } from "@/lib/creators/defaults";
 
 export default async function CreatorAreaPage({ params }: { params: Promise<{ creatorSlug: string }> }) {
   const { creatorSlug } = await params;
   const requestHeaders = await headers();
   const tenant = await getCreatorAreaBySlug(creatorSlug, { hostname: requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") });
   if (!tenant) notFound();
+  if (tenant.creator.id === DEFAULT_CREATOR_ID) redirect(`https://${DEFAULT_CREATOR_DOMAIN}`);
   const links = creatorHomeLinks(tenant);
   const primary = safeCreatorColor(tenant.branding.primaryColor, "#c7a2e9");
   const accent = safeCreatorColor(tenant.branding.accentColor, "#40a9ff");

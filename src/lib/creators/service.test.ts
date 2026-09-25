@@ -42,7 +42,7 @@ describe("creator area service", () => {
       primaryColor: "#11aa99",
       accentColor: "#ffcc00",
     });
-    expect(tenant.domains[0]?.hostname).toBe("canal-da-mari.ludylops.live");
+    expect(tenant.domains).toEqual([]);
     expect(tenant.modules.map((module) => module.moduleKey)).toContain("points");
   });
 
@@ -76,7 +76,7 @@ describe("creator area service", () => {
     expect(areas[0]).toMatchObject({
       slug: "canal-um",
       publicPath: "/c/canal-um",
-      publicHostname: "canal-um.ludylops.live",
+      publicUrl: "https://ludylops-youtube-dashboard.vercel.app/c/canal-um",
     });
   });
 

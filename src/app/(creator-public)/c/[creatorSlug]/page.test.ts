@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ headers: vi.fn(), getArea: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_HTTP_ERROR_FALLBACK;404"); } }));
+vi.mock("next/navigation", () => ({
+  notFound: () => { throw new Error("NEXT_HTTP_ERROR_FALLBACK;404"); },
+  redirect: (url: string) => { throw new Error(`NEXT_REDIRECT;${url}`); },
+}));
 vi.mock("@/lib/creators/service", () => ({ getCreatorAreaBySlug: mocks.getArea }));
 
 import CreatorAreaPage from "./page";
@@ -15,9 +18,14 @@ describe("creator public page boundary", () => {
   });
 
   it("renders an available creator and passes the incoming hostname", async () => {
+    mocks.getArea.mockResolvedValue({ ...defaultCreatorTenant, creator: { ...defaultCreatorTenant.creator, id: "cozy", slug: "cozy" } });
+    expect(await CreatorAreaPage({ params: Promise.resolve({ creatorSlug: "cozy" }) })).toBeTruthy();
+    expect(mocks.getArea).toHaveBeenCalledWith("cozy", { hostname: "localhost:3000" });
+  });
+
+  it("opens the Ludylops community on its own domain after public resolution", async () => {
     mocks.getArea.mockResolvedValue(defaultCreatorTenant);
-    expect(await CreatorAreaPage({ params: Promise.resolve({ creatorSlug: "ludylops" }) })).toBeTruthy();
-    expect(mocks.getArea).toHaveBeenCalledWith("ludylops", { hostname: "localhost:3000" });
+    await expect(CreatorAreaPage({ params: Promise.resolve({ creatorSlug: "ludylops" }) })).rejects.toThrow("NEXT_REDIRECT;https://ludylops.live");
   });
 
   it("uses a generic not-found response when public resolution refuses the creator", async () => {

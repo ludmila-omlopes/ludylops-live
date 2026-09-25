@@ -323,7 +323,7 @@ describe("public creator lifecycle policy", () => {
     }))).resolves.toMatchObject({ creator: { id: cozy.id } });
   });
 
-  it.each(["ludylops.live", "www.ludylops.live", "localhost:3000", "127.0.0.1:3000", "[::1]:3000"])("allows default only for explicit legacy host/path: %s", async (hostname) => {
+  it.each(["ludylops.live", "www.ludylops.live"])("allows default only for explicit legacy host/path: %s", async (hostname) => {
     await expect(resolvePublicCreatorFromRequest({ hostname, pathname: "/quotes" })).resolves.toMatchObject({ creator: { id: defaultCreator.id } });
     defaultCreator.status = "disabled";
     await expect(resolvePublicCreatorFromRequest({ hostname, pathname: "/quotes" })).resolves.toBeNull();
@@ -348,6 +348,14 @@ describe("public creator lifecycle policy", () => {
     await expect(resolvePublicCreatorFromRequest(new Request("http://localhost/c/cozy", {
       headers: { "x-forwarded-host": "unknown.example.com, localhost", host: "localhost" },
     }))).resolves.toBeNull();
+  });
+
+  it.each(["localhost:3000", "127.0.0.1:3000", "[::1]:3000", "ludylops-youtube-dashboard.vercel.app"])("requires an explicit community on the platform host %s", async hostname => {
+    for (const pathname of ["/", "/me", "/ranking", "/quotes"]) {
+      await expect(resolvePublicCreatorFromRequest({ hostname, pathname })).resolves.toBeNull();
+    }
+    await expect(resolvePublicCreatorFromRequest({ hostname, slug: "cozy" })).resolves.toMatchObject({ creator: { id: cozy.id } });
+    await expect(resolvePublicCreatorFromRequest({ hostname, slug: "ludylops" })).resolves.toMatchObject({ creator: { id: defaultCreator.id } });
   });
 
   it("does not turn database or missing-schema failures into an active default", async () => {

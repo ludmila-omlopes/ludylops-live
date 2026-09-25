@@ -6,7 +6,7 @@ vi.mock("@/lib/creators/tenant", () => ({ resolveCreatorFromRequest: resolveCrea
 
 import { CreatorAreaError } from "@/lib/creators/area-errors.server";
 import { createCreatorArea } from "@/lib/creators/service";
-import { creatorBranding, creatorModules, creators } from "@/lib/db/schema";
+import { creatorBranding, creatorDomains, creatorModules, creators } from "@/lib/db/schema";
 
 const input = { displayName: "Canal da Mari", slug: "canal-da-mari" };
 
@@ -77,7 +77,8 @@ describe("creator-area database creation", () => {
     ]);
     expect(results[0]).toMatchObject({ status: "fulfilled", value: { creator: { ownerUserId: "owner_1" } } });
     expect(results[1]).toMatchObject({ status: "rejected", reason: { code: "creator_slug_exists", message: "creator_slug_exists" } });
-    expect(committed).toHaveLength(4);
+    expect(committed).toHaveLength(3);
+    expect(committed.some(row => row.table === creatorDomains)).toBe(false);
     expect(events.filter((event) => event === "commit")).toHaveLength(1);
     expect(events.filter((event) => event === "rollback")).toHaveLength(1);
     expect(db.select).not.toHaveBeenCalled();
