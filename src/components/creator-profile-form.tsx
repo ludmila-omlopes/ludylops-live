@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { creatorColorInk, creatorProfileSchema, safeCreatorColor, type CreatorProfile } from "@/lib/creators/profile";
 
-export function CreatorProfileForm({ creatorId }: { creatorId: string }) {
+export function CreatorProfileForm({ creatorId, initial }: { creatorId: string; initial?: CreatorProfile }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const embedded = Boolean(initial);
+  const [open, setOpen] = useState(embedded);
   const [busy, setBusy] = useState(false);
-  const [expected, setExpected] = useState<CreatorProfile | null>(null);
-  const [draft, setDraft] = useState<CreatorProfile>({ displayName: "", primaryColor: "#c7a2e9", accentColor: "#40a9ff" });
+  const [expected, setExpected] = useState<CreatorProfile | null>(initial ?? null);
+  const [draft, setDraft] = useState<CreatorProfile>(initial ?? { displayName: "", primaryColor: "#c7a2e9", accentColor: "#40a9ff" });
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const endpoint = `/api/me/creator-area/${encodeURIComponent(creatorId)}/profile`;
@@ -43,10 +44,10 @@ export function CreatorProfileForm({ creatorId }: { creatorId: string }) {
   }
   const primary = safeCreatorColor(draft.primaryColor, "#c7a2e9");
   const accent = safeCreatorColor(draft.accentColor, "#40a9ff");
-  return <div className="mt-3">
-    <Button type="button" variant="neutral" aria-expanded={open} disabled={busy} onClick={() => open ? setOpen(false) : void load()}>
+  return <div className={embedded ? "" : "mt-3"}>
+    {!embedded && <Button type="button" variant="neutral" aria-expanded={open} disabled={busy} onClick={() => open ? setOpen(false) : void load()}>
       {open ? "Fechar nome e cores" : "Editar nome e cores"}
-    </Button>
+    </Button>}
     {open && <form onSubmit={save} className="mt-3 grid gap-4 border-2 border-[var(--color-ink)] p-4">
       <h2 className="text-xl font-bold">Nome e cores da comunidade</h2>
       <fieldset disabled={busy || !expected} className="grid min-w-0 gap-4">

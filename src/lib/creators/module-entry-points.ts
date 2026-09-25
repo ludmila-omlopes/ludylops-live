@@ -113,6 +113,13 @@ export const sharedPages = {
   "/comunidades/nova": "Creator provisioning for approved beta accounts",
   "/comunidades/[slug]":
     "Owner-resolved community management; each control keeps its own owner and module checks",
+  "/comunidades/[slug]/identidade": "Owner-verified name, colors and currency label",
+  "/comunidades/[slug]/economia": "Owner-verified chat rewards and isolated balance adjustments",
+  "/comunidades/[slug]/resgates": "Owner-scoped catalog, redemptions and integration recovery",
+  "/comunidades/[slug]/frases": "Owner quote management for isolated quotes",
+  "/comunidades/[slug]/produtos": "Owner-managed isolated product recommendations",
+  "/comunidades/[slug]/mensagens": "Owner-managed periodic chat messages",
+  "/comunidades/[slug]/integracao": "Owner Streamer.bot credentials; revocation stays available when inactive",
   "/owner": "Platform-owner configuration and recovery",
   "/c/[creatorSlug]":
     "Creator identity, branding and availability; no unscoped operational data",

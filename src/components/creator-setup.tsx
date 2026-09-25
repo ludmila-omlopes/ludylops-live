@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { CreatorSetup as Setup } from "@/lib/creators/setup";
 const labels = { configured: "Registrado", pending: "Falta configurar", blocked: "Indisponível", verify: "Verificar na live" };
-const guides = [
+export const setupGuides = [
   ["Credenciais e teste de autenticação", "docs/streamerbot-credentials.md"],
   ["Vínculo do YouTube e moeda", "docs/creator-economy.md"],
   ["Action de ganhos por mensagem", "docs/creator-chat-rewards.md"],
@@ -31,8 +31,16 @@ export function CreatorSetup({ creatorId }: { creatorId: string }) {
       {step.href && <a className="mt-2 inline-block font-bold underline" href={step.href}>{step.link}</a>}
     </li>)}</ol>}
     <details className="text-sm"><summary className="cursor-pointer font-bold">Instruções para configurar e testar</summary>
-      <ul className="mt-3 grid gap-2">{guides.map(([label, path]) => <li key={path}><a className="underline" href={`https://github.com/ludmila-omlopes/ludylops-live/blob/master/${path}`} target="_blank" rel="noreferrer">{label}</a></li>)}</ul>
+      <ul className="mt-3 grid gap-2">{setupGuides.map(([label, path]) => <li key={path}><a className="underline" href={`https://github.com/ludmila-omlopes/ludylops-live/blob/master/${path}`} target="_blank" rel="noreferrer">{label}</a></li>)}</ul>
       <p className="mt-3">Presença, inscrições, apostas e sugestões ainda não estão disponíveis para novas comunidades. Ganhos por chat exigem a regra ativa e a action configurada.</p>
     </details>
+  </section>;
+}
+
+export function CreatorSetupGuides() {
+  return <section className="grid gap-3 border-t-2 border-[var(--color-ink)] pt-4 text-sm">
+    <h2 className="text-2xl font-bold">Instruções para configurar e testar</h2>
+    <ul className="grid gap-2">{setupGuides.map(([label, path]) => <li key={path}><a className="font-bold underline" href={`https://github.com/ludmila-omlopes/ludylops-live/blob/master/${path}`} target="_blank" rel="noreferrer">{label}</a></li>)}</ul>
+    <p>Presença, inscrições, apostas e sugestões ainda não estão disponíveis para novas comunidades. Ganhos por chat exigem a regra ativa e a action configurada.</p>
   </section>;
 }

@@ -1,116 +1,165 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
-import { CommunityStatusBadge } from "@/components/community-status-badge";
-import { CreatorChatRewardsForm } from "@/components/creator-chat-rewards-form";
-import { CreatorCurrencyForm } from "@/components/creator-currency-form";
-import { CreatorProfileForm } from "@/components/creator-profile-form";
-import { CreatorSetup } from "@/components/creator-setup";
-import { PeriodicMessagesManager } from "@/components/periodic-messages-manager";
-import { StreamerbotCredentials } from "@/components/streamerbot-credentials";
-import { requireSession } from "@/lib/auth/session";
-import { COMMUNITIES_PATH } from "@/lib/creators/owner-dashboard";
-import { getOwnedCommunityBySlug } from "@/lib/creators/owner-dashboard.server";
-import { safeCreatorColor } from "@/lib/creators/profile";
-
-type CommunityPageProps = {
-  params: Promise<{ slug: string }>;
-};
-
-const LEGACY_ADMIN_URL = "https://ludylops.live/admin";
+import { CommunitySectionHeading } from "@/components/community-section-heading";
+import { RefreshButton } from "@/components/refresh-button";
+import { getOwnedChatRewards } from "@/lib/creators/chat-rewards-settings.server";
+import { isCommunitySectionAvailable } from "@/lib/creators/community-sections";
+import { loadCommunitySection } from "@/lib/creators/community-workspace.server";
+import { communitySectionPath, summarizeSetup } from "@/lib/creators/owner-dashboard";
+import type { SetupStep } from "@/lib/creators/setup";
+import { getOwnedCreatorSetup } from "@/lib/creators/setup.server";
 
 export const metadata: Metadata = {
-  title: "Gerenciar comunidade",
+  title: "Visão geral da comunidade",
 };
 
-export default async function CommunityDashboardPage({ params }: CommunityPageProps) {
-  const session = await requireSession();
-  const { slug } = await params;
-  const community = await getOwnedCommunityBySlug(session.user!.activeViewerId, slug);
+const stepLabels: Record<SetupStep["state"], string> = {
+  configured: "Registrado",
+  pending: "Falta configurar",
+  blocked: "Indisponível",
+  verify: "Verificar na live",
+};
 
-  if (!community) {
-    notFound();
-  }
-  if (community.isLegacy) {
-    redirect(LEGACY_ADMIN_URL);
-  }
+const stepTones: Record<SetupStep["state"], string> = {
+  configured: "bg-[var(--color-mint)]",
+  pending: "bg-[var(--color-yellow)]",
+  blocked: "bg-[var(--color-paper)]",
+  verify: "bg-[var(--color-sky)]",
+};
 
-  const active = community.status === "active";
-  const primary = safeCreatorColor(community.primaryColor, "#c7a2e9");
-  const accent = safeCreatorColor(community.accentColor, "#40a9ff");
-  const publicPath = `/c/${encodeURIComponent(community.slug)}`;
+type SummaryItem = { label: string; value: string; href?: string };
+
+function SummaryCard({ item }: { item: SummaryItem }) {
+  const content = (
+    <>
+      <span className="text-xs font-black uppercase tracking-[0.08em] text-[var(--color-ink-soft)]">{item.label}</span>
+      <span className="mt-1 block break-words text-base font-bold text-[var(--color-ink)]">{item.value}</span>
+    </>
+  );
+  const className =
+    "block border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-4 shadow-[4px_4px_0_var(--shadow-color)]";
+
+  return item.href ? (
+    <Link href={item.href} className={`${className} transition-transform hover:-translate-y-0.5`}>
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
+  );
+}
+
+export default async function CommunityOverviewPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { community, tenant, viewerId } = await loadCommunitySection(params, "overview");
+  const slug = community.slug;
+
+  const setup = await getOwnedCreatorSetup(viewerId, community.id).catch(() => null);
+  const chatRewards =
+    community.status === "active" && isCommunitySectionAvailable(tenant, "economia")
+      ? await getOwnedChatRewards(viewerId, community.id).catch(() => null)
+      : null;
+  const progress = setup ? summarizeSetup(setup) : null;
+  const percent = progress && progress.total > 0 ? Math.round((progress.configured / progress.total) * 100) : 0;
+
+  const summary: SummaryItem[] = [];
+  if (setup) {
+    summary.push({
+      label: "Moeda",
+      value: setup.currencyLabel,
+      href: isCommunitySectionAvailable(tenant, "identidade") ? communitySectionPath(slug, "identidade") : undefined,
+    });
+  }
+  if (chatRewards) {
+    summary.push({
+      label: "Ganhos no chat",
+      value: chatRewards.enabled
+        ? `${chatRewards.amount} ${setup?.currencyLabel ?? "unidades"} a cada ${chatRewards.cooldownSeconds} s`
+        : "Pausados",
+      href: communitySectionPath(slug, "economia"),
+    });
+  }
+  if (progress) {
+    summary.push({
+      label: "Streamer.bot",
+      value: progress.authenticated ? "Autenticação recebida" : "Aguardando autenticação",
+      href: communitySectionPath(slug, "integracao"),
+    });
+  }
 
   return (
-    <div className="surface-section flex w-full flex-1 flex-col">
-      <section className="border-b-[3px] border-[var(--color-ink)] bg-[var(--color-paper)]">
-        <div
-          aria-hidden="true"
-          className="h-3 border-b-[3px] border-[var(--color-ink)]"
-          style={{ background: `linear-gradient(90deg, ${primary}, ${accent})` }}
-        />
-        <div className="mx-auto grid w-full max-w-[1200px] gap-4 px-4 py-8 sm:px-6 lg:px-10">
-          <Link
-            href={COMMUNITIES_PATH}
-            className="inline-flex items-center gap-2 justify-self-start text-sm font-bold text-[var(--color-ink-soft)] underline decoration-2 underline-offset-4"
-          >
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Minhas comunidades
-          </Link>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1
-              className="min-w-0 break-words text-4xl uppercase leading-[0.9] sm:text-5xl"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              {community.displayName}
-            </h1>
-            <CommunityStatusBadge status={community.status} />
-          </div>
-          <a
-            href={community.publicUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-w-0 items-center gap-1 justify-self-start break-all text-sm font-bold text-[var(--color-ink)] underline decoration-2 underline-offset-4"
-          >
-            {community.publicUrl.replace(/^https?:\/\//u, "")}
-            <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
-          </a>
-          {!active ? (
-            <p role="status" className="max-w-3xl border-[2px] border-[var(--color-ink)] bg-[var(--color-yellow)] px-3 py-2 text-sm font-bold text-[var(--color-ink)]">
-              Comunidade {community.status === "archived" ? "arquivada" : "desativada"}. Você ainda pode revogar suas
-              credenciais do Streamer.bot.
-            </p>
-          ) : null}
-        </div>
-      </section>
+    <>
+      <CommunitySectionHeading title="Visão geral" />
 
-      <section className="mx-auto grid w-full max-w-[1200px] gap-2 px-4 py-8 sm:px-6 lg:px-10">
-        <div className="max-w-3xl">
-          <CreatorSetup creatorId={community.id} />
-          {active ? (
-            <>
-              <div id={`perfil-${community.id}`} className="scroll-mt-24">
-                <CreatorProfileForm creatorId={community.id} />
-              </div>
-              <CreatorCurrencyForm creatorId={community.id} />
-              <div id={`ganhos-${community.id}`} className="scroll-mt-24">
-                <CreatorChatRewardsForm creatorId={community.id} />
-              </div>
-              <PeriodicMessagesManager creatorId={community.id} />
-              <Link href={`${publicPath}/quotes#gerenciar-frases`} className="mt-3 block font-bold underline">
-                Gerenciar frases
-              </Link>
-              <Link href={`${publicPath}/produtinhos`} className="mt-3 block font-bold underline">
-                Gerenciar produtos
-              </Link>
-            </>
-          ) : null}
-          <div id={`integracao-${community.id}`} className="scroll-mt-24">
-            <StreamerbotCredentials creatorId={community.id} enabled={active} mode="creator" />
-          </div>
+      {summary.length > 0 ? (
+        <div className="mb-8 grid gap-4 sm:grid-cols-3">
+          {summary.map((item) => (
+            <SummaryCard key={item.label} item={item} />
+          ))}
         </div>
+      ) : null}
+
+      <section aria-labelledby="primeira-live" className="grid gap-5 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5 shadow-[6px_6px_0_var(--shadow-color)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="primeira-live" className="text-2xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
+            Antes da primeira live
+          </h2>
+          <RefreshButton label="Verificar novamente" pendingLabel="Verificando…" />
+        </div>
+
+        {setup && progress ? (
+          <>
+            <div className="grid gap-2">
+              <p className="text-sm font-bold text-[var(--color-ink)]">
+                {progress.configured} de {progress.total} etapas registradas
+              </p>
+              <div
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={progress.total}
+                aria-valuenow={progress.configured}
+                aria-label="Etapas registradas antes da primeira live"
+                className="h-3 w-full border-[2px] border-[var(--color-ink)] bg-[var(--color-paper)]"
+              >
+                <div className="h-full bg-[var(--color-mint)]" style={{ width: `${percent}%` }} />
+              </div>
+              <p className="text-sm text-[var(--color-ink-soft)]">
+                Depois de mudar uma configuração, verifique novamente. Itens marcados para verificar na live só se
+                confirmam com um teste real.
+              </p>
+            </div>
+
+            <ol className="grid gap-3">
+              {setup.steps.map((step, index) => (
+                <li key={step.id} className="grid min-w-0 gap-2 border-[2px] border-[var(--color-ink)] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-black">
+                      {index + 1}. {step.title}
+                    </h3>
+                    <span className={`badge-brutal px-2 py-0.5 text-[10px] text-[var(--color-ink)] ${stepTones[step.state]}`}>
+                      {stepLabels[step.state]}
+                    </span>
+                  </div>
+                  <p className="break-words text-sm leading-6">{step.detail}</p>
+                  {step.href ? (
+                    <Link
+                      href={step.href}
+                      className="inline-flex items-center gap-1 justify-self-start text-sm font-bold underline decoration-2 underline-offset-4"
+                    >
+                      {step.link}
+                      <ArrowRight className="size-4" aria-hidden="true" />
+                    </Link>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </>
+        ) : (
+          <p role="alert" className="text-sm">
+            Não foi possível verificar a configuração agora. Tente novamente em instantes.
+          </p>
+        )}
       </section>
-    </div>
+    </>
   );
 }
