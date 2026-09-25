@@ -6,7 +6,7 @@
 - Depends on: none.
 - Issue: https://github.com/ludmila-omlopes/ludylops-live/issues/180
 - Planned at: `ec19f8f`, reconciled 2026-09-15; same file tree as remote master `f353ce2`.
-- State: IN PROGRESS (2026-09-15): implementation and local validation complete in .worktrees/issue-180; awaiting PR/integration. Commands: db:baseline:check and db:baseline:ensure -- --apply. Validation: 351 tests (32 new), typecheck, lint and test-environment build. SQL/transaction behavior tested with an adapter fake; real database verification remains a deployment prerequisite. No shared database was changed.
+- State: DONE (2026-09-15): implementation and local validation complete in .worktrees/issue-180; integrated via [PR #190](https://github.com/ludmila-omlopes/ludylops-live/pull/190). Commands: db:baseline:check and db:baseline:ensure -- --apply. Validation: 351 tests (32 new), typecheck, lint and test-environment build. SQL/transaction behavior tested with an adapter fake; real database verification remains a deployment prerequisite. No shared database was changed.
 - Drift check: `git diff --stat ec19f8f..HEAD -- package.json drizzle.config.ts src/lib/db/schema.ts drizzle README.md`.
 
 ## Problem and decision
