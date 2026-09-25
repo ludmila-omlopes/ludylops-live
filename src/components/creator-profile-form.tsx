@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ownerPanelClass, ownerPanelTitleClass } from "@/components/ui/owner-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { creatorColorInk, creatorProfileSchema, safeCreatorColor, type CreatorProfile } from "@/lib/creators/profile";
@@ -48,8 +49,8 @@ export function CreatorProfileForm({ creatorId, initial }: { creatorId: string; 
     {!embedded && <Button type="button" variant="neutral" aria-expanded={open} disabled={busy} onClick={() => open ? setOpen(false) : void load()}>
       {open ? "Fechar nome e cores" : "Editar nome e cores"}
     </Button>}
-    {open && <form onSubmit={save} className="mt-3 grid gap-4 border-2 border-[var(--color-ink)] p-4">
-      <h2 className="text-xl font-bold">Nome e cores da comunidade</h2>
+    {open && <form onSubmit={save} className={`${embedded ? "" : "mt-3 "}${ownerPanelClass}`}>
+      <h2 className={ownerPanelTitleClass}>Nome e cores da comunidade</h2>
       <fieldset disabled={busy || !expected} className="grid min-w-0 gap-4">
         <label className="grid gap-2 text-sm font-bold">Nome do streamer
           <Input value={draft.displayName} onChange={(e) => change("displayName", e.target.value)} required minLength={2} maxLength={80} />

@@ -37,7 +37,7 @@ describe("credential management controls", () => {
     await click("Já salvei; ocultar segredo"); expect(container.querySelectorAll("input")).toHaveLength(0);
     await click("Substituir credencial");
     expect(JSON.parse(fetchMock.mock.calls.find(([, init]) => String(init?.body).includes('"rotate"'))![1].body)).toEqual({ action: "rotate", credentialId: "initial-credential" });
-    await click("Já salvei; ocultar segredo"); await click("Revogar credencial");
+    await click("Já salvei; ocultar segredo"); await click("Revogar credencial"); await click("Confirmar revogação");
     expect(container.textContent).toContain("Revogada");
     await click("Fechar credenciais"); await click("Gerenciar credenciais");
     expect(container.querySelectorAll("input")).toHaveLength(0);
@@ -68,7 +68,9 @@ describe("credential management controls", () => {
     const button = (label: string) => Array.from(container.querySelectorAll("button")).find(b => b.textContent === label)!;
     expect(button("Substituir credencial").disabled).toBe(true);
     expect(button("Revogar credencial").disabled).toBe(false);
-    await click("Revogar credencial"); expect(button("Criar credencial").disabled).toBe(true);
+    await click("Revogar credencial");
+    expect(fetchMock.mock.calls.some(([, init]) => String(init?.body).includes('"revoke"'))).toBe(false);
+    await click("Confirmar revogação"); expect(button("Criar credencial").disabled).toBe(true);
     expect(container.textContent).toContain("não confirma conexão contínua");
   });
   it("discards stale controls on a failed refresh, including the visible secret", async () => {

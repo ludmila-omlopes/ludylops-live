@@ -29,10 +29,7 @@ export default async function CommunityEconomyPage({ params }: { params: Promise
       <div className="grid gap-8">
         <CreatorChatRewardsForm creatorId={community.id} initial={chatRewards} />
         {canAdjustBalances ? (
-          <section className="grid gap-4 border-t-2 border-[var(--color-ink)] pt-6">
-            <h2 className="text-2xl font-bold">Saldos dos espectadores</h2>
-            <CreatorEconomyManager creatorId={community.id} currencyLabel={currencyLabel} />
-          </section>
+          <CreatorEconomyManager creatorId={community.id} currencyLabel={currencyLabel} />
         ) : null}
       </div>
     </>

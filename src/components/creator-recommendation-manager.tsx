@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ownerFieldClass, ownerPanelClass, ownerPanelTitleClass } from "@/components/ui/owner-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RecommendationImageLookup } from "@/components/recommendation-image-lookup";
@@ -57,10 +58,10 @@ export function CreatorRecommendationManager({ creatorId, defaultOpen = false }:
     if (defaultOpen) void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return <section className="my-6">
+  return <section className={defaultOpen ? "" : "my-6"}>
     {!defaultOpen && <Button type="button" variant="neutral" disabled={busy} aria-expanded={open} onClick={() => open ? setOpen(false) : void load()}>Gerenciar produtos</Button>}
-    {open && <div className="mt-4 grid gap-5 border-[3px] border-[var(--color-ink)] p-4 sm:p-6">
-      <h2 className="text-2xl font-black">Produtos que você indica</h2>
+    {open && <div className={`${defaultOpen ? "" : "mt-4 "}${ownerPanelClass}`}>
+      <h2 className={ownerPanelTitleClass}>Produtos que você indica</h2>
       <form onSubmit={save} className="grid gap-4">
         <fieldset disabled={busy || !loaded} className="grid min-w-0 gap-4 sm:grid-cols-2">
           {([ ["name", "Nome do produto", 255], ["category", "Categoria", 32], ["storeLabel", "Loja", 120],
@@ -69,7 +70,7 @@ export function CreatorRecommendationManager({ creatorId, defaultOpen = false }:
               <Input value={draft[key]} maxLength={max} required={key !== "imageUrl"} onChange={(e) => change(key, e.target.value)} />
             </label>)}
           <label className="grid gap-2 text-sm font-bold">Tipo de link
-            <select className="min-w-0 border-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-3" value={draft.linkKind} onChange={(e) => change("linkKind", e.target.value as CreatorRecommendationInput["linkKind"])}>
+            <select className={ownerFieldClass} value={draft.linkKind} onChange={(e) => change("linkKind", e.target.value as CreatorRecommendationInput["linkKind"])}>
               <option value="external">Externo</option><option value="affiliate">Afiliado</option>
             </select>
           </label>
@@ -79,7 +80,7 @@ export function CreatorRecommendationManager({ creatorId, defaultOpen = false }:
           </div>
           <div className="grid gap-2 sm:col-span-2">
             <label htmlFor={`${creatorId}-recommendation-context`} className="text-sm font-bold">Por que você indica?</label>
-            <textarea id={`${creatorId}-recommendation-context`} className="min-h-28 w-full min-w-0 border-2 border-[var(--color-ink)] bg-[var(--color-paper)] p-3" value={draft.context} minLength={8} maxLength={500} required onChange={(e) => change("context", e.target.value)} />
+            <textarea id={`${creatorId}-recommendation-context`} className={`min-h-28 ${ownerFieldClass}`} value={draft.context} minLength={8} maxLength={500} required onChange={(e) => change("context", e.target.value)} />
           </div>
           <label className="flex items-center gap-2 text-sm font-bold sm:col-span-2">
             <input type="checkbox" checked={draft.isActive} onChange={(e) => change("isActive", e.target.checked)} /> Publicar para a comunidade

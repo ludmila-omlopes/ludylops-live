@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ownerPanelClass, ownerPanelTitleClass } from "@/components/ui/owner-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { currencySettingsSchema } from "@/lib/creators/currency";
@@ -47,12 +48,12 @@ export function CreatorCurrencyForm({ creatorId, initial }: { creatorId: string;
     finally { setBusy(false); }
   }
 
-  return <div className="mt-3">
+  return <div className={embedded ? "" : "mt-3"}>
     {!embedded && <Button type="button" variant="neutral" disabled={busy} onClick={() => {
       if (open) setOpen(false); else void load();
     }}>{open ? "Fechar edição da moeda" : "Editar nome da moeda"}</Button>}
-    {open && <form onSubmit={save} className="mt-3 grid gap-3 border-2 border-[var(--color-ink)] p-4">
-      {embedded && <h2 className="text-xl font-bold">Moeda da comunidade</h2>}
+    {open && <form onSubmit={save} className={`${embedded ? "" : "mt-3 "}${embedded ? ownerPanelClass : "grid gap-3 border-2 border-[var(--color-ink)] p-4"}`}>
+      {embedded && <h2 className={ownerPanelTitleClass}>Moeda da comunidade</h2>}
       <label className="grid gap-2 text-sm font-bold">
         Nome da moeda
         <Input value={currencyLabel} maxLength={32} disabled={busy || !loaded} onChange={(event) => {

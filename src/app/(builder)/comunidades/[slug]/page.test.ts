@@ -49,7 +49,7 @@ describe("community overview", () => {
     expect(markup).toContain("etapas registradas");
     expect(markup).toContain('href="/comunidades/canal-da-mari/identidade"');
     expect(markup).toContain('href="/comunidades/canal-da-mari/integracao"');
-    expect(markup).toContain("5 pontos a cada 60 s");
+    expect(markup).toContain("5 pontos a cada 1 min");
     expect(markup).not.toContain("#perfil-");
   });
 
