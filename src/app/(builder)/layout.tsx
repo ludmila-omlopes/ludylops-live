@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { BuilderChrome } from "@/components/builder-chrome";
 import { Providers } from "@/components/providers";
-import { isDemoMode, platformOwnerEmails } from "@/lib/env";
+import { adminEmails, isDemoMode, platformOwnerEmails } from "@/lib/env";
 import { isThemeMode, themeCookieKey } from "@/lib/theme";
 import { PLATFORM_NAME } from "@/lib/creators/platform";
 
@@ -32,6 +32,7 @@ export default async function BuilderLayout({
       <BuilderChrome
         initialTheme={initialTheme}
         isPlatformOwner={isPlatformOwner}
+        isAdmin={Boolean(session?.user?.email && (isDemoMode || adminEmails.has(session.user.email.toLowerCase())))}
         isSignedIn={Boolean(session?.user?.email && session.user.activeViewerId)}
       >
         {children}

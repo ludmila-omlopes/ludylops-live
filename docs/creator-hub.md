@@ -48,7 +48,7 @@ O serviço interno aceita `createCreatorArea(ownerId, input, { liveFeatures: tru
 
 ### Separação entre plataforma e operação legada
 
-Esta mudança separa identidade, navegação, seleção de comunidade e endereços públicos. Não requer migração de banco. Os saldos históricos, resgates e contratos do Streamer.bot da Ludylops permanecem no fluxo legado. A remoção dessas exceções exige uma migração própria e validação da integração, antes de tratar também a operação interna da Ludylops exatamente como a dos novos streamers. A lista do beta ainda é administrada pelo fluxo existente de administração.
+Esta mudança separa identidade, navegação, seleção de comunidade e endereços públicos. Não requer migração de banco. Os saldos históricos, resgates e contratos do Streamer.bot da Ludylops permanecem no fluxo legado. A remoção dessas exceções exige uma migração própria e validação da integração, antes de tratar também a operação interna da Ludylops exatamente como a dos novos streamers. O beta aceita [solicitações com aprovação do admin](creator-beta-access.md), além da lista manual de emails liberados.
 
 ## Validação
 

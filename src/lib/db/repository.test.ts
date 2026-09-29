@@ -100,6 +100,7 @@ import {
   listAdminGameSuggestions,
   listVideoSuggestions,
   listStreamerbotCounters,
+  listAdminStreamerbotCounters,
   listViewerChannelsForGoogleAccount,
   lockBet,
   finalizeGoogleRiscDelivery,
@@ -1991,6 +1992,13 @@ describe("runStreamerbotCounterCommand", () => {
           },
         },
         {
+          key: "creator_beta_request:private",
+          value: 0,
+          lastResetAt: null,
+          updatedAt: new Date("2026-04-07T11:03:30.000Z"),
+          metadata: { email: "private@example.com", status: "pending" },
+        },
+        {
           key: "death_count_daily",
           value: 18,
           lastResetAt: null,
@@ -2041,6 +2049,15 @@ describe("runStreamerbotCounterCommand", () => {
         source: "streamerbot_chat",
       },
     ]);
+  });
+
+  it("keeps beta requests out of admin counter controls", async () => {
+    const { db } = createStreamerbotCounterDb({ counterRows: [{
+      key: "creator_beta_request:private", value: 0, lastResetAt: null,
+      updatedAt: new Date(), metadata: { email: "private@example.com", status: "pending" },
+    }] });
+    getDbMock.mockReturnValue(db);
+    expect(await listAdminStreamerbotCounters()).toEqual([]);
   });
 
   it("resets the counter in database mode when confirmed", async () => {

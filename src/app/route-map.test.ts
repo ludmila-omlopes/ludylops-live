@@ -8,6 +8,7 @@ const appDirectory = path.resolve(__dirname);
 const expectedPageRoutes = new Set([
   "/",
   "/admin",
+  "/admin/beta",
   "/me",
   "/apostas",
   "/contadores",
@@ -66,6 +67,9 @@ const expectedApiRoutes = new Set([
   "/api/admin/catalog",
   "/api/admin/catalog/[id]",
   "/api/admin/creator-area-access",
+  "/api/admin/creator-area-access/requests",
+  "/api/admin/creator-area-access/requests/[id]",
+  "/api/me/creator-area-access",
   "/api/admin/creator-suggestions",
   "/api/admin/creator-suggestions/[id]",
   "/api/admin/current-game",

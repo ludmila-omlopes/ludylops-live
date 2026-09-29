@@ -75,6 +75,7 @@ export const sharedApiGroups = {
   "/api/owner":
     "Platform-owner recovery and configuration; existing role checks remain mandatory",
   "/api/me/creator-area": "Builder provisioning, owner-verified currency configuration and isolated economy adjustments",
+  "/api/me/creator-area-access": "Authenticated beta requests and own access status, independent of live modules",
   "/api/admin/creator-area-access": "Platform beta access configuration",
   "/api/admin/periodic-messages": "Admin-only legacy streamer configuration; active creator and installed/disabled Streamer.bot module verified in storage",
   "/api/internal/google": "Global account protection",
@@ -108,6 +109,7 @@ export const aggregatePages = {
 };
 
 export const sharedPages = {
+  "/admin/beta": "General-admin beta requests and allowlist management, independent of live tenant",
   "/criar-area": "Creator provisioning",
   "/comunidades": "Owner-scoped community list; setup summaries reuse owner-verified loaders",
   "/comunidades/nova": "Creator provisioning for approved beta accounts",

@@ -193,7 +193,7 @@ export default async function AdminPage() {
               {
                 id: "areas-criadores",
                 label: "Beta áreas",
-                description: "Emails liberados para criar área.",
+                description: "Solicitações de acesso e emails aprovados.",
                 badge: `${creatorAreaAccessSettings.allowedEmails.length}`,
                 content: <AdminCreatorAreaAccessPanel initialSettings={creatorAreaAccessSettings} />,
               },

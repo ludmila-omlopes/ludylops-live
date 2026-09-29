@@ -1042,7 +1042,7 @@ function sanitizePublicCounterSummaries(
   ]);
 
   return counters
-    .filter((counter) => !hiddenCounterKeys.has(counter.key))
+    .filter((counter) => !hiddenCounterKeys.has(counter.key) && !counter.key.startsWith("creator_beta_request:"))
     .sort((left, right) => {
     if (left.scopeType !== right.scopeType) {
       return left.scopeType === GLOBAL_COUNTER_SCOPE_TYPE ? -1 : 1;
@@ -6444,7 +6444,10 @@ export async function listAdminStreamerbotCounters() {
 
   try {
     const rows = await db.select().from(streamerbotCounters);
-    return rows.map(serializeStreamerbotCounter).map(buildStreamerbotCounterSummary);
+    return rows
+      .filter((row) => !row.key.startsWith("creator_beta_request:"))
+      .map(serializeStreamerbotCounter)
+      .map(buildStreamerbotCounterSummary);
   } catch (error) {
     if (isMissingCounterSchemaError(error)) {
       return [];
