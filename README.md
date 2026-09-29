@@ -338,10 +338,31 @@ Scripts de manutenção disponíveis:
 
 Antes de mexer em código Next.js, leia a documentação instalada em `node_modules/next/dist/docs/`, porque esta versão pode ter diferenças em relação a versões anteriores.
 
+## Testes com PostgreSQL
+
+Os arquivos `*.postgres.test.ts` verificam isolamento entre comunidades, disputas concorrentes e migrações em um PostgreSQL real. Sem `MODULE_TEST_DATABASE_URL`, eles são pulados; no CI, rodam sempre, e o CI falha se forem pulados.
+
+Localmente, use somente um banco descartável chamado `modules_185_test` em `127.0.0.1`, nunca o banco de produção. Cada suíte cria e remove o próprio schema. O driver Neon conversa por WebSocket, então suba o adaptador em um terminal:
+
+```powershell
+$env:MODULE_TEST_DATABASE_URL = "postgres://postgres:postgres@127.0.0.1:5432/modules_185_test"
+npm run test:db-proxy
+```
+
+Em outro terminal, com a mesma variável:
+
+```powershell
+$env:MODULE_TEST_DATABASE_URL = "postgres://postgres:postgres@127.0.0.1:5432/modules_185_test"
+npm test
+```
+
+O adaptador escuta em `127.0.0.1:55479`; `MODULE_TEST_WS_PORT` muda a porta nos dois lados.
+
 ## Checklist antes de abrir PR
 
 ```bash
 npm run lint
+npm run typecheck
 npm test
 npm run build
 ```

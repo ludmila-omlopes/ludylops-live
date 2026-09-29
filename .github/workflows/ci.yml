@@ -8,6 +8,24 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      # Disposable database for the *.postgres.test.ts suites (isolation,
+      # concurrency and migration checks). Each suite creates and drops its own
+      # schema; nothing here reaches a real environment.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: modules_185_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d modules_185_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,7 +35,22 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - name: Start the test database WebSocket adapter
+        env:
+          MODULE_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/modules_185_test
+        run: |
+          nohup npm run test:db-proxy > "$RUNNER_TEMP/test-db-proxy.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            if grep -q "pronto" "$RUNNER_TEMP/test-db-proxy.log" 2>/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/test-db-proxy.log"
+          exit 1
       - run: npm test
+        env:
+          MODULE_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/modules_185_test
+          # Fails the run if the PostgreSQL suites would be skipped.
+          REQUIRE_MODULE_TEST_DATABASE: "true"
       - run: npm run build
         env:
           # Dummy value for build only — see plan 002 (production fails closed
