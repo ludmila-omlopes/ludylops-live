@@ -140,7 +140,7 @@ describe("product layouts", () => {
   it("defines product-specific metadata", () => {
     expect(builderMetadata).toEqual({
       title: { default: "Creator Hub", template: "%s · Creator Hub" },
-      description: "Prepare o encontro da sua comunidade com a próxima live.",
+      description: "Compartilhe suas indicações com a sua comunidade.",
     });
     expect(creatorMetadata).toEqual({ title: "Comunidade" });
     expect(communityMetadata.title).toBe("Ludylops Games: eu disseco jogos no YouTube");
