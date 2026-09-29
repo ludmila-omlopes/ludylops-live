@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:db-proxy": "node scripts/test-database-proxy.mjs",
     "smoke:auth": "tsx scripts/auth-smoke.ts",
     "pilot:check": "tsx scripts/creator-pilot.ts",
     "db:generate": "drizzle-kit generate",
