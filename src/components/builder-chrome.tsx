@@ -21,9 +21,11 @@ type NavItem = {
 export function builderNavItems({
   isSignedIn,
   isPlatformOwner,
+  isAdmin = false,
 }: {
   isSignedIn: boolean;
   isPlatformOwner: boolean;
+  isAdmin?: boolean;
 }): NavItem[] {
   const items: NavItem[] = isSignedIn
     ? [
@@ -57,6 +59,9 @@ export function builderNavItems({
     });
   }
 
+  if (isAdmin) {
+    items.push({ href: "/admin/beta", label: "Beta áreas", isActive: (pathname) => pathname === "/admin/beta", tone: "admin" });
+  }
   return items;
 }
 
@@ -85,15 +90,17 @@ export function BuilderChrome({
   initialTheme = null,
   isPlatformOwner = false,
   isSignedIn = false,
+  isAdmin = false,
 }: {
   children: React.ReactNode;
   initialTheme?: ThemeMode | null;
   isPlatformOwner?: boolean;
   isSignedIn?: boolean;
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname() ?? "";
   const [mobileOpen, setMobileOpen] = useState(false);
-  const navItems = builderNavItems({ isSignedIn, isPlatformOwner });
+  const navItems = builderNavItems({ isSignedIn, isPlatformOwner, isAdmin });
 
   return (
     <div className="flex min-h-screen flex-col">

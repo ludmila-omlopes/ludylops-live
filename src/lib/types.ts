@@ -173,6 +173,15 @@ export interface CreatorAreaAccessSettingsRecord {
   updatedBy: string | null;
 }
 
+export interface CreatorBetaRequestRecord {
+  id: string;
+  email: string;
+  status: "pending" | "approved" | "rejected";
+  requestedAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+}
+
 export interface ViewerRecord {
   id: string;
   googleUserId: string | null;

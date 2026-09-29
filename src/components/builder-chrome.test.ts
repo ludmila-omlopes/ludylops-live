@@ -23,6 +23,7 @@ const BuilderChromeForTest = BuilderChrome as React.ComponentType<{
   children?: React.ReactNode;
   isPlatformOwner?: boolean;
   isSignedIn?: boolean;
+  isAdmin?: boolean;
 }>;
 
 describe("BuilderChrome", () => {
@@ -79,6 +80,14 @@ describe("BuilderChrome", () => {
     expect(ownerMarkup).toContain("Administrar comunidades");
     expect(viewerMarkup).not.toContain('href="/owner"');
     expect(viewerMarkup).not.toContain("Administrar comunidades");
+  });
+
+  it("shows beta administration to general admins independently of platform-owner access", () => {
+    const admin = renderToStaticMarkup(React.createElement(BuilderChromeForTest, { isSignedIn: true, isAdmin: true }, "child"));
+    const viewer = renderToStaticMarkup(React.createElement(BuilderChromeForTest, { isSignedIn: true, isAdmin: false }, "child"));
+    expect(admin).toContain('href="/admin/beta"');
+    expect(admin).not.toContain('href="/owner"');
+    expect(viewer).not.toContain('href="/admin/beta"');
   });
 
   it("does not include community-only navigation or footer copy", () => {

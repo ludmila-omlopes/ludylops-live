@@ -5,6 +5,7 @@ import { ShoppingBag, Palette, Link2, Share2, type LucideIcon } from "lucide-rea
 import { auth } from "@/auth";
 import { CreatorAreaCreateForm } from "@/components/creator-area-create-form";
 import { CreatorLandingCta } from "@/components/creator-landing-cta";
+import { CreatorBetaRequest } from "@/components/creator-beta-request";
 import { canCreateCreatorArea } from "@/lib/creators/access";
 import { COMMUNITIES_PATH } from "@/lib/creators/owner-dashboard";
 import { getPlatformOrigin, resolveCreatorLandingState } from "@/lib/creators/platform";
@@ -106,7 +107,7 @@ export default async function CreateCreatorAreaPage() {
           </h1>
           <p className="mt-5 max-w-2xl text-base font-medium leading-7 text-[var(--color-ink-soft)]">
             Reúna seus produtos favoritos com seus links, seu nome e suas cores.
-            Comece com sua página de indicações. O acesso para novos criadores está disponível por convite, em beta fechado.
+            O acesso para novos criadores está em beta fechado. Solicite sua participação e aguarde a aprovação.
           </p>
 
           <CommunitySection />
@@ -123,7 +124,7 @@ export default async function CreateCreatorAreaPage() {
               </h2>
               <p className="text-sm font-medium leading-6 text-[var(--color-ink-soft)]">
                 A criação de novas áreas está em beta fechado. Entre com sua conta Google para ver
-                se o seu email já está liberado.
+                se o seu email já está liberado ou solicitar acesso.
               </p>
               <CreatorLandingCta />
             </div>
@@ -137,12 +138,7 @@ export default async function CreateCreatorAreaPage() {
               >
                 Beta fechado
               </h2>
-              <p className="text-sm font-medium leading-6 text-[var(--color-ink-soft)]">
-                Novas áreas estão em beta fechado e o acesso é liberado por convite. O email da
-                conta Google usada no login (<strong>{session?.user?.email}</strong>) ainda não
-                está na lista de aprovados. Peça para liberar esse endereço e tente novamente
-                depois.
-              </p>
+              <CreatorBetaRequest email={session!.user!.email!} />
             </div>
           ) : null}
 

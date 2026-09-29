@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { AdminBetaRequestsPanel } from "@/components/admin-beta-requests-panel";
 import type { CreatorAreaAccessSettingsRecord } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 
@@ -32,7 +33,7 @@ export function AdminCreatorAreaAccessPanel({
           headers: {
             "content-type": "application/json",
           },
-          body: JSON.stringify({ emailsText }),
+          body: JSON.stringify({ emailsText, expectedUpdatedAt: settings.updatedAt }),
         });
         const result = (await response.json()) as {
           ok?: boolean;
@@ -69,7 +70,7 @@ export function AdminCreatorAreaAccessPanel({
             Só estes emails podem reservar uma área enquanto o teste fechado estiver ativo. Admins gerais continuam liberados.
           </p>
         </div>
-        <span className="retro-label accent-chip">{settings.allowedEmails.length} liberados</span>
+        <span className="retro-label accent-chip">{settings.allowedEmails.length} {settings.allowedEmails.length === 1 ? "liberado" : "liberados"}</span>
       </div>
 
       <label className="mt-5 grid gap-2">
@@ -89,6 +90,18 @@ export function AdminCreatorAreaAccessPanel({
         <Button type="button" onClick={save} disabled={isPending} variant="success" size="sm">
           {isPending ? "Salvando..." : "Salvar lista"}
         </Button>
+        <Button type="button" disabled={isPending} size="sm" onClick={() => {
+          startTransition(async () => {
+            try {
+              const response = await fetch("/api/admin/creator-area-access", { cache: "no-store" });
+              const result = await response.json();
+              if (!response.ok || !result.ok) throw new Error("Falha ao atualizar os emails.");
+              setSettings(result.data);
+              setEmailsText(toText(result.data));
+              setFeedback("Emails atualizados.");
+            } catch { setFeedback("Falha ao atualizar os emails. Tente novamente."); }
+          });
+        }}>Recarregar emails</Button>
         {feedback ? <span className="text-sm font-bold text-[var(--color-ink-soft)]">{feedback}</span> : null}
         {settings.updatedAt ? (
           <span className="text-sm font-bold text-[var(--color-ink-soft)]">
@@ -97,6 +110,14 @@ export function AdminCreatorAreaAccessPanel({
           </span>
         ) : null}
       </div>
+      <AdminBetaRequestsPanel onSettings={(updated) => {
+        if (emailsText === toText(settings)) {
+          setSettings(updated);
+          setEmailsText(toText(updated));
+        } else {
+          setFeedback("Há edições ainda não salvas. Recarregue os emails antes de alterar a lista.");
+        }
+      }} />
     </div>
   );
 }
