@@ -327,7 +327,7 @@ Scripts de manutenção disponíveis:
 
 ## Stack
 
-- Next.js `16.2.1`
+- Next.js `16.3.7`
 - React `19.2.4`
 - Tailwind CSS v4
 - Auth.js / NextAuth v5 beta
