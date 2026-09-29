@@ -24,7 +24,7 @@ beforeEach(async () => {
   globalThis.__creatorTenantStore = []; globalThis.__creatorEconomyDemo = undefined; globalThis.__creatorRedemptionsDemo = undefined; globalThis.__lojaDemoStore = undefined;
   globalThis.__creatorOperationsDemo = undefined;
   state.trusted = true; state.viewerId = "owner"; state.authenticated = true;
-  id = (await createCreatorArea("owner", { displayName: "Canal Cristal", currencyLabel: "cristais" })).creator.id; state.creatorId = id;
+  id = (await createCreatorArea("owner", { displayName: "Canal Cristal", currencyLabel: "cristais" }, { liveFeatures: true })).creator.id; state.creatorId = id;
   await getViewerDashboard("nonexistent"); // Initialize the shared demo identities.
   const viewer = globalThis.__lojaDemoStore!.viewers[0]; state.viewerId = viewer.id;
   await saveCreatorCatalog(id, "owner", item);
@@ -65,7 +65,7 @@ describe("creator redemption adapters", () => {
     expect((await integration(request({}))).status).toBe(400);
     state.raw = JSON.stringify({ operation: "claim", redemptionId, bridgeId: "worker" });
     state.authenticated = false; expect((await integration(request({}))).status).toBe(401);
-    state.authenticated = true; const other = (await createCreatorArea("other-owner", { displayName: "Canal B" })).creator.id;
+    state.authenticated = true; const other = (await createCreatorArea("other-owner", { displayName: "Canal B" }, { liveFeatures: true })).creator.id;
     state.creatorId = other; expect((await integration(request({}))).status).toBe(403);
     state.creatorId = id; expect((await integration(request({}))).status).toBe(200);
     expect((await integration(request({}))).status).toBe(200);

@@ -12,8 +12,8 @@ beforeEach(async () => {
   state.demo = true; globalThis.__creatorTenantStore = []; globalThis.__lojaDemoStore = undefined;
   const viewer = await ensureViewerFromStreamerbotIdentity({ viewerExternalId: "UCabcdefghijklmnopqrstuv", youtubeDisplayName: "Dona A", initializeBalance: false });
   owner = viewer.id;
-  a = (await createCreatorArea(owner, { displayName: "Canal A" })).creator.id;
-  b = (await createCreatorArea("other", { displayName: "Canal B" })).creator.id;
+  a = (await createCreatorArea(owner, { displayName: "Canal A" }, { liveFeatures: true })).creator.id;
+  b = (await createCreatorArea("other", { displayName: "Canal B" }, { liveFeatures: true })).creator.id;
   getQuoteDemoStore({ creatorId: a }).quotes = []; getQuoteDemoStore({ creatorId: b }).quotes = [];
 });
 const create = (body = "Pérola da live", id = randomUUID()) => createOwnedQuote(owner, a, { id, body });

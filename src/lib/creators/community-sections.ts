@@ -1,4 +1,5 @@
 import { canUseModules, modulesAreAvailable } from "./module-access";
+import { getModuleAvailability } from "./modules";
 import {
   communitySectionLabels,
   communitySectionPath,
@@ -25,8 +26,10 @@ const sectionOrder: CommunitySectionKey[] = [
 export function isCommunitySectionAvailable(tenant: SectionTenant, section: CommunitySectionKey) {
   switch (section) {
     case "overview":
-    case "integracao":
       return true;
+    case "integracao":
+      // Keep revocation available for inactive communities with an installed integration.
+      return getModuleAvailability(tenant?.modules ?? [], "streamerbot").available;
     case "identidade":
       return tenant?.creator.status === "active";
     case "economia":

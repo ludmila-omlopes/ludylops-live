@@ -17,14 +17,14 @@ beforeEach(async () => {
   globalThis.__creatorTenantStore = []; globalThis.__creatorEconomyDemo = undefined; globalThis.__lojaDemoStore = undefined;
   await getViewerPoints("initialize");
   viewerId = (await ensureViewerFromStreamerbotIdentity({ viewerExternalId: "UCabcdefghijklmnopqrstuv", initializeBalance: false })).id;
-  creatorId = (await createCreatorArea("owner", { displayName: "Canal A", currencyLabel: "cristais" })).creator.id;
+  creatorId = (await createCreatorArea("owner", { displayName: "Canal A", currencyLabel: "cristais" }, { liveFeatures: true })).creator.id;
 });
 afterEach(() => vi.useRealTimers());
 describe("chat earning rules", () => {
   it("defaults off and preserves unrelated settings, names and another community", async () => {
     expect((await getOwnedChatRewards("owner", creatorId)).enabled).toBe(false);
     expect(getChatRewardSettings({ chatRewards: { ...settings, amount: -1 } }).enabled).toBe(false);
-    const other = (await createCreatorArea("other", { displayName: "Canal B" })).creator.id;
+    const other = (await createCreatorArea("other", { displayName: "Canal B" }, { liveFeatures: true })).creator.id;
     await updateOwnedChatRewards("owner", creatorId, settings);
     await updateOwnedCurrency("owner", creatorId, { currencyLabel: "corações" });
     expect(await getOwnedChatRewards("owner", creatorId)).toEqual(settings);

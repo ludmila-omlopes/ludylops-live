@@ -12,14 +12,14 @@ beforeEach(async () => {
   globalThis.__creatorTenantStore = []; globalThis.__creatorEconomyDemo = undefined; globalThis.__lojaDemoStore = undefined;
   await getViewerPoints("initialize-demo");
   viewerId = (await ensureViewerFromStreamerbotIdentity({ viewerExternalId: "UCabcdefghijklmnopqrstuv", initializeBalance: false })).id;
-  creatorId = (await createCreatorArea("owner", { displayName: "Canal A", currencyLabel: "cristais" })).creator.id;
+  creatorId = (await createCreatorArea("owner", { displayName: "Canal A", currencyLabel: "cristais" }, { liveFeatures: true })).creator.id;
 });
 const owner = { kind: "owner", viewerId: "owner" } as const;
 const credit = (key: string, amount = 10) => mutateCreatorEconomy({ creatorId }, owner,
   { kind: "credit", viewerId, operationKey: key, amount, reason: "Participação na live" });
 describe("creator economy contract", () => {
   it("separates currencies and retries without changing the legacy balance", async () => {
-    const otherId = (await createCreatorArea("other", { displayName: "Canal B", currencyLabel: "estrelas" })).creator.id;
+    const otherId = (await createCreatorArea("other", { displayName: "Canal B", currencyLabel: "estrelas" }, { liveFeatures: true })).creator.id;
     const before = (await getViewerPoints(viewerId))!.balance.currentBalance;
     await credit("one"); expect((await credit("one")).duplicate).toBe(true);
     await mutateCreatorEconomy({ creatorId: otherId }, { kind: "owner", viewerId: "other" }, { kind: "credit", viewerId, operationKey: "one", amount: 30, reason: "Outra live" });

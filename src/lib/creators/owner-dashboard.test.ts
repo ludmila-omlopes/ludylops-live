@@ -33,6 +33,7 @@ describe("owner dashboard helpers", () => {
   it("counts configured setup steps and reports authentication separately", () => {
     expect(
       summarizeSetup({
+        live: true,
         steps: [
           step("profile", "configured"),
           step("credential", "pending"),
@@ -40,9 +41,9 @@ describe("owner dashboard helpers", () => {
           step("bridge", "verify"),
         ],
       }),
-    ).toEqual({ configured: 2, total: 4, authenticated: true });
+    ).toEqual({ configured: 2, total: 4, authenticated: true, live: true });
 
-    expect(summarizeSetup({ steps: [step("authentication", "pending")] }).authenticated).toBe(false);
+    expect(summarizeSetup({ live: true, steps: [step("authentication", "pending")] }).authenticated).toBe(false);
   });
 
   it("lists active communities first, then disabled and archived, alphabetically", () => {
@@ -103,14 +104,21 @@ describe("owner dashboard loaders", () => {
     await expect(getOwnedCommunityBySlug(null, "canal-da-mari")).resolves.toBeNull();
   });
 
-  it("adds currency and setup progress to each card", async () => {
+  it("summarizes page-only communities without a currency", async () => {
     await createDemo("viewer_1", "canal-da-mari", "Canal da Mari");
 
     const [card] = await listOwnedCommunityCards("viewer_1");
 
-    expect(card.currencyLabel).toEqual(expect.any(String));
-    expect(card.setup).toMatchObject({ total: expect.any(Number), authenticated: false });
+    expect(card.currencyLabel).toBeNull();
+    expect(card.setup).toMatchObject({ total: 3, configured: 1, authenticated: false, live: false });
     expect(card.setup!.configured).toBeLessThanOrEqual(card.setup!.total);
+  });
+
+  it("preserves the live summary for communities with the live modules", async () => {
+    await createCreatorArea("viewer_1", { displayName: "Canal ao vivo", currencyLabel: "cristais" }, { liveFeatures: true });
+    const [card] = await listOwnedCommunityCards("viewer_1");
+    expect(card.currencyLabel).toBe("cristais");
+    expect(card.setup).toMatchObject({ live: true, total: 8 });
   });
 
   it("returns no cards without a session viewer", async () => {

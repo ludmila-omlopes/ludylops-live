@@ -24,6 +24,7 @@ describe.skipIf(!url)("creator setup on PostgreSQL", () => {
     pool = new Pool({ connectionString: url, options: `-c search_path=${namespace}`, application_name: namespace, max: 8 });
     await pool.query(`CREATE TABLE creators(id varchar(64) PRIMARY KEY, slug text, display_name text, owner_user_id text, status text, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
       CREATE TABLE creator_modules(id varchar(64) PRIMARY KEY,creator_id varchar(64) REFERENCES creators(id),module_key text,status text,config_json jsonb DEFAULT '{}',installed_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now());
+      CREATE TABLE product_recommendations(creator_id text, is_active boolean, moderation_status text);
       CREATE TABLE creator_catalog_items(creator_id text, is_active boolean, stock integer); CREATE TABLE creator_redemptions(creator_id text,status text); CREATE TABLE streamerbot_credentials(id varchar(64) PRIMARY KEY, creator_id varchar(64) REFERENCES creators(id) NOT NULL, encrypted_secret text NOT NULL, status text DEFAULT 'active',created_at timestamptz DEFAULT now(),retiring_until timestamptz,revoked_at timestamptz,last_used_at timestamptz);
       INSERT INTO creators(id,slug,display_name,owner_user_id,status) VALUES ('a','a','A','owner-a','active'),('b','b','B','owner-b','active'),('creator_ludylops','ludylops','Ludylops','owner-a','active');
       INSERT INTO creator_modules(id,creator_id,module_key,status) VALUES ('m-a','a','streamerbot','installed'),('m-b','b','streamerbot','installed'),('m-l','creator_ludylops','streamerbot','installed');`);
@@ -33,7 +34,7 @@ describe.skipIf(!url)("creator setup on PostgreSQL", () => {
   beforeEach(async () => {
     state.env.CREATOR_ECONOMY_ENABLED = "true";
     state.env.STREAMERBOT_CREDENTIAL_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
-    await pool.query("DELETE FROM creator_catalog_items; DELETE FROM creator_redemptions; DELETE FROM streamerbot_credentials; UPDATE creators SET status='active'; UPDATE creators SET owner_user_id='owner-a' WHERE id='a'; UPDATE creator_modules SET status='installed'");
+    await pool.query("DELETE FROM creator_catalog_items; DELETE FROM creator_redemptions; DELETE FROM streamerbot_credentials; DELETE FROM product_recommendations; DELETE FROM creator_modules WHERE module_key='product_recommendations'; UPDATE creators SET status='active'; UPDATE creators SET owner_user_id='owner-a' WHERE id='a'; UPDATE creator_modules SET status='installed'");
   });
   afterAll(async () => { if (pool) await pool.end(); if (admin) { await admin.query(`DROP SCHEMA ${namespace} CASCADE`); await admin.end(); } });
 
@@ -52,5 +53,21 @@ describe.skipIf(!url)("creator setup on PostgreSQL", () => {
     state.env.CREATOR_ECONOMY_ENABLED='true'; await pool.query("UPDATE creator_modules SET status='disabled' WHERE id='m-a'");
     expect((await getOwnedCreatorSetup('owner-a','a')).steps.find(s=>s.id==='catalog')?.state).toBe('blocked');
     await pool.query("UPDATE creators SET status='archived' WHERE id='a'"); expect((await getOwnedCreatorSetup('owner-a','a')).active).toBe(false);
+  });
+
+  it("counts only published products from the owned community and reacts to module changes", async () => {
+    await pool.query("UPDATE creator_modules SET status='disabled' WHERE creator_id='a'; INSERT INTO creator_modules(id,creator_id,module_key,status) VALUES ('products-a','a','product_recommendations','installed'); INSERT INTO product_recommendations VALUES ('a',false,'approved'),('a',true,'pending'),('a',true,'rejected'),('b',true,'approved')");
+    state.env.CREATOR_ECONOMY_ENABLED = "false";
+    const pending = await getOwnedCreatorSetup("owner-a", "a");
+    expect(pending.live).toBe(false);
+    expect(pending.steps.find(step => step.id === "products")?.state).toBe("pending");
+    await pool.query("INSERT INTO product_recommendations SELECT 'a',true,'approved' FROM generate_series(1,55)");
+    const published = await getOwnedCreatorSetup("owner-a", "a");
+    expect(published.steps.find(step => step.id === "products")).toMatchObject({ state: "configured", detail: expect.stringContaining("55 produtos publicados") });
+    await expect(getOwnedCreatorSetup("owner-b", "a")).rejects.toThrow();
+    await pool.query("UPDATE creator_modules SET status='disabled' WHERE id='products-a'");
+    expect((await getOwnedCreatorSetup("owner-a", "a")).steps.find(step => step.id === "products")?.state).toBe("blocked");
+    await pool.query("UPDATE creator_modules SET status='installed' WHERE creator_id='a'");
+    expect((await getOwnedCreatorSetup("owner-a", "a")).live).toBe(true);
   });
 });

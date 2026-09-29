@@ -29,6 +29,25 @@ Em 25/09/2026, o retorno adicional foi salvo no cliente de produção, preservan
 
 ## Limite desta etapa
 
+### Comunidades novas começam com indicações de produtos
+
+A criação padrão instala apenas `product_recommendations`. O formulário pede nome, endereço e cores; não pede moeda nem configura integração. A página pública apresenta as indicações, sem prometer recursos de live.
+
+O roteiro inicial tem três etapas: nome e cores, primeiros produtos e divulgação do endereço. A contagem considera todos os produtos ativos e aprovados da própria comunidade, sem depender da paginação, da moeda ou de credenciais. Rascunhos e itens pendentes de moderação não contam. A divulgação é uma ação manual, portanto não é marcada automaticamente como concluída.
+
+Sem módulos de live instalados, a lista e a visão geral não mostram moeda ou Streamer.bot. Identidade só oferece a edição de moeda quando Pontos está disponível. Integração exige Streamer.bot instalado; acessos diretos sem esse módulo voltam à visão geral. Comunidades desativadas que ainda têm Streamer.bot instalado mantêm acesso à revogação de credenciais.
+
+Não há migração nem alteração dos módulos das comunidades existentes, incluindo Teste 1, Teste 2 e Ludylops. A administração pode instalar os módulos posteriormente pelos controles existentes em `/owner`, respeitando suas dependências. O checklist de live passa a valer quando houver um módulo de live instalado. A economia continua dependendo de `CREATOR_ECONOMY_ENABLED`.
+
+O serviço interno aceita `createCreatorArea(ownerId, input, { liveFeatures: true })` para instalar o pacote de live explicitamente. Essa opção não é aceita como autorização no corpo da requisição pública de criação. É um ponto de extensão para o futuro plano de streamer; esta entrega não implementa cobrança ou assinatura.
+
+### Próximos trabalhos
+
+- Sugestões de jogos por comunidade: hoje o fluxo é global da Ludylops e depende da moeda. Antes de implementar, decidir como funcionarão nas contas sem live, incluindo a possibilidade de sugestões sem boost.
+- Corrigir `npm run smoke:auth`: o script pode aceitar um redirecionamento de erro de configuração como sucesso. O comportamento também foi observado com a versão anterior do Auth.js; o conserto exige distinguir o redirecionamento ao provedor de um erro.
+
+### Separação entre plataforma e operação legada
+
 Esta mudança separa identidade, navegação, seleção de comunidade e endereços públicos. Não requer migração de banco. Os saldos históricos, resgates e contratos do Streamer.bot da Ludylops permanecem no fluxo legado. A remoção dessas exceções exige uma migração própria e validação da integração, antes de tratar também a operação interna da Ludylops exatamente como a dos novos streamers. A lista do beta ainda é administrada pelo fluxo existente de administração.
 
 ## Validação

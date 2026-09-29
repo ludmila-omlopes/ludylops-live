@@ -10,7 +10,7 @@ import { defaultCreatorTenant } from "./tenant";
 let id: string;
 beforeEach(async () => {
   state.demo = true; state.env.CREATOR_ECONOMY_ENABLED = "true"; globalThis.__creatorTenantStore = [];
-  id = (await createCreatorArea("owner", { displayName: "Canal Cristal", currencyLabel: "cristais" })).creator.id;
+  id = (await createCreatorArea("owner", { displayName: "Canal Cristal", currencyLabel: "cristais" }, { liveFeatures: true })).creator.id;
 });
 describe("owner profile", () => {
   it("updates only name/colors and preserves slug, owner, domains, modules and other branding", async () => {

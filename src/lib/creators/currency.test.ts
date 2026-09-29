@@ -34,8 +34,8 @@ describe("currency identity", () => {
     expect(getEnabledModuleNav(DEFAULT_CREATOR_MODULES).find((m) => m.key === "points")?.label).toBe("pipetz");
   });
   it("creates distinct currencies, edits only the owner's points config and preserves module status", async () => {
-    const a = await createCreatorArea("owner-a", { displayName: "Canal A", currencyLabel: "cristais" });
-    const b = await createCreatorArea("owner-b", { displayName: "Canal B", currencyLabel: "estrelas" });
+    const a = await createCreatorArea("owner-a", { displayName: "Canal A", currencyLabel: "cristais" }, { liveFeatures: true });
+    const b = await createCreatorArea("owner-b", { displayName: "Canal B", currencyLabel: "estrelas" }, { liveFeatures: true });
     const points = a.modules.find((m) => m.moduleKey === "points")!;
     points.configJson.otherSetting = { amount: 7 }; points.status = "disabled";
     const otherModules = structuredClone(a.modules.filter((m) => m.moduleKey !== "points"));
@@ -49,23 +49,23 @@ describe("currency identity", () => {
     expect(DEFAULT_CREATOR_MODULES.find((m) => m.moduleKey === "points")?.configJson.currencyLabel).toBe("pipetz");
   });
   it("defaults a new community to points instead of copying pipetz", async () => {
-    const tenant = await createCreatorArea("owner", { displayName: "Nova Live" });
+    const tenant = await createCreatorArea("owner", { displayName: "Nova Live" }, { liveFeatures: true });
     expect(await getOwnedCurrency("owner", tenant.creator.id)).toEqual({ currencyLabel: "pontos" });
     expect(getEnabledModuleNav(tenant.modules).find((m) => m.key === "points")?.label).toBe("pontos");
   });
   it.each(["stranger", "", "owner-b"])("denies read/write to %s", async (owner) => {
-    const tenant = await createCreatorArea("owner-a", { displayName: "Canal A" });
+    const tenant = await createCreatorArea("owner-a", { displayName: "Canal A" }, { liveFeatures: true });
     await expect(getOwnedCurrency(owner, tenant.creator.id)).rejects.toThrow("Moeda indisponível");
     await expect(updateOwnedCurrency(owner, tenant.creator.id, { currencyLabel: "roubadas" })).rejects.toThrow("Moeda indisponível");
   });
   it.each(["disabled", "archived"] as const)("denies a %s creator", async (status) => {
-    const tenant = await createCreatorArea("owner-a", { displayName: "Canal A" });
+    const tenant = await createCreatorArea("owner-a", { displayName: "Canal A" }, { liveFeatures: true });
     tenant.creator.status = status;
     await expect(updateOwnedCurrency("owner-a", tenant.creator.id, { currencyLabel: "moedas" })).rejects.toThrow("Moeda indisponível");
     await expect(getOwnedCurrency("owner-a", tenant.creator.id)).rejects.toThrow("Moeda indisponível");
   });
   it("rejects missing/archived points and cannot revive them", async () => {
-    const tenant = await createCreatorArea("owner-a", { displayName: "Canal A" });
+    const tenant = await createCreatorArea("owner-a", { displayName: "Canal A" }, { liveFeatures: true });
     tenant.modules.find((m) => m.moduleKey === "points")!.status = "archived";
     await expect(updateOwnedCurrency("owner-a", tenant.creator.id, { currencyLabel: "moedas" })).rejects.toThrow();
     tenant.modules = [];
@@ -73,7 +73,7 @@ describe("currency identity", () => {
     expect(tenant.modules).toEqual([]);
   });
   it("rejects extra mutation fields and keeps the legacy default immutable here", async () => {
-    const tenant = await createCreatorArea("owner", { displayName: "Canal A" });
+    const tenant = await createCreatorArea("owner", { displayName: "Canal A" }, { liveFeatures: true });
     await expect(updateOwnedCurrency("owner", tenant.creator.id, { currencyLabel: "x", status: "installed" })).rejects.toThrow();
     await expect(updateOwnedCurrency("owner", "creator_ludylops", { currencyLabel: "x" })).rejects.toThrow("Moeda indisponível");
   });

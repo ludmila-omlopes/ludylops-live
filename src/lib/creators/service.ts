@@ -18,7 +18,7 @@ import {
   insertDemoCreatorTenant,
 } from "@/lib/creators/demo-store";
 import { creatorSlugFromInput, isReservedCreatorSlug, normalizeCreatorSlug } from "@/lib/creators/identity";
-import { creatorModuleCatalog } from "@/lib/creators/modules";
+import { creatorModuleCatalog, isLiveModuleKey } from "@/lib/creators/modules";
 import { resolveCreatorFromRequest, resolvePublicCreatorFromRequest, type ResolveCreatorOptions } from "@/lib/creators/tenant";
 import { getDb } from "@/lib/db/client";
 import { creatorBranding, creatorModules, creators } from "@/lib/db/schema";
@@ -87,6 +87,7 @@ function buildDemoTenant(input: {
   primaryColor: string;
   accentColor: string;
   currencyLabel: string;
+  liveFeatures: boolean;
 }): CreatorTenantRecord {
   const creatorId = `creator_${input.slug}`.slice(0, 64);
   const now = nowIso();
@@ -109,11 +110,20 @@ function buildDemoTenant(input: {
       updatedAt: now,
     },
     domains: [],
-    modules: buildDemoCreatorModules(creatorId, input.currencyLabel),
+    modules: buildDemoCreatorModules(creatorId, input.currencyLabel, input.liveFeatures),
   };
 }
 
-export async function createCreatorArea(ownerUserId: string | null | undefined, input: unknown) {
+export type CreateCreatorAreaOptions = {
+  /** Installs the live modules too (streamer plan). By default a community starts with its own page only. */
+  liveFeatures?: boolean;
+};
+
+export async function createCreatorArea(
+  ownerUserId: string | null | undefined,
+  input: unknown,
+  { liveFeatures = false }: CreateCreatorAreaOptions = {},
+) {
   if (!ownerUserId) {
     throw new CreatorAreaError("missing_creator_owner");
   }
@@ -133,6 +143,7 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
         primaryColor: parsed.primaryColor,
         accentColor: parsed.accentColor,
         currencyLabel: parsed.currencyLabel,
+        liveFeatures,
       }),
     );
   }
@@ -162,7 +173,7 @@ export async function createCreatorArea(ownerUserId: string | null | undefined, 
       });
 
       await tx.insert(creatorModules).values(
-        creatorModuleCatalog.map((module) => ({
+        creatorModuleCatalog.filter((module) => liveFeatures || !isLiveModuleKey(module.key)).map((module) => ({
           id: `creator_module_${randomUUID()}`.slice(0, 64),
           creatorId,
           moduleKey: module.key,

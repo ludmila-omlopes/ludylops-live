@@ -10,7 +10,7 @@ import { PLATFORM_NAME } from "@/lib/creators/platform";
 
 export const metadata: Metadata = {
   title: { default: PLATFORM_NAME, template: `%s · ${PLATFORM_NAME}` },
-  description: "Prepare o encontro da sua comunidade com a próxima live.",
+  description: "Compartilhe suas indicações com a sua comunidade.",
 };
 
 export default async function BuilderLayout({

@@ -15,7 +15,7 @@ const context = () => ({ params: Promise.resolve({ id: creatorId }) });
 beforeEach(async () => {
   state.demo = true; globalThis.__creatorTenantStore = []; globalThis.__lojaDemoStore = undefined;
   state.owner = ownerId = (await ensureViewerFromStreamerbotIdentity({ viewerExternalId: "UCabcdefghijklmnopqrstuv", initializeBalance: false })).id;
-  creatorId = (await createCreatorArea(ownerId, { displayName: "Canal A" })).creator.id;
+  creatorId = (await createCreatorArea(ownerId, { displayName: "Canal A" }, { liveFeatures: true })).creator.id;
   getQuoteDemoStore({ creatorId }).quotes = [];
 });
 describe("owner quote API", () => {

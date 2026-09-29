@@ -27,8 +27,8 @@ beforeEach(async () => {
   state.viewer = "owner"; state.auth.mockReset(); globalThis.__creatorTenantStore = [];
   globalThis.__creatorEconomyDemo = undefined; globalThis.__lojaDemoStore = undefined;
   await getViewerPoints("initialize");
-  id = (await createCreatorArea("owner", { displayName: "Canal A" })).creator.id;
-  otherId = (await createCreatorArea("other-owner", { displayName: "Canal B" })).creator.id;
+  id = (await createCreatorArea("owner", { displayName: "Canal A" }, { liveFeatures: true })).creator.id;
+  otherId = (await createCreatorArea("other-owner", { displayName: "Canal B" }, { liveFeatures: true })).creator.id;
 });
 describe("owner and integration currency adapters", () => {
   it("enforces session, origin and ownership before any identity/data side effect", async () => {

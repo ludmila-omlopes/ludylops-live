@@ -64,4 +64,11 @@ describe("community section guard", () => {
     );
     await expect(loadCommunitySection(params("canal-da-mari"), "integracao")).resolves.toBeTruthy();
   });
+
+  it("redirects direct integration URLs when Streamer.bot is missing or disabled", async () => {
+    for (const integrationModules of [[], [{ moduleKey: "streamerbot", status: "disabled" }]]) {
+      mocks.getWorkspace.mockResolvedValue({ community, tenant: { creator: community, modules: integrationModules } });
+      await expect(loadCommunitySection(params(community.slug), "integracao")).rejects.toThrow("NEXT_REDIRECT;/comunidades/canal-da-mari");
+    }
+  });
 });

@@ -15,8 +15,8 @@ beforeEach(async () => {
   state.demo = true; state.env.CREATOR_ECONOMY_ENABLED = "true";
   globalThis.__creatorTenantStore = []; globalThis.__creatorEconomyDemo = undefined; globalThis.__lojaDemoStore = undefined;
   await getViewerPoints("initialize");
-  a = (await createCreatorArea("owner-a", { displayName: "Canal A", currencyLabel: "cristais" })).creator.id;
-  b = (await createCreatorArea("owner-b", { displayName: "Canal B", currencyLabel: "estrelas" })).creator.id;
+  a = (await createCreatorArea("owner-a", { displayName: "Canal A", currencyLabel: "cristais" }, { liveFeatures: true })).creator.id;
+  b = (await createCreatorArea("owner-b", { displayName: "Canal B", currencyLabel: "estrelas" }, { liveFeatures: true })).creator.id;
   viewer = (await ensureViewerFromStreamerbotIdentity({ viewerExternalId: "UCabcdefghijklmnopqrstuv", youtubeDisplayName: "Lia", initializeBalance: false })).id;
   // A visible, linked participant. Integration-only identities remain excluded by default.
   globalThis.__lojaDemoStore!.viewers.find((v) => v.id === viewer)!.excludeFromRanking = false;

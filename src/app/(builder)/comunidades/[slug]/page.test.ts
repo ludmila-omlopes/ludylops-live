@@ -61,4 +61,16 @@ describe("community overview", () => {
 
     expect(markup).toContain("Não foi possível verificar a configuração agora.");
   });
+
+  it("shows products and sharing without currency or integration for a page-only community", async () => {
+    const pageModules = modules.filter(module => module.moduleKey === "product_recommendations");
+    mocks.load.mockResolvedValue({ community, tenant: { creator: community, modules: pageModules }, viewerId: "viewer_1" });
+    mocks.setup.mockResolvedValue(buildCreatorSetup({ creator: community, modules: pageModules, economyEnabled: false, credentials: null, catalog: null, products: { published: 2 } }));
+    const markup = renderToStaticMarkup(await CommunityOverviewPage({ params: Promise.resolve({ slug: community.slug }) }));
+    expect(markup).toContain("Primeiros passos");
+    expect(markup).toContain("Primeiros produtos");
+    expect(markup).toContain("Divulgue o endereço");
+    expect(markup).not.toMatch(/Streamer\.bot|Moeda|primeira live|Verificar na live/);
+    expect(mocks.chat).not.toHaveBeenCalled();
+  });
 });
