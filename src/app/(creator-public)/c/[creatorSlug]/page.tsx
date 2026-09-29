@@ -6,6 +6,7 @@ import { getCreatorAreaBySlug } from "@/lib/creators/service";
 import { creatorHomeLinks } from "@/lib/creators/home";
 import { creatorColorInk, safeCreatorColor } from "@/lib/creators/profile";
 import { DEFAULT_CREATOR_ID, DEFAULT_CREATOR_DOMAIN } from "@/lib/creators/defaults";
+import { hasLiveModules } from "@/lib/creators/modules";
 
 export default async function CreatorAreaPage({ params }: { params: Promise<{ creatorSlug: string }> }) {
   const { creatorSlug } = await params;
@@ -14,6 +15,7 @@ export default async function CreatorAreaPage({ params }: { params: Promise<{ cr
   if (!tenant) notFound();
   if (tenant.creator.id === DEFAULT_CREATOR_ID) redirect(`https://${DEFAULT_CREATOR_DOMAIN}`);
   const links = creatorHomeLinks(tenant);
+  const live = hasLiveModules(tenant.modules);
   const primary = safeCreatorColor(tenant.branding.primaryColor, "#c7a2e9");
   const accent = safeCreatorColor(tenant.branding.accentColor, "#40a9ff");
   return <div className="flex w-full flex-col">
@@ -25,13 +27,13 @@ export default async function CreatorAreaPage({ params }: { params: Promise<{ cr
         </div>
         <h1 className="mt-8 max-w-4xl break-words text-5xl uppercase leading-[0.95] text-pretty sm:text-7xl"
           style={{ fontFamily: "var(--font-display)" }}>{tenant.creator.displayName}</h1>
-        <p className="mt-6 max-w-xl text-lg font-medium leading-8">Cada live rende uma história. Essa comunidade faz parte dela.</p>
+        <p className="mt-6 max-w-xl text-lg font-medium leading-8">{live ? "Cada live rende uma história. Essa comunidade faz parte dela." : "Escolhas, descobertas e indicações para compartilhar com você."}</p>
       </div>
     </header>
     <div aria-hidden="true" className="h-4 border-y-[3px] border-[var(--color-ink)]" style={{ backgroundColor: accent }} />
     <section className="bg-[var(--color-paper)] px-4 pb-16 pt-10 sm:px-6 lg:px-10">
       <div className="mx-auto grid w-full max-w-[1200px] gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:gap-16">
-        <h2 className="max-w-xs text-3xl font-black leading-tight">Entre uma live e outra.</h2>
+        <h2 className="max-w-xs text-3xl font-black leading-tight">{live ? "Entre uma live e outra." : "Para conhecer de perto."}</h2>
         {links.length ? <nav aria-label="Participar da comunidade" className="border-t-[3px] border-[var(--color-ink)]">
           {links.map((link) => <Link key={link.href} href={link.href}
             className="group flex min-w-0 items-center justify-between gap-5 border-b-2 border-[var(--color-ink)] py-6 transition-colors hover:bg-[var(--color-paper-pink)] focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-4">
@@ -41,7 +43,7 @@ export default async function CreatorAreaPage({ params }: { params: Promise<{ cr
             </span>
             <ArrowUpRight aria-hidden="true" className="size-6 shrink-0 transition-transform motion-safe:group-hover:-translate-y-1 motion-safe:group-hover:translate-x-1" />
           </Link>)}
-        </nav> : <p className="max-w-lg text-lg leading-8">Até o próximo encontro na live.</p>}
+        </nav> : <p className="max-w-lg text-lg leading-8">{live ? "Até o próximo encontro na live." : "Novas indicações em breve."}</p>}
       </div>
     </section>
   </div>;

@@ -11,6 +11,7 @@ import { communitySectionPath, summarizeSetup } from "@/lib/creators/owner-dashb
 import type { SetupStep } from "@/lib/creators/setup";
 import { getOwnedCreatorSetup } from "@/lib/creators/setup.server";
 import { formatDuration } from "@/lib/duration";
+import { hasLiveModules } from "@/lib/creators/modules";
 
 export const metadata: Metadata = {
   title: "Visão geral da comunidade",
@@ -54,6 +55,7 @@ function SummaryCard({ item }: { item: SummaryItem }) {
 export default async function CommunityOverviewPage({ params }: { params: Promise<{ slug: string }> }) {
   const { community, tenant, viewerId } = await loadCommunitySection(params, "overview");
   const slug = community.slug;
+  const live = hasLiveModules(tenant.modules);
 
   const setup = await getOwnedCreatorSetup(viewerId, community.id).catch(() => null);
   const chatRewards =
@@ -64,7 +66,7 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
   const percent = progress && progress.total > 0 ? Math.round((progress.configured / progress.total) * 100) : 0;
 
   const summary: SummaryItem[] = [];
-  if (setup) {
+  if (setup && isCommunitySectionAvailable(tenant, "economia")) {
     summary.push({
       label: "Moeda",
       value: setup.currencyLabel,
@@ -80,7 +82,7 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
       href: communitySectionPath(slug, "economia"),
     });
   }
-  if (progress) {
+  if (progress && isCommunitySectionAvailable(tenant, "integracao")) {
     summary.push({
       label: "Streamer.bot",
       value: progress.authenticated ? "Autenticação recebida" : "Aguardando autenticação",
@@ -100,10 +102,10 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
         </div>
       ) : null}
 
-      <section aria-labelledby="primeira-live" className="grid gap-5 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5 shadow-[6px_6px_0_var(--shadow-color)]">
+      <section aria-labelledby="primeiros-passos" className="grid gap-5 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5 shadow-[6px_6px_0_var(--shadow-color)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="primeira-live" className="text-2xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
-            Antes da primeira live
+          <h2 id="primeiros-passos" className="text-2xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
+            {live ? "Antes da primeira live" : "Primeiros passos"}
           </h2>
           <RefreshButton label="Verificar novamente" pendingLabel="Verificando…" />
         </div>
@@ -119,14 +121,15 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
                 aria-valuemin={0}
                 aria-valuemax={progress.total}
                 aria-valuenow={progress.configured}
-                aria-label="Etapas registradas antes da primeira live"
+                aria-label="Etapas registradas"
                 className="h-3 w-full border-[2px] border-[var(--color-ink)] bg-[var(--color-paper)]"
               >
                 <div className="h-full bg-[var(--color-mint)]" style={{ width: `${percent}%` }} />
               </div>
               <p className="text-sm text-[var(--color-ink-soft)]">
-                Depois de mudar uma configuração, verifique novamente. Itens marcados para verificar na live só se
-                confirmam com um teste real.
+                {live
+                  ? "Depois de mudar uma configuração, verifique novamente. Itens marcados para verificar na live só se confirmam com um teste real."
+                  : "Escolha suas primeiras indicações e compartilhe com seu público. A divulgação do endereço fica por sua conta."}
               </p>
             </div>
 
@@ -138,7 +141,7 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
                       {index + 1}. {step.title}
                     </h3>
                     <span className={`badge-brutal px-2 py-0.5 text-[10px] text-[var(--color-ink)] ${stepTones[step.state]}`}>
-                      {stepLabels[step.state]}
+                      {step.state === "verify" && !live ? "Por sua conta" : stepLabels[step.state]}
                     </span>
                   </div>
                   <p className="break-words text-sm leading-6">{step.detail}</p>

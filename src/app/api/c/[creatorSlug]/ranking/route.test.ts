@@ -14,8 +14,8 @@ beforeEach(async () => {
   state.demo = true; state.env.CREATOR_ECONOMY_ENABLED = "true"; state.db.mockReset().mockReturnValue(null);
   globalThis.__creatorTenantStore = []; globalThis.__creatorEconomyDemo = undefined; globalThis.__lojaDemoStore = undefined;
   await getViewerPoints("initialize");
-  a = (await createCreatorArea("owner-a", { displayName: "Canal A", currencyLabel: "cristais" })).creator.id;
-  b = (await createCreatorArea("owner-b", { displayName: "Canal B", currencyLabel: "estrelas" })).creator.id;
+  a = (await createCreatorArea("owner-a", { displayName: "Canal A", currencyLabel: "cristais" }, { liveFeatures: true })).creator.id;
+  b = (await createCreatorArea("owner-b", { displayName: "Canal B", currencyLabel: "estrelas" }, { liveFeatures: true })).creator.id;
   const viewer = await ensureViewerFromStreamerbotIdentity({ viewerExternalId: "UCabcdefghijklmnopqrstuv", youtubeDisplayName: "Lia", initializeBalance: false });
   viewer.excludeFromRanking = false;
   for (const [creatorId, owner, amount] of [[a, "owner-a", 20], [b, "owner-b", 90]] as const)

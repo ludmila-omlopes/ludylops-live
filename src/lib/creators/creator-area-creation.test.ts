@@ -60,12 +60,23 @@ function transactionDb(failureTable?: unknown) {
 describe("creator-area database creation", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it("persists the chosen currency with the new creator's points module", async () => {
+  it("installs only the community page by default, leaving every live module off", async () => {
     const { committed } = transactionDb();
-    await createCreatorArea("owner_1", { ...input, currencyLabel: "corações" });
+    // Request data cannot opt itself into the server-only live package.
+    await createCreatorArea("owner_1", { ...input, currencyLabel: "corações", liveFeatures: true });
+    const modules = committed.find((row) => row.table === creatorModules)?.value;
+    expect(modules).toEqual([
+      expect.objectContaining({ moduleKey: "product_recommendations", status: "installed", creatorId: committed[0].value.id }),
+    ]);
+  });
+
+  it("persists the chosen currency with the points module when live features are requested", async () => {
+    const { committed } = transactionDb();
+    await createCreatorArea("owner_1", { ...input, currencyLabel: "corações" }, { liveFeatures: true });
     const modules = committed.find((row) => row.table === creatorModules)?.value;
     expect(modules).toEqual(expect.arrayContaining([
       expect.objectContaining({ moduleKey: "points", configJson: { currencyLabel: "corações" }, creatorId: committed[0].value.id }),
+      expect.objectContaining({ moduleKey: "streamerbot", status: "installed" }),
     ]));
   });
 

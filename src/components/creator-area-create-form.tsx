@@ -29,7 +29,6 @@ type CreatorAreaResponse = {
 export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string }) {
   const [displayName, setDisplayName] = useState("");
   const [slug, setSlug] = useState("");
-  const [currencyLabel, setCurrencyLabel] = useState("pontos");
   const [primaryColor, setPrimaryColor] = useState("#c7a2e9");
   const [accentColor, setAccentColor] = useState("#40a9ff");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -61,7 +60,6 @@ export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string
     const draft = {
       displayName,
       slug: slug || undefined,
-      currencyLabel,
       primaryColor,
       accentColor,
     };
@@ -136,16 +134,6 @@ export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string
         </span>
         {renderFieldError("slug")}
       </label>
-
-      <div className="grid gap-2">
-        <label htmlFor="creator-currency-label" className="text-xs font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">Nome da moeda</label>
-        <Input id="creator-currency-label" aria-describedby="creator-currency-help" value={currencyLabel} maxLength={32} onChange={(event) => {
-          setCurrencyLabel(event.target.value);
-          clearFieldError("currencyLabel");
-        }} placeholder="Ex.: cristais" aria-invalid={Boolean(fieldErrors.currencyLabel)} />
-        <span id="creator-currency-help" className="text-sm text-[var(--color-ink-soft)]">Como sua comunidade vai chamar os pontos da live.</span>
-        {renderFieldError("currencyLabel")}
-      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2">

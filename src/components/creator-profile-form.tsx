@@ -52,7 +52,7 @@ export function CreatorProfileForm({ creatorId, initial }: { creatorId: string; 
     {open && <form onSubmit={save} className={`${embedded ? "" : "mt-3 "}${ownerPanelClass}`}>
       <h2 className={ownerPanelTitleClass}>Nome e cores da comunidade</h2>
       <fieldset disabled={busy || !expected} className="grid min-w-0 gap-4">
-        <label className="grid gap-2 text-sm font-bold">Nome do streamer
+        <label className="grid gap-2 text-sm font-bold">Nome do criador
           <Input value={draft.displayName} onChange={(e) => change("displayName", e.target.value)} required minLength={2} maxLength={80} />
         </label>
         {([ ["primaryColor", "Cor principal"], ["accentColor", "Cor de destaque"] ] as const).map(([key, label]) => <div key={key} className="grid gap-2">

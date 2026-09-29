@@ -16,6 +16,8 @@ export type SetupProgress = {
   configured: number;
   total: number;
   authenticated: boolean;
+  /** False for a community that only has its own page (no currency or Streamer.bot). */
+  live: boolean;
 };
 
 export type OwnedCommunityCard = OwnedCommunity & {
@@ -62,11 +64,12 @@ export const creatorStatusLabels: Record<CreatorStatus, string> = {
   archived: "Arquivada",
 };
 
-export function summarizeSetup(setup: Pick<CreatorSetup, "steps">): SetupProgress {
+export function summarizeSetup(setup: Pick<CreatorSetup, "steps" | "live">): SetupProgress {
   return {
     configured: setup.steps.filter((step) => step.state === "configured").length,
     total: setup.steps.length,
     authenticated: setup.steps.some((step) => step.id === "authentication" && step.state === "configured"),
+    live: setup.live,
   };
 }
 

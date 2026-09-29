@@ -10,6 +10,16 @@ function tenant(status: string, modules = allInstalled) {
 }
 
 describe("community sections", () => {
+  it("limits a page-only community to overview, identity and products", () => {
+    expect(availableCommunitySections(tenant("active", [{ moduleKey: "product_recommendations", status: "installed" }]), "canal").map(section => section.key))
+      .toEqual(["overview", "identidade", "produtos"]);
+  });
+
+  it.each(["disabled", "archived"])("hides integration when Streamer.bot is %s", (status) => {
+    const modules = allInstalled.map(module => module.moduleKey === "streamerbot" ? { ...module, status } : module);
+    expect(isCommunitySectionAvailable(tenant("active", modules), "integracao")).toBe(false);
+  });
+
   it("lists every owner section in a fixed order when all modules are available", () => {
     expect(availableCommunitySections(tenant("active"), "canal").map((section) => [section.key, section.href])).toEqual([
       ["overview", "/comunidades/canal"],

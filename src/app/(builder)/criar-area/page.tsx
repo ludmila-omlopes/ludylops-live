@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Coins, Palette, Sparkles, MessageSquare, type LucideIcon } from "lucide-react";
+import { ShoppingBag, Palette, Link2, Share2, type LucideIcon } from "lucide-react";
 
 import { auth } from "@/auth";
 import { CreatorAreaCreateForm } from "@/components/creator-area-create-form";
@@ -23,21 +23,21 @@ type CommunityStep = {
 
 const COMMUNITY_STEPS: CommunityStep[] = [
   {
-    title: "Pontos acumulados",
-    body: "Sua comunidade ganha sua moeda pelas mensagens no chat, conforme a regra que você ativar.",
-    icon: Coins,
+    title: "Suas indicações",
+    body: "Compartilhe os produtos que você usa, recomenda e quer apresentar ao seu público.",
+    icon: ShoppingBag,
     bg: "bg-[var(--color-mint)]",
   },
   {
-    title: "Frases da comunidade",
-    body: "Guarde as frases que marcaram as lives e relembre esses momentos com o chat.",
-    icon: MessageSquare,
+    title: "Seus links",
+    body: "Use o link da loja ou o seu link de afiliado em cada indicação.",
+    icon: Link2,
     bg: "bg-[var(--color-pink)]",
   },
   {
-    title: "Resgates com efeito",
-    body: "Ela troca pontos por efeitos que aparecem na sua transmissão.",
-    icon: Sparkles,
+    title: "Perto do seu público",
+    body: "Divulgue seu endereço na bio, nos vídeos e nos canais em que você conversa com sua comunidade.",
+    icon: Share2,
     bg: "bg-[var(--color-blue)]",
   },
   {
@@ -102,11 +102,11 @@ export default async function CreateCreatorAreaPage() {
             className="max-w-3xl text-4xl uppercase leading-[0.9] text-pretty sm:text-5xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Sua live, sua moeda, sua comunidade.
+            Suas indicações, com a sua identidade.
           </h1>
           <p className="mt-5 max-w-2xl text-base font-medium leading-7 text-[var(--color-ink-soft)]">
-            Reúna sua comunidade com uma moeda própria e resgates durante a live.
-            O acesso para novos streamers está disponível por convite, em beta fechado.
+            Reúna seus produtos favoritos com seus links, seu nome e suas cores.
+            Comece com sua página de indicações. O acesso para novos criadores está disponível por convite, em beta fechado.
           </p>
 
           <CommunitySection />
@@ -119,7 +119,7 @@ export default async function CreateCreatorAreaPage() {
                 className="text-2xl uppercase text-[var(--color-ink)]"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                Crie a área da sua comunidade
+                Comece suas indicações
               </h2>
               <p className="text-sm font-medium leading-6 text-[var(--color-ink-soft)]">
                 A criação de novas áreas está em beta fechado. Entre com sua conta Google para ver

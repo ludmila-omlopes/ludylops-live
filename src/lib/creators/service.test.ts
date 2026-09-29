@@ -43,7 +43,20 @@ describe("creator area service", () => {
       accentColor: "#ffcc00",
     });
     expect(tenant.domains).toEqual([]);
-    expect(tenant.modules.map((module) => module.moduleKey)).toContain("points");
+    expect(tenant.modules.map((module) => module.moduleKey)).toEqual(["product_recommendations"]);
+  });
+
+  it("installs the live modules only when a streamer community is requested", async () => {
+    const tenant = await createCreatorArea(
+      "viewer_1",
+      { displayName: "Canal da Mari", currencyLabel: "cristais" },
+      { liveFeatures: true },
+    );
+
+    expect(tenant.modules.map((module) => module.moduleKey)).toEqual(
+      expect.arrayContaining(["points", "streamerbot", "redemptions", "product_recommendations"]),
+    );
+    expect(tenant.modules.find((module) => module.moduleKey === "points")?.configJson).toEqual({ currencyLabel: "cristais" });
   });
 
   it("resolves a created demo area by slug", async () => {

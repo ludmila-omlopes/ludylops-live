@@ -144,6 +144,22 @@ export const creatorModuleCatalog = [
 export const defaultCreatorModuleKeys = creatorModuleCatalog.map((module) => module.key);
 validateModuleCatalog(creatorModuleCatalog);
 
+/**
+ * A new community starts with its own page only. Live features (currency,
+ * Streamer.bot, redemptions, quotes, overlays and the rest) are turned on per
+ * community from the platform console, or at creation for a streamer plan.
+ */
+export const pageModuleKeys: readonly CreatorModuleKey[] = ["product_recommendations"];
+
+export function isLiveModuleKey(moduleKey: string) {
+  return !pageModuleKeys.some((key) => key === moduleKey);
+}
+
+/** True when any live module is installed; disabled or missing live modules do not count. */
+export function hasLiveModules(modules: readonly { moduleKey: string; status: string }[]) {
+  return modules.some((module) => module.status === "installed" && isLiveModuleKey(module.moduleKey));
+}
+
 export const getModuleAvailability = (modules: readonly { moduleKey: string; status: string }[], key: string) =>
   moduleAvailability(creatorModuleCatalog, modules, key);
 

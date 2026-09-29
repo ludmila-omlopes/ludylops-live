@@ -26,8 +26,8 @@ beforeEach(() => {
 
 describe("owner currency endpoint", () => {
   it("persists only the selected owner's currency and marks responses no-store", async () => {
-    const a = await createCreatorArea("owner-a", { displayName: "Canal A" });
-    const b = await createCreatorArea("owner-b", { displayName: "Canal B" });
+    const a = await createCreatorArea("owner-a", { displayName: "Canal A" }, { liveFeatures: true });
+    const b = await createCreatorArea("owner-b", { displayName: "Canal B" }, { liveFeatures: true });
     const response = await PATCH(request(a.creator.id), context(a.creator.id));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
@@ -49,7 +49,7 @@ describe("owner currency endpoint", () => {
   });
   it.each([null, {}, { currencyLabel: "" }, { currencyLabel: "a".repeat(33) },
     { currencyLabel: "gemas", ownerUserId: "owner-a" }, { currencyLabel: "gemas", creatorId: "other" }])("rejects invalid or forged input %s", async (body) => {
-    const a = await createCreatorArea("owner-a", { displayName: "Canal A" });
+    const a = await createCreatorArea("owner-a", { displayName: "Canal A" }, { liveFeatures: true });
     expect((await PATCH(request(a.creator.id, body), context(a.creator.id))).status).toBe(400);
     expect(await getOwnedCurrency("owner-a", a.creator.id)).toEqual({ currencyLabel: "pontos" });
   });

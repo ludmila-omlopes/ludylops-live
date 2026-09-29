@@ -27,8 +27,8 @@ beforeEach(async () => {
   state.viewer = "owner"; state.auth.mockReset(); globalThis.__creatorTenantStore = [];
   globalThis.__creatorEconomyDemo = undefined; globalThis.__lojaDemoStore = undefined;
   await getViewerPoints("initialize");
-  id = (await createCreatorArea("owner", { displayName: "Canal A" })).creator.id;
-  otherId = (await createCreatorArea("other", { displayName: "Canal B" })).creator.id;
+  id = (await createCreatorArea("owner", { displayName: "Canal A" }, { liveFeatures: true })).creator.id;
+  otherId = (await createCreatorArea("other", { displayName: "Canal B" }, { liveFeatures: true })).creator.id;
 });
 describe("chat reward adapters", () => {
   it("protects owner settings with session, origin and ownership", async () => {

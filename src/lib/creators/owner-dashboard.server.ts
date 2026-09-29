@@ -114,7 +114,7 @@ export async function listOwnedCommunityCards(viewerId: string | null | undefine
 
       try {
         const setup = await getOwnedCreatorSetup(viewerId, community.id);
-        return { ...community, currencyLabel: setup.currencyLabel, setup: summarizeSetup(setup) };
+        return { ...community, currencyLabel: setup.live ? setup.currencyLabel : null, setup: summarizeSetup(setup) };
       } catch {
         // One unavailable summary must not hide the rest of the list.
         return { ...community, currencyLabel: null, setup: null };

@@ -28,7 +28,7 @@ function SetupProgressBar({ configured, total }: { configured: number; total: nu
       aria-valuemin={0}
       aria-valuemax={total}
       aria-valuenow={configured}
-      aria-label="Etapas concluídas antes da primeira live"
+      aria-label="Etapas concluídas"
       className="h-3 w-full border-[2px] border-[var(--color-ink)] bg-[var(--color-paper)]"
     >
       <div className="h-full bg-[var(--color-mint)]" style={{ width: `${percent}%` }} />
@@ -65,14 +65,14 @@ function CommunityCard({ community }: { community: OwnedCommunityCard }) {
           </p>
         ) : (
           <dl className="grid gap-3 text-sm">
-            <div className="flex flex-wrap justify-between gap-2">
+            {community.setup?.live ? <div className="flex flex-wrap justify-between gap-2">
               <dt className="font-black uppercase tracking-[0.08em] text-[var(--color-ink-soft)]">Moeda</dt>
               <dd className="font-bold text-[var(--color-ink)]">{community.currencyLabel ?? "Indisponível"}</dd>
-            </div>
+            </div> : null}
             <div className="grid gap-2">
               <div className="flex flex-wrap justify-between gap-2">
                 <dt className="font-black uppercase tracking-[0.08em] text-[var(--color-ink-soft)]">
-                  Primeira live
+                  {community.setup?.live ? "Primeira live" : "Primeiros passos"}
                 </dt>
                 <dd className="font-bold text-[var(--color-ink)]">
                   {community.setup
@@ -84,7 +84,7 @@ function CommunityCard({ community }: { community: OwnedCommunityCard }) {
                 <SetupProgressBar configured={community.setup.configured} total={community.setup.total} />
               ) : null}
             </div>
-            <div className="flex flex-wrap justify-between gap-2">
+            {community.setup?.live ? <div className="flex flex-wrap justify-between gap-2">
               <dt className="font-black uppercase tracking-[0.08em] text-[var(--color-ink-soft)]">Streamer.bot</dt>
               <dd className="font-bold text-[var(--color-ink)]">
                 {community.setup
@@ -93,7 +93,7 @@ function CommunityCard({ community }: { community: OwnedCommunityCard }) {
                     : "Aguardando autenticação"
                   : "Indisponível"}
               </dd>
-            </div>
+            </div> : null}
           </dl>
         )}
 
@@ -168,7 +168,7 @@ export default async function CommunitiesPage() {
             {canCreate ? (
               <>
                 <p className="text-sm font-medium leading-6 text-[var(--color-ink-soft)]">
-                  Escolha o nome, a moeda e as cores da sua comunidade para começar.
+                  Escolha o nome e as cores da sua comunidade e compartilhe suas indicações.
                 </p>
                 <Link
                   href={NEW_COMMUNITY_PATH}

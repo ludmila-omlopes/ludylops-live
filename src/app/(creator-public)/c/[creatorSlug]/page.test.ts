@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
 
 const mocks = vi.hoisted(() => ({ headers: vi.fn(), getArea: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
@@ -21,6 +22,13 @@ describe("creator public page boundary", () => {
     mocks.getArea.mockResolvedValue({ ...defaultCreatorTenant, creator: { ...defaultCreatorTenant.creator, id: "cozy", slug: "cozy" } });
     expect(await CreatorAreaPage({ params: Promise.resolve({ creatorSlug: "cozy" }) })).toBeTruthy();
     expect(mocks.getArea).toHaveBeenCalledWith("cozy", { hostname: "localhost:3000" });
+  });
+
+  it("renders product-only communities without promising live features", async () => {
+    mocks.getArea.mockResolvedValue({ ...defaultCreatorTenant, creator: { ...defaultCreatorTenant.creator, id: "cozy", slug: "cozy" }, modules: defaultCreatorTenant.modules.filter(module => module.moduleKey === "product_recommendations") });
+    const markup = renderToStaticMarkup(await CreatorAreaPage({ params: Promise.resolve({ creatorSlug: "cozy" }) }));
+    expect(markup).toContain('href="/c/cozy/produtinhos"');
+    expect(markup).not.toMatch(/\blive\b|moeda|resgates|ranking/);
   });
 
   it("opens the Ludylops community on its own domain after public resolution", async () => {
