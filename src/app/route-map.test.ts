@@ -21,6 +21,7 @@ const expectedPageRoutes = new Set([
   "/privacy",
   "/terms",
   "/owner",
+  "/inicio",
   "/criar-area",
   "/comunidades",
   "/comunidades/nova",

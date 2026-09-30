@@ -48,7 +48,7 @@ describe("proxy composition", () => {
 
   it.each(["localhost:3000", "ludylops-youtube-dashboard.vercel.app"])("opens the hub at %s without selecting a community", async host => {
     const response = await proxy(new NextRequest(`https://${host}/?ref=invite`), event);
-    expect(response?.headers.get("x-middleware-rewrite")).toBe(`https://${host}/criar-area?ref=invite`);
+    expect(response?.headers.get("x-middleware-rewrite")).toBe(`https://${host}/inicio?ref=invite`);
     expect(response?.headers.get("location")).toBeNull();
     expect(mocks.authenticatedProxy).not.toHaveBeenCalled();
   });
