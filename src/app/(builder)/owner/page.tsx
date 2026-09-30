@@ -14,37 +14,23 @@ export default async function OwnerPage() {
 
   return (
     <div className="flex w-full flex-col">
-      <section className="landing-plane surface-hero py-8 sm:py-10">
-        <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
-          <h1
-            className="text-4xl uppercase sm:text-6xl"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Plataforma
-          </h1>
-        </div>
-      </section>
+      <div className="mx-auto grid w-[min(1500px,100%-32px)] gap-8 pt-12 pb-6">
+        <h1 className="hub-h1">Plataforma</h1>
 
-      {canCreateArea ? (
-        <section className="landing-plane bg-[var(--color-paper)] py-6 sm:py-8">
-          <div className="mx-auto grid w-full max-w-[1500px] gap-5 px-4 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(420px,0.7fr)] lg:px-10">
-            <div className="self-center">
-              <h2
-                className="text-3xl uppercase"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Nova área
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-[var(--color-ink-soft)]">
+        {canCreateArea ? (
+          <section className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(420px,0.7fr)]" aria-labelledby="nova-area">
+            <div className="grid content-center gap-2">
+              <h2 id="nova-area" className="hub-h2">Nova área</h2>
+              <p className="hub-sub text-[15px]">
                 Convide um criador para reunir sua comunidade com nome, cores e moeda próprios.
               </p>
             </div>
-            <div className="border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5 shadow-[6px_6px_0_var(--shadow-color)] sm:p-6">
+            <div className="hub-card hub-card-pad sm:p-8">
               <CreatorAreaCreateForm addressPrefix={`${getPlatformOrigin()}/c/`} />
             </div>
-          </div>
-        </section>
-      ) : null}
+          </section>
+        ) : null}
+      </div>
 
       <PlatformOwnerCreatorList instances={instances} />
     </div>

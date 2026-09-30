@@ -13,6 +13,7 @@ vi.mock("next/font/google", () => ({
   Archivo_Black: () => ({ variable: "font-display" }),
   DM_Sans: () => ({ variable: "font-body" }),
   Geist: () => ({ variable: "font-sans" }),
+  Geist_Mono: () => ({ variable: "font-hub-mono" }),
   IBM_Plex_Mono: () => ({ variable: "font-mono" }),
 }));
 vi.mock("next/headers", () => ({ cookies: mocks.cookies, headers: async () => new Headers({ host: "localhost" }) }));

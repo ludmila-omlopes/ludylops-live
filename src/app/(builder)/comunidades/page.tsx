@@ -11,7 +11,7 @@ import {
   type OwnedCommunityCard,
 } from "@/lib/creators/owner-dashboard";
 import { listOwnedCommunityCards } from "@/lib/creators/owner-dashboard.server";
-import { safeCreatorColor } from "@/lib/creators/profile";
+import { creatorColorInk, safeCreatorColor } from "@/lib/creators/profile";
 
 export const metadata: Metadata = {
   title: "Minhas comunidades",
@@ -29,9 +29,9 @@ function SetupProgressBar({ configured, total }: { configured: number; total: nu
       aria-valuemax={total}
       aria-valuenow={configured}
       aria-label="Etapas concluídas"
-      className="h-3 w-full border-[2px] border-[var(--color-ink)] bg-[var(--color-paper)]"
+      className="hub-progress"
     >
-      <div className="h-full bg-[var(--color-mint)]" style={{ width: `${percent}%` }} />
+      <span style={{ width: `${percent}%` }} />
     </div>
   );
 }
@@ -42,78 +42,61 @@ function CommunityCard({ community }: { community: OwnedCommunityCard }) {
   const manageHref = community.isLegacy ? LEGACY_ADMIN_URL : communityDashboardPath(community.slug);
 
   return (
-    <article className="flex min-w-0 flex-col border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] shadow-[5px_5px_0_var(--shadow-color)]">
-      <div
-        aria-hidden="true"
-        className="h-4 border-b-[3px] border-[var(--color-ink)]"
-        style={{ background: `linear-gradient(90deg, ${primary}, ${accent})` }}
-      />
-      <div className="grid flex-1 content-start gap-4 p-5">
+    <article className="hub-card flex min-w-0 flex-col overflow-hidden">
+      <div aria-hidden="true" className="h-20" style={{ background: `linear-gradient(120deg, ${primary}, ${accent})` }} />
+      <div className="-mt-7 grid flex-1 content-start gap-5 px-6 pb-6">
+        <span
+          aria-hidden="true"
+          className="grid size-14 place-items-center rounded-full text-xl font-bold shadow-[0_0_0_4px_var(--hub-surface)]"
+          style={{ background: primary, color: creatorColorInk(primary) }}
+        >
+          {Array.from(community.displayName)[0]?.toUpperCase()}
+        </span>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <h2
-            className="min-w-0 break-words text-2xl uppercase leading-[0.95] text-[var(--color-ink)]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {community.displayName}
-          </h2>
+          <h2 className="hub-h2 min-w-0 break-words">{community.displayName}</h2>
           <CommunityStatusBadge status={community.status} />
         </div>
 
         {community.isLegacy ? (
-          <p className="text-sm font-medium leading-6 text-[var(--color-ink-soft)]">
-            A operação da Ludylops continua na administração da live.
-          </p>
+          <p className="hub-muted text-sm leading-6">A operação da Ludylops continua na administração da live.</p>
         ) : (
           <dl className="grid gap-3 text-sm">
-            {community.setup?.live ? <div className="flex flex-wrap justify-between gap-2">
-              <dt className="font-black uppercase tracking-[0.08em] text-[var(--color-ink-soft)]">Moeda</dt>
-              <dd className="font-bold text-[var(--color-ink)]">{community.currencyLabel ?? "Indisponível"}</dd>
-            </div> : null}
+            {community.setup?.live ? (
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="hub-muted">Moeda</dt>
+                <dd className="font-semibold">{community.currencyLabel ?? "Indisponível"}</dd>
+              </div>
+            ) : null}
             <div className="grid gap-2">
               <div className="flex flex-wrap justify-between gap-2">
-                <dt className="font-black uppercase tracking-[0.08em] text-[var(--color-ink-soft)]">
-                  {community.setup?.live ? "Primeira live" : "Primeiros passos"}
-                </dt>
-                <dd className="font-bold text-[var(--color-ink)]">
-                  {community.setup
-                    ? `${community.setup.configured} de ${community.setup.total} etapas`
-                    : "Indisponível"}
+                <dt className="hub-muted">{community.setup?.live ? "Primeira live" : "Primeiros passos"}</dt>
+                <dd className="font-semibold">
+                  {community.setup ? `${community.setup.configured} de ${community.setup.total} etapas` : "Indisponível"}
                 </dd>
               </div>
               {community.setup ? (
                 <SetupProgressBar configured={community.setup.configured} total={community.setup.total} />
               ) : null}
             </div>
-            {community.setup?.live ? <div className="flex flex-wrap justify-between gap-2">
-              <dt className="font-black uppercase tracking-[0.08em] text-[var(--color-ink-soft)]">Streamer.bot</dt>
-              <dd className="font-bold text-[var(--color-ink)]">
-                {community.setup
-                  ? community.setup.authenticated
-                    ? "Autenticação recebida"
-                    : "Aguardando autenticação"
-                  : "Indisponível"}
-              </dd>
-            </div> : null}
+            {community.setup?.live ? (
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="hub-muted">Streamer.bot</dt>
+                <dd className="font-semibold">
+                  {community.setup.authenticated ? "Autenticação recebida" : "Aguardando autenticação"}
+                </dd>
+              </div>
+            ) : null}
           </dl>
         )}
 
-        <a
-          href={community.publicUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-w-0 items-center gap-1 break-all text-sm font-bold text-[var(--color-ink-soft)] underline decoration-2 underline-offset-4"
-        >
+        <a href={community.publicUrl} target="_blank" rel="noreferrer" className="hub-link min-w-0 break-all text-sm">
           {community.publicUrl.replace(/^https?:\/\//u, "")}
           <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
         </a>
       </div>
 
-      <div className="border-t-[3px] border-[var(--color-ink)] p-4">
-        <Link
-          href={manageHref}
-          className="btn-brutal ink-button w-full px-5 py-2.5 text-sm text-[var(--color-accent-ink)]"
-          aria-label={`Gerenciar ${community.displayName}`}
-        >
+      <div className="px-6 pb-6">
+        <Link href={manageHref} className="hub-btn hub-btn-primary hub-btn-block" aria-label={`Gerenciar ${community.displayName}`}>
           Gerenciar
           <ArrowRight className="size-4" aria-hidden="true" />
         </Link>
@@ -131,62 +114,44 @@ export default async function CommunitiesPage() {
   ]);
 
   return (
-    <div className="surface-section flex w-full flex-1 flex-col">
-      <section className="mx-auto grid w-full max-w-[1200px] gap-8 px-4 py-10 sm:px-6 lg:px-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <h1
-            className="text-4xl uppercase leading-[0.9] sm:text-5xl"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Minhas comunidades
-          </h1>
-          {canCreate && communities.length > 0 ? (
-            <Link
-              href={NEW_COMMUNITY_PATH}
-              className="btn-brutal accent-button px-5 py-2.5 text-sm text-[var(--color-accent-ink)]"
-            >
-              <Plus className="size-4" aria-hidden="true" />
-              Nova comunidade
-            </Link>
-          ) : null}
-        </div>
+    <div className="hub-page grid gap-10">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <h1 className="hub-h1">Minhas comunidades</h1>
+        {canCreate && communities.length > 0 ? (
+          <Link href={NEW_COMMUNITY_PATH} className="hub-btn hub-btn-primary">
+            <Plus className="size-4" aria-hidden="true" />
+            Nova comunidade
+          </Link>
+        ) : null}
+      </div>
 
-        {communities.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {communities.map((community) => (
-              <CommunityCard key={community.id} community={community} />
-            ))}
-          </div>
-        ) : (
-          <div className="grid max-w-2xl gap-4 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-6 shadow-[6px_6px_0_var(--shadow-color)]">
-            <h2
-              className="text-2xl uppercase text-[var(--color-ink)]"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Nenhuma comunidade ainda
-            </h2>
-            {canCreate ? (
-              <>
-                <p className="text-sm font-medium leading-6 text-[var(--color-ink-soft)]">
-                  Escolha o nome e as cores da sua comunidade e compartilhe suas indicações.
-                </p>
-                <Link
-                  href={NEW_COMMUNITY_PATH}
-                  className="btn-brutal accent-button justify-self-start px-5 py-2.5 text-sm text-[var(--color-accent-ink)]"
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  Criar comunidade
-                </Link>
-              </>
-            ) : (
-              <p className="text-sm font-medium leading-6 text-[var(--color-ink-soft)]">
-                Novas comunidades estão em beta fechado, e o acesso é liberado por convite. O email{" "}
-                <strong>{session.user?.email}</strong> ainda não está na lista de aprovados.
+      {communities.length > 0 ? (
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {communities.map((community) => (
+            <CommunityCard key={community.id} community={community} />
+          ))}
+        </div>
+      ) : (
+        <div className="hub-card hub-card-pad grid max-w-2xl gap-4 sm:p-8">
+          <h2 className="hub-h2">Nenhuma comunidade ainda</h2>
+          {canCreate ? (
+            <>
+              <p className="hub-muted text-[15px] leading-6">
+                Escolha o nome e as cores da sua comunidade e compartilhe suas indicações.
               </p>
-            )}
-          </div>
-        )}
-      </section>
+              <Link href={NEW_COMMUNITY_PATH} className="hub-btn hub-btn-primary justify-self-start">
+                <Plus className="size-4" aria-hidden="true" />
+                Criar comunidade
+              </Link>
+            </>
+          ) : (
+            <p className="hub-muted text-[15px] leading-6">
+              Novas comunidades estão em beta fechado, e o acesso é liberado por convite. O email{" "}
+              <strong className="text-[var(--hub-ink)]">{session.user?.email}</strong> ainda não está na lista de aprovados.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

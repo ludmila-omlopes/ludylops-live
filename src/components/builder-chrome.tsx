@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { Menu, Moon, Sun, Users, X } from "lucide-react";
+
 import { AuthButtons } from "@/components/auth-buttons";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Button } from "@/components/ui/button";
+import { useThemeMode } from "@/components/theme-toggle";
 import type { ThemeMode } from "@/lib/theme";
 import { PLATFORM_NAME } from "@/lib/creators/platform";
 import { COMMUNITIES_PATH, NEW_COMMUNITY_PATH } from "@/lib/creators/owner-dashboard";
@@ -65,24 +66,22 @@ export function builderNavItems({
   return items;
 }
 
-function desktopLinkClass(item: NavItem, active: boolean) {
-  const base = "rounded-[var(--radius)] border px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-[0.1em]";
-  if (item.tone === "admin") {
-    return `${base} admin-action border-[2px] border-[var(--color-ink)] text-[var(--color-admin-ink)]${
-      active ? " shadow-[4px_4px_0_var(--shadow-color)]" : ""
-    }`;
-  }
-  return active
-    ? `${base} border-[2px] border-[var(--color-ink)] bg-[var(--color-purple)] text-[var(--color-accent-ink)] shadow-[4px_4px_0_var(--shadow-color)]`
-    : `${base} border-transparent text-[var(--color-ink-soft)] hover:border-[var(--color-ink)]`;
-}
+function ThemeButton({ initialTheme }: { initialTheme: ThemeMode | null }) {
+  const { theme, toggle } = useThemeMode(initialTheme);
+  const isDark = theme === "dark";
 
-function mobileLinkClass(item: NavItem, active: boolean) {
-  const base = "border-[2px] border-[var(--color-ink)] px-4 py-3 text-sm font-extrabold uppercase";
-  if (item.tone === "admin") {
-    return `${base} admin-action`;
-  }
-  return active ? `${base} bg-[var(--color-purple)] text-[var(--color-accent-ink)]` : base;
+  return (
+    <button
+      type="button"
+      className="hub-icon-btn"
+      onClick={toggle}
+      aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+      aria-pressed={isDark}
+      suppressHydrationWarning
+    >
+      {isDark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+    </button>
+  );
 }
 
 export function BuilderChrome({
@@ -91,85 +90,74 @@ export function BuilderChrome({
   isPlatformOwner = false,
   isSignedIn = false,
   isAdmin = false,
+  fontClassName = "",
 }: {
   children: React.ReactNode;
   initialTheme?: ThemeMode | null;
   isPlatformOwner?: boolean;
   isSignedIn?: boolean;
   isAdmin?: boolean;
+  fontClassName?: string;
 }) {
   const pathname = usePathname() ?? "";
   const [mobileOpen, setMobileOpen] = useState(false);
   const navItems = builderNavItems({ isSignedIn, isPlatformOwner, isAdmin });
 
+  const links = (onNavigate?: () => void) =>
+    navItems.map((item) => {
+      const active = item.isActive(pathname);
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          onClick={onNavigate}
+          aria-current={active ? "page" : undefined}
+          className={`hub-nav-link${item.tone === "admin" ? " is-admin" : ""}`}
+        >
+          {item.label}
+        </Link>
+      );
+    });
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <header
-        className="sticky top-0 z-40 border-b-[3px] border-[var(--color-ink)] bg-[var(--color-header-surface)]"
-        aria-label={PLATFORM_NAME}
-      >
-        <div className="mx-auto flex w-full max-w-[1500px] items-center gap-4 px-4 py-3 sm:px-6 lg:px-10">
-          <Link
-            href={isSignedIn ? COMMUNITIES_PATH : "/criar-area"}
-            className="shrink-0 text-xl font-black uppercase text-[var(--color-ink)]"
-          >
+    <div className={`hub-scope flex min-h-screen flex-col ${fontClassName}`}>
+      <header className="hub-nav" aria-label={PLATFORM_NAME}>
+        <div className="hub-nav-inner">
+          <Link href={isSignedIn ? COMMUNITIES_PATH : "/inicio"} className="hub-brand">
+            <span className="hub-brand-mark">
+              <Users aria-hidden="true" />
+            </span>
             {PLATFORM_NAME}
           </Link>
 
-          <nav className="ml-auto hidden items-center gap-2 md:flex" aria-label="Navegação de comunidades">
-            {navItems.map((item) => {
-              const active = item.isActive(pathname);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={desktopLinkClass(item, active)}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-            <ThemeToggle initialTheme={initialTheme} />
-            <AuthButtons />
+          <nav className="hub-nav-links" aria-label="Navegação de comunidades">
+            {links()}
           </nav>
+          <div className="hub-nav-actions hub-desktop-only">
+            <ThemeButton initialTheme={initialTheme} />
+            <AuthButtons />
+          </div>
 
-          <div className="ml-auto flex items-center gap-3 md:hidden">
-            <ThemeToggle initialTheme={initialTheme} />
-            <Button
+          <div className="hub-nav-actions hub-mobile-only" style={{ marginLeft: "auto" }}>
+            <ThemeButton initialTheme={initialTheme} />
+            <button
               type="button"
+              className="hub-icon-btn"
               onClick={() => setMobileOpen((open) => !open)}
-              variant="pink"
-              size="sm"
               aria-label="Menu"
               aria-expanded={mobileOpen}
             >
-              {mobileOpen ? "Fechar" : "Menu"}
-            </Button>
+              {mobileOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+            </button>
           </div>
         </div>
 
         {mobileOpen ? (
-          <div className="border-t-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-4 md:hidden">
-            <nav className="flex flex-col gap-2" aria-label="Navegação de comunidades">
-              {navItems.map((item) => {
-                const active = item.isActive(pathname);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    aria-current={active ? "page" : undefined}
-                    className={mobileLinkClass(item, active)}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
+          <div className="hub-mobile-menu">
+            <nav className="grid gap-1" aria-label="Navegação de comunidades">
+              {links(() => setMobileOpen(false))}
             </nav>
-            <div className="mt-4 border-t-[2px] border-[var(--color-ink)] pt-4">
-              <AuthButtons />
-            </div>
+            <AuthButtons />
           </div>
         ) : null}
       </header>

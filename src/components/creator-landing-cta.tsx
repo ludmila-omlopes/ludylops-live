@@ -35,7 +35,7 @@ export function CreatorLandingCta() {
       <div className="flex flex-col gap-2 sm:flex-row">
         {hasGoogle ? (
           <Button type="button" onClick={handleGoogleSignIn} variant="accent">
-            Criar a minha área
+            Entrar com Google
           </Button>
         ) : null}
         {hasCredentials ? (
