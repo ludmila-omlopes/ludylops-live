@@ -25,10 +25,10 @@ const stepLabels: Record<SetupStep["state"], string> = {
 };
 
 const stepTones: Record<SetupStep["state"], string> = {
-  configured: "bg-[var(--color-mint)]",
-  pending: "bg-[var(--color-yellow)]",
-  blocked: "bg-[var(--color-paper)]",
-  verify: "bg-[var(--color-sky)]",
+  configured: "hub-chip-success",
+  pending: "hub-chip-warning",
+  blocked: "",
+  verify: "hub-chip-on",
 };
 
 type SummaryItem = { label: string; value: string; href?: string };
@@ -36,12 +36,11 @@ type SummaryItem = { label: string; value: string; href?: string };
 function SummaryCard({ item }: { item: SummaryItem }) {
   const content = (
     <>
-      <span className="text-xs font-black uppercase tracking-[0.08em] text-[var(--color-ink-soft)]">{item.label}</span>
-      <span className="mt-1 block break-words text-base font-bold text-[var(--color-ink)]">{item.value}</span>
+      <span className="hub-muted text-sm">{item.label}</span>
+      <span className="mt-1 block break-words text-base font-semibold">{item.value}</span>
     </>
   );
-  const className =
-    "block border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-4 shadow-[4px_4px_0_var(--shadow-color)]";
+  const className = "hub-card block p-5";
 
   return item.href ? (
     <Link href={item.href} className={`${className} transition-transform hover:-translate-y-0.5`}>
@@ -102,9 +101,9 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
         </div>
       ) : null}
 
-      <section aria-labelledby="primeiros-passos" className="grid gap-5 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5 shadow-[6px_6px_0_var(--shadow-color)]">
+      <section aria-labelledby="primeiros-passos" className="hub-card grid gap-6 p-6 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="primeiros-passos" className="text-2xl uppercase" style={{ fontFamily: "var(--font-display)" }}>
+          <h2 id="primeiros-passos" className="hub-h2">
             {live ? "Antes da primeira live" : "Primeiros passos"}
           </h2>
           <RefreshButton label="Verificar novamente" pendingLabel="Verificando…" />
@@ -113,7 +112,7 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
         {setup && progress ? (
           <>
             <div className="grid gap-2">
-              <p className="text-sm font-bold text-[var(--color-ink)]">
+              <p className="text-sm font-semibold">
                 {progress.configured} de {progress.total} etapas registradas
               </p>
               <div
@@ -122,11 +121,11 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
                 aria-valuemax={progress.total}
                 aria-valuenow={progress.configured}
                 aria-label="Etapas registradas"
-                className="h-3 w-full border-[2px] border-[var(--color-ink)] bg-[var(--color-paper)]"
+                className="hub-progress"
               >
-                <div className="h-full bg-[var(--color-mint)]" style={{ width: `${percent}%` }} />
+                <span style={{ width: `${percent}%` }} />
               </div>
-              <p className="text-sm text-[var(--color-ink-soft)]">
+              <p className="hub-muted text-sm leading-6">
                 {live
                   ? "Depois de mudar uma configuração, verifique novamente. Itens marcados para verificar na live só se confirmam com um teste real."
                   : "Escolha suas primeiras indicações e compartilhe com seu público. A divulgação do endereço fica por sua conta."}
@@ -135,20 +134,20 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
 
             <ol className="grid gap-3">
               {setup.steps.map((step, index) => (
-                <li key={step.id} className="grid min-w-0 gap-2 border-[2px] border-[var(--color-ink)] p-4">
+                <li key={step.id} className="hub-well grid min-w-0 gap-2 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-black">
+                    <h3 className="font-semibold">
                       {index + 1}. {step.title}
                     </h3>
-                    <span className={`badge-brutal px-2 py-0.5 text-[10px] text-[var(--color-ink)] ${stepTones[step.state]}`}>
+                    <span className={`hub-chip ${stepTones[step.state]}`}>
                       {step.state === "verify" && !live ? "Por sua conta" : stepLabels[step.state]}
                     </span>
                   </div>
-                  <p className="break-words text-sm leading-6">{step.detail}</p>
+                  <p className="hub-muted break-words text-sm leading-6">{step.detail}</p>
                   {step.href ? (
                     <Link
                       href={step.href}
-                      className="inline-flex items-center gap-1 justify-self-start text-sm font-bold underline decoration-2 underline-offset-4"
+                      className="hub-link justify-self-start text-sm"
                     >
                       {step.link}
                       <ArrowRight className="size-4" aria-hidden="true" />

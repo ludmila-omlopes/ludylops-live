@@ -101,7 +101,7 @@ export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string
   return (
     <form onSubmit={handleSubmit} className="grid gap-5">
       <label className="grid gap-2">
-        <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">Nome do criador</span>
+        <span className="text-sm font-semibold text-[var(--color-ink)]">Nome do criador</span>
         <Input
           value={displayName}
           onChange={(event) => {
@@ -115,7 +115,7 @@ export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string
       </label>
 
       <label className="grid gap-2">
-        <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">Endereço</span>
+        <span className="text-sm font-semibold text-[var(--color-ink)]">Endereço</span>
         <div className="grid gap-2">
           <Input
             value={slug}
@@ -137,7 +137,7 @@ export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2">
-          <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">Cor principal</span>
+          <span className="text-sm font-semibold text-[var(--color-ink)]">Cor principal</span>
           <Input
             type="color"
             value={primaryColor}
@@ -152,7 +152,7 @@ export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string
         </label>
 
         <label className="grid gap-2">
-          <span className="text-xs font-black uppercase tracking-[0.14em] text-[var(--color-ink)]">Cor de destaque</span>
+          <span className="text-sm font-semibold text-[var(--color-ink)]">Cor de destaque</span>
           <Input
             type="color"
             value={accentColor}
@@ -167,9 +167,9 @@ export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string
         </label>
       </div>
 
-      <div className="overflow-hidden border-[3px] border-[var(--color-ink)]" aria-label="Amostra das cores">
+      <div className="overflow-hidden rounded-[18px] border-[3px] border-[var(--color-ink)]" aria-label="Amostra das cores">
         <div
-          className="break-words p-5 text-2xl font-black uppercase"
+          className="break-words p-5 text-2xl font-bold tracking-[-0.02em]"
           style={{ backgroundColor: previewPrimary, color: creatorColorInk(previewPrimary), fontFamily: "var(--font-display)" }}
         >
           {displayName.trim() || "Sua comunidade"}

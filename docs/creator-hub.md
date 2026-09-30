@@ -4,8 +4,9 @@ Creator Hub é o nome provisório da plataforma. O mesmo projeto da Vercel atend
 
 | Endereço | Comportamento |
 | --- | --- |
-| `https://ludylops-youtube-dashboard.vercel.app/` | Entrada do Creator Hub, reescrita para `/criar-area` |
-| `<plataforma>/criar-area` | Criação e configuração das comunidades do usuário |
+| `https://ludylops-youtube-dashboard.vercel.app/` | Entrada do Creator Hub, reescrita para `/inicio` |
+| `<plataforma>/inicio` | Página inicial do Creator Hub, no grupo de rotas `(hub)`, com cabeçalho e rodapé próprios (fora do layout do builder); quem já tem comunidade vai para `/comunidades` |
+| `<plataforma>/criar-area` | Login, pedido de acesso ao beta e criação da primeira comunidade |
 | `<plataforma>/owner` | Administração das comunidades pelo proprietário da plataforma |
 | `<plataforma>/c/<slug>` | Comunidade selecionada explicitamente |
 | `https://ludylops.live/` | Comunidade Ludylops e suas rotas existentes |

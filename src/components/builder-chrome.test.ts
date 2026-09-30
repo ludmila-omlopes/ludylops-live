@@ -11,6 +11,7 @@ vi.mock("@/components/auth-buttons", () => ({
 }));
 vi.mock("@/components/theme-toggle", () => ({
   ThemeToggle: () => React.createElement("span", null, "theme"),
+  useThemeMode: () => ({ theme: "light", toggle: () => undefined }),
 }));
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, ...props }: Record<string, unknown>) =>
@@ -36,6 +37,7 @@ describe("BuilderChrome", () => {
       React.createElement(BuilderChromeForTest, { isPlatformOwner: false }, "child"),
     );
 
+    expect(markup).toContain('href="/inicio"');
     expect(markup).toContain('href="/criar-area"');
     expect(markup).toContain("Criar área");
     expect(markup).toContain("Creator Hub");

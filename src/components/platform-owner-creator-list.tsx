@@ -173,7 +173,7 @@ export function PlatformOwnerCreatorList({
   }
 
   return (
-    <section className="landing-plane landing-divider bg-[var(--color-paper-pink)] py-6 sm:py-8">
+    <section className="py-6 sm:py-8">
       <div className="mx-auto grid w-full max-w-[1500px] gap-5 px-4 sm:px-6 lg:px-10">
         <div className="panel surface-section p-5">
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">

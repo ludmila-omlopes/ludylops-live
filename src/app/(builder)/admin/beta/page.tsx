@@ -9,8 +9,8 @@ export default async function BetaAdminPage() {
   await requireAdminSession();
   const settings = await getCreatorAreaAccessSettings();
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
-      <h1 className="mb-6 text-4xl uppercase" style={{ fontFamily: "var(--font-display)" }}>Acesso ao beta</h1>
+    <div className="hub-page grid max-w-5xl gap-8">
+      <h1 className="hub-h1">Acesso ao beta</h1>
       <AdminCreatorAreaAccessPanel initialSettings={settings} />
     </div>
   );

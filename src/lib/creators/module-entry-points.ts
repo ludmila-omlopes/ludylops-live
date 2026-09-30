@@ -110,6 +110,7 @@ export const aggregatePages = {
 
 export const sharedPages = {
   "/admin/beta": "General-admin beta requests and allowlist management, independent of live tenant",
+  "/inicio": "Platform home; lists only the viewer's own communities to redirect owners",
   "/criar-area": "Creator provisioning",
   "/comunidades": "Owner-scoped community list; setup summaries reuse owner-verified loaders",
   "/comunidades/nova": "Creator provisioning for approved beta accounts",

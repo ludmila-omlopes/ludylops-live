@@ -35,7 +35,8 @@ function subscribe(onStoreChange: () => void) {
   };
 }
 
-export function ThemeToggle({ initialTheme = null }: { initialTheme?: ThemeMode | null }) {
+/** Current theme plus a toggle, shared by every theme switch in the app. */
+export function useThemeMode(initialTheme: ThemeMode | null = null) {
   const theme = useSyncExternalStore(
     subscribe,
     getPreferredTheme,
@@ -46,12 +47,17 @@ export function ThemeToggle({ initialTheme = null }: { initialTheme?: ThemeMode 
     applyTheme(theme);
   }, [theme]);
 
-  function handleToggle() {
+  function toggle() {
     const nextTheme = theme === "dark" ? "light" : "dark";
     persistTheme(nextTheme);
     window.dispatchEvent(new Event(themeChangeEvent));
   }
 
+  return { theme, toggle };
+}
+
+export function ThemeToggle({ initialTheme = null }: { initialTheme?: ThemeMode | null }) {
+  const { theme, toggle: handleToggle } = useThemeMode(initialTheme);
   const isDark = theme === "dark";
 
   return (
