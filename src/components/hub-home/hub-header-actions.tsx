@@ -13,7 +13,7 @@ import styles from "./hub-home.module.css";
 const AFTER_SIGN_IN = "/criar-area";
 
 export function HubHeaderActions({ initialTheme, createHref }: { initialTheme: ThemeMode | null; createHref: string }) {
-  const { theme, toggle } = useThemeMode(initialTheme);
+  const { theme, toggle } = useThemeMode(initialTheme, { followSystem: true });
   const isDark = theme === "dark";
 
   async function handleSignIn() {
@@ -41,7 +41,7 @@ export function HubHeaderActions({ initialTheme, createHref }: { initialTheme: T
         Entrar
       </button>
       <Link href={createHref} className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}>
-        Criar minha comunidade
+        Criar comunidade
       </Link>
     </div>
   );

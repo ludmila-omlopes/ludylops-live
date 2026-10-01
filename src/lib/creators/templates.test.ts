@@ -4,6 +4,7 @@ import { creatorTemplateFrom, creatorTemplateSchema, withCreatorTemplate } from 
 
 describe("creator templates", () => {
   it("reads the stored template", () => {
+    expect(creatorTemplateFrom({ template: "estudio" })).toBe("estudio");
     expect(creatorTemplateFrom({ template: "palco" })).toBe("palco");
     expect(creatorTemplateFrom({ template: "neobrutalista" })).toBe("neobrutalista");
   });

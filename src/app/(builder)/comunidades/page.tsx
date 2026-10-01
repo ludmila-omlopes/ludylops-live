@@ -47,7 +47,7 @@ function CommunityCard({ community }: { community: OwnedCommunityCard }) {
       <div className="-mt-7 grid flex-1 content-start gap-5 px-6 pb-6">
         <span
           aria-hidden="true"
-          className="grid size-14 place-items-center rounded-full text-xl font-bold shadow-[0_0_0_4px_var(--hub-surface)]"
+          className="grid size-14 place-items-center rounded-[14px] text-xl font-semibold shadow-[0_0_0_4px_var(--hub-surface)]"
           style={{ background: primary, color: creatorColorInk(primary) }}
         >
           {Array.from(community.displayName)[0]?.toUpperCase()}

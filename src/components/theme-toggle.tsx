@@ -35,8 +35,10 @@ function subscribe(onStoreChange: () => void) {
   };
 }
 
-/** Current theme plus a toggle, shared by every theme switch in the app. */
-export function useThemeMode(initialTheme: ThemeMode | null = null) {
+/** Current theme plus a toggle, shared by every theme switch in the app.
+ * With followSystem, a visitor without a saved choice keeps the system theme: the
+ * light fallback used while hydrating is never written to the page. */
+export function useThemeMode(initialTheme: ThemeMode | null = null, { followSystem = false } = {}) {
   const theme = useSyncExternalStore(
     subscribe,
     getPreferredTheme,
@@ -44,8 +46,9 @@ export function useThemeMode(initialTheme: ThemeMode | null = null) {
   );
 
   useEffect(() => {
+    if (followSystem && theme !== getPreferredTheme()) return;
     applyTheme(theme);
-  }, [theme]);
+  }, [theme, followSystem]);
 
   function toggle() {
     const nextTheme = theme === "dark" ? "light" : "dark";

@@ -22,7 +22,37 @@ export default async function CreatorAreaPage({ params }: { params: Promise<{ cr
   const heading = live ? "Entre uma live e outra." : "Para conhecer de perto.";
   const emptyText = live ? "Até o próximo encontro na live." : "Novas indicações em breve.";
 
-  if (creatorTemplateFrom(tenant.branding.themeJson) === "palco") {
+  const template = creatorTemplateFrom(tenant.branding.themeJson);
+
+  if (template === "estudio") {
+    return <div className="flex w-full flex-col">
+      <header className="estudio-hero">
+        <div aria-hidden="true" className="estudio-grid" />
+        <div className="estudio-wrap estudio-hero-in">
+          <div aria-hidden="true" className="estudio-avatar">{initial}</div>
+          <h1 className="estudio-title">{tenant.creator.displayName}</h1>
+          <p className="estudio-lede">{tagline}</p>
+          <span className="estudio-meta">/c/{tenant.creator.slug}</span>
+        </div>
+      </header>
+      <section className="estudio-sec">
+        <div className="estudio-wrap grid gap-8 lg:grid-cols-[0.7fr_1.3fr] lg:gap-16">
+          <h2 className="estudio-h2">{heading}</h2>
+          {links.length ? <nav aria-label="Participar da comunidade" className="estudio-links">
+            {links.map((link) => <Link key={link.href} href={link.href} className="estudio-link">
+              <span className="min-w-0">
+                <span className="block break-words text-lg font-medium tracking-tight sm:text-xl">{link.label}</span>
+                <span className="hub-muted mt-1 block break-words text-sm leading-6">{link.description}</span>
+              </span>
+              <span aria-hidden="true" className="estudio-arrow"><ArrowUpRight className="size-4" /></span>
+            </Link>)}
+          </nav> : <p className="hub-sub">{emptyText}</p>}
+        </div>
+      </section>
+    </div>;
+  }
+
+  if (template === "palco") {
     return <div className="hub-page grid gap-12 sm:gap-16">
       <header className="hub-card palco-hero">
         <div aria-hidden="true" className="palco-avatar">{initial}</div>

@@ -9,7 +9,7 @@ import { adminEmails, isDemoMode, platformOwnerEmails } from "@/lib/env";
 import { isThemeMode, themeCookieKey } from "@/lib/theme";
 import { PLATFORM_NAME } from "@/lib/creators/platform";
 
-import "@/app/palco-theme.css";
+import "@/app/estudio-theme.css";
 
 export const metadata: Metadata = {
   title: { default: PLATFORM_NAME, template: `%s · ${PLATFORM_NAME}` },

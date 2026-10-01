@@ -6,6 +6,7 @@ import { creatorColorInk, safeCreatorColor } from "@/lib/creators/profile";
 import { getCreatorAreaBySlug } from "@/lib/creators/service";
 import { creatorTemplateFrom } from "@/lib/creators/templates";
 
+import "@/app/estudio-theme.css";
 import "@/app/palco-theme.css";
 import "@/app/neobrutal-creator-theme.css";
 
@@ -40,7 +41,7 @@ export default async function CreatorCommunityLayout({
   return (
     <div
       data-creator-template={template}
-      className={template === "palco" ? hubMono.variable : undefined}
+      className={template === "neobrutalista" ? undefined : hubMono.variable}
       style={
         {
           "--creator-primary": primary,

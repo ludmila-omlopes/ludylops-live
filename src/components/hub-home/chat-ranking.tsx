@@ -79,7 +79,7 @@ export function ChatRanking() {
 
   return (
     <div ref={flowRef} className={styles.flow} aria-hidden="true">
-      <div className={`${styles.glass} ${styles.pane}`}>
+      <div className={`${styles.card} ${styles.pane}`}>
         <div className={styles.paneHead}>
           <span>Chat da live</span>
           <MessageCircle />
@@ -100,7 +100,7 @@ export function ChatRanking() {
           ))}
         </div>
       </div>
-      <div className={`${styles.glass} ${styles.pane}`}>
+      <div className={`${styles.card} ${styles.pane}`}>
         <div className={styles.paneHead}>
           <span>Ranking do canal</span>
           <Trophy />
@@ -111,7 +111,7 @@ export function ChatRanking() {
               key={person.name}
               layout={!reduce}
               transition={{ type: "spring", stiffness: 260, damping: 30 }}
-              className={`${styles.rk} ${styles.well}`}
+              className={styles.rk}
               ref={(node) => {
                 if (node) rows.current.set(person.name, node);
                 else rows.current.delete(person.name);

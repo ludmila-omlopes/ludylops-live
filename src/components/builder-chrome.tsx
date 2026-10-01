@@ -67,7 +67,7 @@ export function builderNavItems({
 }
 
 function ThemeButton({ initialTheme }: { initialTheme: ThemeMode | null }) {
-  const { theme, toggle } = useThemeMode(initialTheme);
+  const { theme, toggle } = useThemeMode(initialTheme, { followSystem: true });
   const isDark = theme === "dark";
 
   return (
