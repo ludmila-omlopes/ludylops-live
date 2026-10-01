@@ -11,7 +11,7 @@ const request = (data?: unknown, origin = "https://ludylops.live") => new Reques
   method: data ? "PATCH" : "GET", headers: { origin }, ...(data ? { body: JSON.stringify(data) } : {}),
 });
 const context = () => ({ params: Promise.resolve({ id }) });
-const expected = { displayName: "Canal A", primaryColor: "#c7a2e9", accentColor: "#40a9ff" };
+const expected = { displayName: "Canal A", primaryColor: "#c7a2e9", accentColor: "#40a9ff", template: "palco" };
 beforeEach(async () => {
   state.owner = "owner"; state.demo = true; globalThis.__creatorTenantStore = [];
   id = (await createCreatorArea("owner", { displayName: "Canal A" })).creator.id;

@@ -39,7 +39,7 @@ export default async function CreatorProductsPage({ params, searchParams }: {
       : <>
         {!data.items.length && <p className="mt-8">Nenhum produto publicado ainda.</p>}
         <div className="mt-8 grid gap-6 sm:grid-cols-2">
-          {data.items.map((product) => <article key={product.id} className="flex min-w-0 flex-col gap-4 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5">
+          {data.items.map((product) => <article key={product.id} className="hub-card flex min-w-0 flex-col gap-4 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5">
             <h2 className="break-words text-2xl font-black">{product.name}</h2>
             <p className="break-words text-sm">{product.category} · {product.storeLabel}</p>
             {product.imageUrl && <img src={product.imageUrl} alt={product.name} loading="lazy" referrerPolicy="no-referrer" className="aspect-[4/3] w-full object-contain" />}

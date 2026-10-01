@@ -2,6 +2,7 @@ import { z, ZodError } from "zod";
 
 import { DEFAULT_CREATOR_BRANDING } from "@/lib/creators/defaults";
 import { currencyLabelSchema } from "./currency";
+import { creatorTemplateSchema, DEFAULT_NEW_CREATOR_TEMPLATE } from "./templates";
 
 // Client-safe validation and error formatting for the creator-area form.
 // This module must NOT import server-only code (database client, env, node
@@ -20,6 +21,7 @@ export const createCreatorAreaSchema = z.object({
   slug: z.string().trim().max(64, "Use até 64 caracteres.").optional(),
   primaryColor: creatorColorSchema.default(DEFAULT_CREATOR_BRANDING.primaryColor),
   accentColor: creatorColorSchema.default(DEFAULT_CREATOR_BRANDING.accentColor),
+  template: creatorTemplateSchema.default(DEFAULT_NEW_CREATOR_TEMPLATE),
 });
 
 export type CreateCreatorAreaInput = z.infer<typeof createCreatorAreaSchema>;

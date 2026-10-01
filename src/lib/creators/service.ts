@@ -19,6 +19,7 @@ import {
 } from "@/lib/creators/demo-store";
 import { creatorSlugFromInput, isReservedCreatorSlug, normalizeCreatorSlug } from "@/lib/creators/identity";
 import { creatorModuleCatalog, isLiveModuleKey } from "@/lib/creators/modules";
+import { withCreatorTemplate, type CreatorTemplate } from "@/lib/creators/templates";
 import { resolveCreatorFromRequest, resolvePublicCreatorFromRequest, type ResolveCreatorOptions } from "@/lib/creators/tenant";
 import { getDb } from "@/lib/db/client";
 import { creatorBranding, creatorModules, creators } from "@/lib/db/schema";
@@ -86,6 +87,7 @@ function buildDemoTenant(input: {
   slug: string;
   primaryColor: string;
   accentColor: string;
+  template: CreatorTemplate;
   currencyLabel: string;
   liveFeatures: boolean;
 }): CreatorTenantRecord {
@@ -107,6 +109,7 @@ function buildDemoTenant(input: {
       creatorId,
       primaryColor: input.primaryColor,
       accentColor: input.accentColor,
+      themeJson: withCreatorTemplate({}, input.template),
       updatedAt: now,
     },
     domains: [],
@@ -142,6 +145,7 @@ export async function createCreatorArea(
         slug: parsed.slug,
         primaryColor: parsed.primaryColor,
         accentColor: parsed.accentColor,
+        template: parsed.template,
         currencyLabel: parsed.currencyLabel,
         liveFeatures,
       }),
@@ -169,7 +173,7 @@ export async function createCreatorArea(
         fontHeading: DEFAULT_CREATOR_BRANDING.fontHeading,
         fontBody: DEFAULT_CREATOR_BRANDING.fontBody,
         borderRadius: DEFAULT_CREATOR_BRANDING.borderRadius,
-        themeJson: {},
+        themeJson: withCreatorTemplate({}, parsed.template),
       });
 
       await tx.insert(creatorModules).values(
