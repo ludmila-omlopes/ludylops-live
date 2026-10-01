@@ -25,7 +25,7 @@ describe("owner profile", () => {
     expect(tenant.branding).toMatchObject({ logoUrl: "/logo.png", themeJson: { keep: true, template: "neobrutalista" }, fontHeading: snapshot.branding.fontHeading });
   });
   it("starts new communities on the chosen template and reads older ones as neobrutalist", async () => {
-    expect(await getOwnedCreatorProfile("owner", id)).toHaveProperty("template", "palco");
+    expect(await getOwnedCreatorProfile("owner", id)).toHaveProperty("template", "estudio");
     const chosen = await createCreatorArea("owner", { displayName: "Canal Tijolo", template: "neobrutalista" });
     expect(await getOwnedCreatorProfile("owner", chosen.creator.id)).toHaveProperty("template", "neobrutalista");
     globalThis.__creatorTenantStore![0].branding.themeJson = {};

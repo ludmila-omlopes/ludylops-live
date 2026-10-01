@@ -3,17 +3,21 @@ import { z } from "zod";
 // Visual templates for a creator's public community pages. Client-safe: the
 // creation and identity forms import it. The choice lives in
 // creator_branding.theme_json.template, so no schema migration is needed.
-export const CREATOR_TEMPLATES = ["palco", "neobrutalista"] as const;
+export const CREATOR_TEMPLATES = ["estudio", "palco", "neobrutalista"] as const;
 export type CreatorTemplate = (typeof CREATOR_TEMPLATES)[number];
 
 export const creatorTemplateSchema = z.enum(CREATOR_TEMPLATES, { message: "Escolha um template." });
 
-/** Selected by default when a new community is created. */
-export const DEFAULT_NEW_CREATOR_TEMPLATE: CreatorTemplate = "palco";
+/** Selected by default when a new community is created: the Creator Hub look. */
+export const DEFAULT_NEW_CREATOR_TEMPLATE: CreatorTemplate = "estudio";
 /** Communities created before templates existed already look neobrutalist. */
 export const LEGACY_CREATOR_TEMPLATE: CreatorTemplate = "neobrutalista";
 
 export const creatorTemplateOptions: Record<CreatorTemplate, { label: string; description: string }> = {
+  estudio: {
+    label: "Estúdio",
+    description: "Superfícies planas, linhas finas e tipografia precisa, com as suas cores.",
+  },
   palco: {
     label: "Palco",
     description: "Vidro translúcido, cantos arredondados e um brilho suave com as suas cores.",

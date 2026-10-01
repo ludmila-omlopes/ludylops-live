@@ -10,6 +10,23 @@ import { CREATOR_TEMPLATES, creatorTemplateOptions, type CreatorTemplate } from 
 function Preview({ template, name, primary, accent }: { template: CreatorTemplate; name: string; primary: string; accent: string }) {
   const ink = creatorColorInk(primary);
 
+  if (template === "estudio") {
+    const line = "1px solid var(--hub-edge-2, rgb(9 9 11 / 0.09))";
+    return (
+      <div aria-hidden="true" style={{ border: line, borderRadius: 10, background: "var(--hub-surface, #fff)", color: "var(--hub-ink, #09090b)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 14px 12px", fontSize: 17, fontWeight: 500, letterSpacing: "-0.035em", lineHeight: 1.1 }}>
+          <span style={{ width: 18, height: 18, flex: "none", borderRadius: 5, background: primary }} />
+          {name}
+        </div>
+        <div style={{ borderTop: line, padding: 12, display: "flex", justifyContent: "flex-end" }}>
+          <span style={{ background: primary, color: ink, borderRadius: 6, padding: "6px 10px", fontSize: 11, fontWeight: 500 }}>
+            Ver produto
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   if (template === "neobrutalista") {
     return (
       <div aria-hidden="true" style={{ border: "3px solid #111", boxShadow: "4px 4px 0 #111", background: "#fff", color: "#111" }}>
@@ -62,7 +79,7 @@ export function CreatorTemplatePicker({
   return (
     <fieldset className="grid min-w-0 gap-3" disabled={disabled}>
       <legend className="mb-3 text-sm font-semibold">Template da página</legend>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-3">
         {CREATOR_TEMPLATES.map((template) => {
           const option = creatorTemplateOptions[template];
           const selected = value === template;

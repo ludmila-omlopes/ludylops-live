@@ -26,7 +26,8 @@ describe("creator hub home", () => {
     const markup = renderToStaticMarkup(await CreatorHubHomePage());
     expect(mocks.listAreas).not.toHaveBeenCalled();
     expect(markup).toContain('href="/criar-area"');
-    expect(markup).toContain("comunidade</span>.");
+    expect(markup).toContain("Um ponto de encontro para a sua comunidade.</h1>");
+    expect(markup).toContain("hub-scope");
     for (const id of ["recursos", "pontos", "como-funciona", "perguntas", "comecar"]) {
       expect(markup).toContain(`id="${id}"`);
     }

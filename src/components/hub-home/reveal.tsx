@@ -2,7 +2,9 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
-// Content blocks rise into place the first time they enter the viewport.
+// Content blocks rise into place the first time they enter the viewport. The starting
+// state is the same on the server and the client (reduced motion is only known in the
+// browser); with reduced motion the block simply appears.
 export function Reveal({
   as = "div",
   children,
@@ -20,10 +22,10 @@ export function Reveal({
   return (
     <Component
       className={className}
-      initial={reduce ? false : { opacity: 0, y: 28 }}
+      initial={{ opacity: 0, y: 28 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
-      transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
+      transition={reduce ? { duration: 0 } : { duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
     >
       {children}
     </Component>

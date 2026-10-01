@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 // What a new community gets today; live features are installed separately.
 const INCLUDED: { title: string; body: string; icon: LucideIcon }[] = [
   { title: "Endereço próprio", body: "Um link curto para a bio, a descrição dos vídeos e o chat.", icon: Globe },
-  { title: "Seu visual, suas cores", body: "Escolha entre dois templates e use as cores do seu canal.", icon: Palette },
+  { title: "Seu visual, suas cores", body: "Escolha entre três templates e use as cores do seu canal.", icon: Palette },
   { title: "Links de afiliado", body: "Os produtos que você usa, com o seu link e o motivo de cada indicação.", icon: Link2 },
 ];
 

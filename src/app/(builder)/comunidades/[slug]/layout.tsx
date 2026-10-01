@@ -32,12 +32,12 @@ export default async function CommunityLayout({
           <div className="flex flex-wrap items-center gap-4">
             <span
               aria-hidden="true"
-              className="grid size-12 place-items-center rounded-full text-lg font-bold"
+              className="grid size-12 place-items-center rounded-xl text-lg font-semibold"
               style={{ background: primary, color: creatorColorInk(primary) }}
             >
               {Array.from(community.displayName)[0]?.toUpperCase()}
             </span>
-            <p className="min-w-0 break-words text-3xl font-bold tracking-[-0.04em] sm:text-4xl">{community.displayName}</p>
+            <p className="min-w-0 break-words text-3xl font-medium tracking-[-0.04em] sm:text-4xl">{community.displayName}</p>
             <CommunityStatusBadge status={community.status} />
           </div>
           <a href={community.publicUrl} target="_blank" rel="noreferrer" className="hub-link min-w-0 justify-self-start break-all text-sm">
