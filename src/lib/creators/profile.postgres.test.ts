@@ -40,12 +40,12 @@ describe.skipIf(!url)("community profile on PostgreSQL", () => {
       TRUNCATE creator_branding; INSERT INTO creator_branding (creator_id,logo_url,theme_json) VALUES ('a','/keep.png','{"keep":true}'),('b',null,'{}');`);
   });
   afterAll(async () => { if (pool) await pool.end(); if (admin) { await admin.query(`DROP SCHEMA ${namespace} CASCADE`); await admin.end(); } });
-  it("persists name/colors atomically without changing domains, ownership, modules or balances", async () => {
-    const expected = await read();
-    const profile = { displayName: "Corações na live", primaryColor: "#102030", accentColor: "#ffaa00" };
+  it("persists name/colors/template atomically without changing domains, ownership, modules or balances", async () => {
+    const expected = await read(); expect(expected.template).toBe("neobrutalista");
+    const profile = { displayName: "Corações na live", primaryColor: "#102030", accentColor: "#ffaa00", template: "palco" as const };
     expect(await updateOwnedCreatorProfile("owner-a", "a", { expected, profile })).toEqual(profile); expect(await read()).toEqual(profile);
     expect((await pool.query("SELECT slug,owner_user_id,status FROM creators WHERE id='a'")).rows[0]).toEqual({ slug: "canal-a", owner_user_id: "owner-a", status: "active" });
-    expect((await pool.query("SELECT logo_url,theme_json FROM creator_branding WHERE creator_id='a'")).rows[0]).toEqual({ logo_url: "/keep.png", theme_json: { keep: true } });
+    expect((await pool.query("SELECT logo_url,theme_json FROM creator_branding WHERE creator_id='a'")).rows[0]).toEqual({ logo_url: "/keep.png", theme_json: { keep: true, template: "palco" } });
     expect((await pool.query("SELECT * FROM creator_balances ORDER BY creator_id")).rows).toEqual([{ creator_id: "a", current_balance: 150 }, { creator_id: "b", current_balance: 42 }]);
     expect((await pool.query("SELECT config_json FROM creator_modules")).rows[0].config_json.currencyLabel).toBe("cristais");
     expect((await pool.query("SELECT hostname FROM creator_domains WHERE creator_id='a'")).rows[0].hostname).toBe("canal-a.ludylops.live");

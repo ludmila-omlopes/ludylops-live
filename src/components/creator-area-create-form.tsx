@@ -3,6 +3,7 @@
 import { ExternalLink, Plus } from "lucide-react";
 import { useState, useTransition } from "react";
 
+import { CreatorTemplatePicker } from "@/components/creator-template-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,9 +13,9 @@ import {
 } from "@/lib/creators/area-form";
 import { creatorSlugFromInput } from "@/lib/creators/identity";
 import { communityDashboardPath } from "@/lib/creators/owner-dashboard";
-import { creatorColorInk, safeCreatorColor } from "@/lib/creators/profile";
+import { DEFAULT_NEW_CREATOR_TEMPLATE, type CreatorTemplate } from "@/lib/creators/templates";
 
-type FieldErrors = Partial<Record<"displayName" | "slug" | "currencyLabel" | "primaryColor" | "accentColor", string>>;
+type FieldErrors = Partial<Record<"displayName" | "slug" | "currencyLabel" | "primaryColor" | "accentColor" | "template", string>>;
 
 type CreatorAreaResponse = {
   ok?: boolean;
@@ -31,12 +32,11 @@ export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string
   const [slug, setSlug] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#c7a2e9");
   const [accentColor, setAccentColor] = useState("#40a9ff");
+  const [template, setTemplate] = useState<CreatorTemplate>(DEFAULT_NEW_CREATOR_TEMPLATE);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isPending, startTransition] = useTransition();
   const previewSlug = creatorSlugFromInput({ slug, displayName }) ?? "";
-  const previewPrimary = safeCreatorColor(primaryColor, "#c7a2e9");
-  const previewAccent = safeCreatorColor(accentColor, "#40a9ff");
 
   function clearFieldError(field: keyof FieldErrors) {
     setFieldErrors((current) => {
@@ -62,6 +62,7 @@ export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string
       slug: slug || undefined,
       primaryColor,
       accentColor,
+      template,
     };
     const parsed = createCreatorAreaSchema.safeParse(draft);
 
@@ -167,15 +168,18 @@ export function CreatorAreaCreateForm({ addressPrefix }: { addressPrefix: string
         </label>
       </div>
 
-      <div className="overflow-hidden rounded-[18px] border-[3px] border-[var(--color-ink)]" aria-label="Amostra das cores">
-        <div
-          className="break-words p-5 text-2xl font-bold tracking-[-0.02em]"
-          style={{ backgroundColor: previewPrimary, color: creatorColorInk(previewPrimary), fontFamily: "var(--font-display)" }}
-        >
-          {displayName.trim() || "Sua comunidade"}
-        </div>
-        <div className="h-3" style={{ backgroundColor: previewAccent }} />
-      </div>
+      <CreatorTemplatePicker
+        name="creator-template"
+        value={template}
+        onChange={(next) => {
+          setTemplate(next);
+          clearFieldError("template");
+        }}
+        displayName={displayName}
+        primaryColor={primaryColor}
+        accentColor={accentColor}
+      />
+      {renderFieldError("template")}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={isPending} variant="accent">

@@ -5,6 +5,7 @@ import { isDemoMode } from "@/lib/env";
 import { DEFAULT_CREATOR_BRANDING, DEFAULT_CREATOR_ID } from "./defaults";
 import { listDemoCreatorTenants } from "./demo-store";
 import { creatorProfileUpdateSchema, profileMatches, type CreatorProfile } from "./profile";
+import { creatorTemplateFrom, withCreatorTemplate } from "./templates";
 
 export class CreatorProfileAccessError extends Error {}
 export class CreatorProfileConflictError extends Error {}
@@ -17,8 +18,9 @@ function demoTenant(ownerId: string, creatorId: string) {
   if (!tenant) throw new CreatorProfileAccessError();
   return tenant;
 }
-function project(displayName: string, branding: { primaryColor: string; accentColor: string } = DEFAULT_CREATOR_BRANDING): CreatorProfile {
-  return { displayName, primaryColor: branding.primaryColor, accentColor: branding.accentColor };
+type ProfileBranding = { primaryColor: string; accentColor: string; themeJson: Record<string, unknown> };
+function project(displayName: string, branding: ProfileBranding = DEFAULT_CREATOR_BRANDING): CreatorProfile {
+  return { displayName, primaryColor: branding.primaryColor, accentColor: branding.accentColor, template: creatorTemplateFrom(branding.themeJson) };
 }
 function database() {
   const db = getDb();
@@ -30,14 +32,15 @@ async function lockedProfile(tx: Tx, ownerId: string, creatorId: string, writing
     .where(and(eq(creators.id, creatorId), eq(creators.ownerUserId, ownerId), eq(creators.status, "active")))
     .for(writing ? "update" : "share");
   if (!creator) throw new CreatorProfileAccessError();
-  const [branding] = await tx.select({ primaryColor: creatorBranding.primaryColor, accentColor: creatorBranding.accentColor })
+  const [row] = await tx.select({ primaryColor: creatorBranding.primaryColor, accentColor: creatorBranding.accentColor, themeJson: creatorBranding.themeJson })
     .from(creatorBranding).where(eq(creatorBranding.creatorId, creatorId)).for(writing ? "update" : "share");
-  return project(creator.displayName, branding);
+  const branding = row ? { ...row, themeJson: (row.themeJson ?? {}) as Record<string, unknown> } : undefined;
+  return { profile: project(creator.displayName, branding), themeJson: branding?.themeJson ?? {} };
 }
 export async function getOwnedCreatorProfile(ownerId: string, creatorId: string) {
   identity(ownerId, creatorId);
   if (isDemoMode) { const t = demoTenant(ownerId, creatorId); return project(t.creator.displayName, t.branding); }
-  return database().transaction((tx) => lockedProfile(tx, ownerId, creatorId, false));
+  return database().transaction(async (tx) => (await lockedProfile(tx, ownerId, creatorId, false)).profile);
 }
 /** Owner identity comes from the session. Only presentation fields may change. */
 export async function updateOwnedCreatorProfile(ownerId: string, creatorId: string, input: unknown) {
@@ -49,16 +52,17 @@ export async function updateOwnedCreatorProfile(ownerId: string, creatorId: stri
     if (!profileMatches(current, expected) && !profileMatches(current, profile)) throw new CreatorProfileConflictError();
     const updatedAt = new Date().toISOString();
     t.creator = { ...t.creator, displayName: profile.displayName, updatedAt };
-    t.branding = { ...t.branding, primaryColor: profile.primaryColor, accentColor: profile.accentColor, updatedAt };
+    t.branding = { ...t.branding, primaryColor: profile.primaryColor, accentColor: profile.accentColor, themeJson: withCreatorTemplate(t.branding.themeJson, profile.template), updatedAt };
     return profile;
   }
   return database().transaction(async (tx) => {
-    const current = await lockedProfile(tx, ownerId, creatorId, true);
+    const { profile: current, themeJson } = await lockedProfile(tx, ownerId, creatorId, true);
     if (!profileMatches(current, expected) && !profileMatches(current, profile)) throw new CreatorProfileConflictError();
     const updatedAt = new Date();
+    const nextTheme = withCreatorTemplate(themeJson, profile.template);
     await tx.update(creators).set({ displayName: profile.displayName, updatedAt }).where(eq(creators.id, creatorId));
-    await tx.insert(creatorBranding).values({ creatorId, primaryColor: profile.primaryColor, accentColor: profile.accentColor, updatedAt })
-      .onConflictDoUpdate({ target: creatorBranding.creatorId, set: { primaryColor: profile.primaryColor, accentColor: profile.accentColor, updatedAt } });
+    await tx.insert(creatorBranding).values({ creatorId, primaryColor: profile.primaryColor, accentColor: profile.accentColor, themeJson: nextTheme, updatedAt })
+      .onConflictDoUpdate({ target: creatorBranding.creatorId, set: { primaryColor: profile.primaryColor, accentColor: profile.accentColor, themeJson: nextTheme, updatedAt } });
     return profile;
   });
 }

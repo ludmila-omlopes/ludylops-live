@@ -13,16 +13,23 @@ beforeEach(async () => {
   id = (await createCreatorArea("owner", { displayName: "Canal Cristal", currencyLabel: "cristais" }, { liveFeatures: true })).creator.id;
 });
 describe("owner profile", () => {
-  it("updates only name/colors and preserves slug, owner, domains, modules and other branding", async () => {
+  it("updates only name/colors/template and preserves slug, owner, domains, modules and other branding", async () => {
     const tenant = globalThis.__creatorTenantStore![0];
     tenant.branding.themeJson = { keep: true }; tenant.branding.logoUrl = "/logo.png";
     const snapshot = structuredClone(tenant);
     const expected = await getOwnedCreatorProfile("owner", id);
-    const profile = { displayName: "Comunidade Coração", primaryColor: "#102030", accentColor: "#ffcc88" };
+    const profile = { displayName: "Comunidade Coração", primaryColor: "#102030", accentColor: "#ffcc88", template: "neobrutalista" as const };
     expect(await updateOwnedCreatorProfile("owner", id, { profile, expected })).toEqual(profile);
     expect(tenant.creator).toMatchObject({ id, slug: snapshot.creator.slug, ownerUserId: "owner", displayName: profile.displayName, status: "active" });
     expect(tenant.modules).toEqual(snapshot.modules); expect(tenant.domains).toEqual(snapshot.domains);
-    expect(tenant.branding).toMatchObject({ logoUrl: "/logo.png", themeJson: { keep: true }, fontHeading: snapshot.branding.fontHeading });
+    expect(tenant.branding).toMatchObject({ logoUrl: "/logo.png", themeJson: { keep: true, template: "neobrutalista" }, fontHeading: snapshot.branding.fontHeading });
+  });
+  it("starts new communities on the chosen template and reads older ones as neobrutalist", async () => {
+    expect(await getOwnedCreatorProfile("owner", id)).toHaveProperty("template", "palco");
+    const chosen = await createCreatorArea("owner", { displayName: "Canal Tijolo", template: "neobrutalista" });
+    expect(await getOwnedCreatorProfile("owner", chosen.creator.id)).toHaveProperty("template", "neobrutalista");
+    globalThis.__creatorTenantStore![0].branding.themeJson = {};
+    expect(await getOwnedCreatorProfile("owner", id)).toHaveProperty("template", "neobrutalista");
   });
   it("rejects stale edits and safely accepts a retried save", async () => {
     const expected = await getOwnedCreatorProfile("owner", id);
@@ -39,10 +46,11 @@ describe("owner profile", () => {
     for (const status of ["disabled", "archived"] as const) { tenant.creator.status = status; await expect(getOwnedCreatorProfile("owner", id)).rejects.toBeInstanceOf(CreatorProfileAccessError); }
   });
   it("rejects arbitrary CSS, extra fields and unavailable production storage", async () => {
-    const valid = { displayName: "Nome", primaryColor: "#123456", accentColor: "#ffffff" };
+    const valid = { displayName: "Nome", primaryColor: "#123456", accentColor: "#ffffff", template: "palco" as const };
     for (const primaryColor of ["red", "url(https://evil.test)", "#fff", "#000000;display:none"]) expect(creatorProfileSchema.safeParse({ ...valid, primaryColor }).success).toBe(false);
     expect(creatorProfileSchema.safeParse({ ...valid, slug: "hijacked" }).success).toBe(false);
     expect(creatorProfileSchema.safeParse({ ...valid, displayName: " ".repeat(5) }).success).toBe(false);
+    expect(creatorProfileSchema.safeParse({ ...valid, template: "glass" }).success).toBe(false);
     state.demo = false;
     await expect(getOwnedCreatorProfile("owner", id)).rejects.toThrow("profile_storage_unavailable");
     await expect(updateOwnedCreatorProfile("owner", id, { expected: valid, profile: valid })).rejects.toThrow("profile_storage_unavailable");

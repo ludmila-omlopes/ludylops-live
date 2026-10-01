@@ -31,6 +31,18 @@ describe("creator public page boundary", () => {
     expect(markup).not.toMatch(/\blive\b|moeda|resgates|ranking/);
   });
 
+  it("renders the chosen template, keeping the same links", async () => {
+    const cozy = { ...defaultCreatorTenant, creator: { ...defaultCreatorTenant.creator, id: "cozy", slug: "cozy" }, modules: defaultCreatorTenant.modules.filter(module => module.moduleKey === "product_recommendations") };
+    mocks.getArea.mockResolvedValue({ ...cozy, branding: { ...cozy.branding, themeJson: { template: "palco" } } });
+    const palco = renderToStaticMarkup(await CreatorAreaPage({ params: Promise.resolve({ creatorSlug: "cozy" }) }));
+    expect(palco).toContain("palco-hero");
+    expect(palco).toContain('href="/c/cozy/produtinhos"');
+    mocks.getArea.mockResolvedValue({ ...cozy, branding: { ...cozy.branding, themeJson: {} } });
+    const neobrutal = renderToStaticMarkup(await CreatorAreaPage({ params: Promise.resolve({ creatorSlug: "cozy" }) }));
+    expect(neobrutal).not.toContain("palco-hero");
+    expect(neobrutal).toContain('href="/c/cozy/produtinhos"');
+  });
+
   it("opens the Ludylops community on its own domain after public resolution", async () => {
     mocks.getArea.mockResolvedValue(defaultCreatorTenant);
     await expect(CreatorAreaPage({ params: Promise.resolve({ creatorSlug: "ludylops" }) })).rejects.toThrow("NEXT_REDIRECT;https://ludylops.live");

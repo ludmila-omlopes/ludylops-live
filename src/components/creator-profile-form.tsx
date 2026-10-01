@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CreatorTemplatePicker } from "@/components/creator-template-picker";
 import { ownerPanelClass, ownerPanelTitleClass } from "@/components/ui/owner-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { creatorColorInk, creatorProfileSchema, safeCreatorColor, type CreatorProfile } from "@/lib/creators/profile";
+import { creatorProfileSchema, safeCreatorColor, type CreatorProfile } from "@/lib/creators/profile";
+import { LEGACY_CREATOR_TEMPLATE, type CreatorTemplate } from "@/lib/creators/templates";
 
 export function CreatorProfileForm({ creatorId, initial }: { creatorId: string; initial?: CreatorProfile }) {
   const router = useRouter();
@@ -13,13 +15,13 @@ export function CreatorProfileForm({ creatorId, initial }: { creatorId: string; 
   const [open, setOpen] = useState(embedded);
   const [busy, setBusy] = useState(false);
   const [expected, setExpected] = useState<CreatorProfile | null>(initial ?? null);
-  const [draft, setDraft] = useState<CreatorProfile>(initial ?? { displayName: "", primaryColor: "#c7a2e9", accentColor: "#40a9ff" });
+  const [draft, setDraft] = useState<CreatorProfile>(initial ?? { displayName: "", primaryColor: "#c7a2e9", accentColor: "#40a9ff", template: LEGACY_CREATOR_TEMPLATE });
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const endpoint = `/api/me/creator-area/${encodeURIComponent(creatorId)}/profile`;
   async function receive(response: Response) {
     const payload = await response.json();
-    if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Não foi possível salvar o nome e as cores.");
+    if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Não foi possível salvar a identidade.");
     return creatorProfileSchema.parse(payload.data);
   }
   async function load() {
@@ -28,8 +30,11 @@ export function CreatorProfileForm({ creatorId, initial }: { creatorId: string; 
     catch (e) { setError(e instanceof Error ? e.message : "Não foi possível consultar os dados."); }
     finally { setBusy(false); }
   }
-  function change(key: keyof CreatorProfile, value: string) {
+  function change(key: "displayName" | "primaryColor" | "accentColor", value: string) {
     setDraft((profile) => ({ ...profile, [key]: value })); setSaved(false);
+  }
+  function changeTemplate(template: CreatorTemplate) {
+    setDraft((profile) => ({ ...profile, template })); setSaved(false);
   }
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(null); setSaved(false);
@@ -43,14 +48,12 @@ export function CreatorProfileForm({ creatorId, initial }: { creatorId: string; 
     } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível salvar os dados."); }
     finally { setBusy(false); }
   }
-  const primary = safeCreatorColor(draft.primaryColor, "#c7a2e9");
-  const accent = safeCreatorColor(draft.accentColor, "#40a9ff");
   return <div className={embedded ? "" : "mt-3"}>
     {!embedded && <Button type="button" variant="neutral" aria-expanded={open} disabled={busy} onClick={() => open ? setOpen(false) : void load()}>
-      {open ? "Fechar nome e cores" : "Editar nome e cores"}
+      {open ? "Fechar identidade" : "Editar identidade"}
     </Button>}
     {open && <form onSubmit={save} className={`${embedded ? "" : "mt-3 "}${ownerPanelClass}`}>
-      <h2 className={ownerPanelTitleClass}>Nome e cores da comunidade</h2>
+      <h2 className={ownerPanelTitleClass}>Nome, cores e template</h2>
       <fieldset disabled={busy || !expected} className="grid min-w-0 gap-4">
         <label className="grid gap-2 text-sm font-bold">Nome do criador
           <Input value={draft.displayName} onChange={(e) => change("displayName", e.target.value)} required minLength={2} maxLength={80} />
@@ -64,14 +67,12 @@ export function CreatorProfileForm({ creatorId, initial }: { creatorId: string; 
           </div>
         </div>)}
       </fieldset>
-      {expected && <div className="overflow-hidden border-2 border-[var(--color-ink)]" aria-label="Amostra das cores">
-        <div className="break-words p-5 text-2xl font-black" style={{ backgroundColor: primary, color: creatorColorInk(primary) }}>{draft.displayName || "Sua comunidade"}</div>
-        <div className="h-3" style={{ backgroundColor: accent }} />
-      </div>}
+      <CreatorTemplatePicker name={`${creatorId}-template`} value={draft.template} onChange={changeTemplate}
+        displayName={draft.displayName} primaryColor={draft.primaryColor} accentColor={draft.accentColor} disabled={busy || !expected} />
       {error && <p role="alert" className="text-sm">{error}</p>}
-      {saved && <p role="status" className="text-sm">Nome e cores salvos.</p>}
+      {saved && <p role="status" className="text-sm">Identidade salva.</p>}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={busy || !expected}>{busy ? "Aguarde..." : "Salvar nome e cores"}</Button>
+        <Button type="submit" disabled={busy || !expected}>{busy ? "Aguarde..." : "Salvar identidade"}</Button>
         <Button type="button" variant="neutral" disabled={busy} onClick={() => void load()}>Recarregar dados</Button>
       </div>
     </form>}

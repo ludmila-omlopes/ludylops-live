@@ -32,7 +32,20 @@ Em 25/09/2026, o retorno adicional foi salvo no cliente de produção, preservan
 
 ### Comunidades novas começam com indicações de produtos
 
-A criação padrão instala apenas `product_recommendations`. O formulário pede nome, endereço e cores; não pede moeda nem configura integração. A página pública apresenta as indicações, sem prometer recursos de live.
+A criação padrão instala apenas `product_recommendations`. O formulário pede nome, endereço, cores e template; não pede moeda nem configura integração. A página pública apresenta as indicações, sem prometer recursos de live.
+
+### Templates das comunidades
+
+Cada comunidade escolhe um de dois templates para as páginas em `/c/<slug>`, sempre com as cores principal e de destaque do criador:
+
+| Template | Origem | Arquivo |
+| --- | --- | --- |
+| `palco` | Identidade do Creator Hub: vidro translúcido, cantos arredondados, Geist | `src/app/palco-theme.css` |
+| `neobrutalista` | Identidade da comunidade Ludylops: bordas grossas, sombras duras, títulos em caixa alta | `src/app/neobrutal-creator-theme.css` |
+
+A escolha fica em `creator_branding.theme_json.template`, sem migração de banco. Comunidades novas começam em `palco`; comunidades criadas antes dos templates, sem esse campo, continuam em `neobrutalista`. O proprietário troca o template e as cores em Identidade, com a mesma checagem de edição concorrente do nome e das cores.
+
+O layout de `/c/[creatorSlug]` envolve as páginas em `[data-creator-template]` e define `--creator-primary`, `--creator-accent` e as tintas de contraste (`--creator-*-ink`). O tema Palco é o mesmo do builder: suas cores de acento são variáveis `--palco-*`, preenchidas com o âmbar no Creator Hub e com as cores do criador nas comunidades. A Ludylops não recebe o wrapper e mantém a identidade original.
 
 O roteiro inicial tem três etapas: nome e cores, primeiros produtos e divulgação do endereço. A contagem considera todos os produtos ativos e aprovados da própria comunidade, sem depender da paginação, da moeda ou de credenciais. Rascunhos e itens pendentes de moderação não contam. A divulgação é uma ação manual, portanto não é marcada automaticamente como concluída.
 
@@ -56,5 +69,6 @@ Esta mudança separa identidade, navegação, seleção de comunidade e endereç
 - Raiz local/Vercel abre Creator Hub; domínio Ludylops mantém a comunidade.
 - `/c/<slug>` exige criador ativo; seletores conflitantes e hosts desconhecidos não recorrem à Ludylops.
 - Criação não insere domínio automático e gera link canônico da plataforma.
+- Os dois templates aparecem em `/c/<slug>` com as cores do criador, em tema claro e escuro; trocar o template em Identidade muda a página pública.
 - Testes completos, TypeScript, lint e build devem passar.
 - Confira separadamente a renderização local e o login Google no host real após configurar o retorno e implantar.

@@ -1,17 +1,20 @@
 import { z } from "zod";
 
+import { creatorTemplateSchema } from "./templates";
+
 const color = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "Use uma cor como #c7a2e9.");
 export const creatorProfileSchema = z.object({
   displayName: z.string().trim().min(2, "Informe um nome com pelo menos 2 caracteres.").max(80, "Use até 80 caracteres."),
   primaryColor: color,
   accentColor: color,
+  template: creatorTemplateSchema,
 }).strict();
 export const creatorProfileUpdateSchema = z.object({ profile: creatorProfileSchema, expected: creatorProfileSchema }).strict();
 export type CreatorProfile = z.infer<typeof creatorProfileSchema>;
 
 export function profileMatches(a: CreatorProfile, b: CreatorProfile) {
   return a.displayName === b.displayName && a.primaryColor.toLowerCase() === b.primaryColor.toLowerCase()
-    && a.accentColor.toLowerCase() === b.accentColor.toLowerCase();
+    && a.accentColor.toLowerCase() === b.accentColor.toLowerCase() && a.template === b.template;
 }
 
 /** Legacy/corrupt branding must not become arbitrary CSS. */

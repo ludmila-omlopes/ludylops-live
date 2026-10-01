@@ -1,0 +1,37 @@
+/* Template "Neobrutalista" das comunidades de criadores: a linguagem visual da comunidade
+   Ludylops (bordas grossas, sombras duras, títulos em caixa alta), com as cores do criador no
+   lugar da paleta lilás, rosa e azul da Ludylops. As variáveis --creator-* vêm do layout da
+   comunidade. Os fundos claros misturam a cor do criador com o papel do tema claro ou escuro. */
+
+[data-creator-template="neobrutalista"] {
+  --color-purple: var(--creator-primary);
+  --color-purple-mid: var(--creator-primary);
+  --color-purple-bold: color-mix(in srgb, var(--creator-primary) 70%, #000);
+  --color-pink: var(--creator-accent);
+  --color-pink-hot: color-mix(in srgb, var(--creator-accent) 85%, #000);
+  --color-blue: var(--creator-accent);
+  --color-yellow: var(--creator-accent);
+  --color-accent-ink: var(--creator-primary-ink);
+  --color-accent-ink-soft: var(--creator-primary-ink);
+  --color-lavender: color-mix(in srgb, var(--creator-primary) 14%, var(--color-paper));
+  --color-periwinkle: color-mix(in srgb, var(--creator-primary) 20%, var(--color-paper));
+  --color-lilac: color-mix(in srgb, var(--creator-primary) 8%, var(--color-paper));
+  --color-paper-warm: color-mix(in srgb, var(--creator-primary) 14%, var(--color-paper));
+  --color-paper-pink: color-mix(in srgb, var(--creator-accent) 16%, var(--color-paper));
+  --color-rose: color-mix(in srgb, var(--creator-accent) 22%, var(--color-paper));
+  --color-sky: color-mix(in srgb, var(--creator-accent) 14%, var(--color-paper));
+  --color-window-bar: var(--creator-primary);
+  --color-halftone-dot: color-mix(in srgb, var(--creator-accent) 22%, transparent);
+  --surface-hero: color-mix(in srgb, var(--creator-primary) 14%, var(--color-paper));
+  --surface-card-alt: color-mix(in srgb, var(--creator-primary) 14%, var(--color-paper));
+  --surface-card-accent: color-mix(in srgb, var(--creator-accent) 16%, var(--color-paper));
+  --surface-community-cta: color-mix(in srgb, var(--creator-accent) 14%, var(--color-paper));
+  --grad-header: linear-gradient(135deg, var(--creator-primary), var(--creator-accent));
+  --primary: var(--creator-primary);
+  --ring: var(--creator-primary);
+}
+
+/* Botões na cor de destaque usam a tinta que contrasta com ela. */
+[data-creator-template="neobrutalista"] :is(.accent-button, .btn-brutal[class*="bg-[var(--color-blue)]"], .btn-brutal[class*="bg-[var(--color-pink)]"], .btn-brutal[class*="bg-[var(--color-yellow)]"]) {
+  color: var(--creator-accent-ink);
+}

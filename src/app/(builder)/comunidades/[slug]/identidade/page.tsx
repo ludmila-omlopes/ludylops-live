@@ -24,7 +24,7 @@ export default async function CommunityIdentityPage({ params }: { params: Promis
     <>
       <CommunitySectionHeading
         title="Identidade"
-        description={hasCurrency ? "O nome, as cores e a moeda que sua comunidade encontra durante a live." : "O nome e as cores que seu público vai reconhecer."}
+        description={hasCurrency ? "O nome, as cores, o template da página e a moeda que sua comunidade encontra durante a live." : "O nome, as cores e o template da página que seu público vai ver."}
       />
       <div className="grid gap-6">
         <CreatorProfileForm creatorId={community.id} initial={profile} />
