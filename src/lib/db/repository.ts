@@ -6207,9 +6207,11 @@ export async function listVideoSuggestions(viewerId?: string | null) {
 
   try {
     [suggestionRows, boostRows] = await Promise.all([
-      db.select().from(videoSuggestions).orderBy(desc(videoSuggestions.totalVotes), desc(videoSuggestions.createdAt)),
+      // Community videos live in the same tables; the legacy flow only ever sees Ludylops'.
+      db.select().from(videoSuggestions).where(eq(videoSuggestions.creatorId, DEFAULT_CREATOR_ID))
+        .orderBy(desc(videoSuggestions.totalVotes), desc(videoSuggestions.createdAt)),
       viewerId
-        ? db.select().from(videoSuggestionBoosts).where(eq(videoSuggestionBoosts.viewerId, viewerId))
+        ? db.select().from(videoSuggestionBoosts).where(and(eq(videoSuggestionBoosts.creatorId, DEFAULT_CREATOR_ID), eq(videoSuggestionBoosts.viewerId, viewerId)))
         : Promise.resolve([]),
     ]);
   } catch (error) {
@@ -7632,7 +7634,7 @@ export async function createVideoSuggestion(input: {
     const [existing] = await tx
       .select()
       .from(videoSuggestions)
-      .where(and(eq(videoSuggestions.youtubeVideoId, youtubeVideoId), inArray(videoSuggestions.status, ["open", "accepted"])))
+      .where(and(eq(videoSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(videoSuggestions.youtubeVideoId, youtubeVideoId), inArray(videoSuggestions.status, ["open", "accepted"])))
       .limit(1);
     if (existing) {
       throw new Error("suggestion_already_exists");
@@ -7658,6 +7660,7 @@ export async function createVideoSuggestion(input: {
 
     await tx.insert(videoSuggestions).values({
       id: suggestionId,
+      creatorId: DEFAULT_CREATOR_ID,
       viewerId: input.viewerId,
       youtubeVideoId,
       title,
@@ -7761,7 +7764,7 @@ export async function boostVideoSuggestion(input: {
     const [suggestion] = await tx
       .select()
       .from(videoSuggestions)
-      .where(eq(videoSuggestions.id, input.suggestionId))
+      .where(and(eq(videoSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(videoSuggestions.id, input.suggestionId)))
       .limit(1);
     if (!suggestion) {
       throw new Error("suggestion_not_found");
@@ -7791,6 +7794,7 @@ export async function boostVideoSuggestion(input: {
 
     await tx.insert(videoSuggestionBoosts).values({
       id: randomUUID(),
+      creatorId: DEFAULT_CREATOR_ID,
       suggestionId: input.suggestionId,
       viewerId: input.viewerId,
       amount: input.amount,
@@ -7803,7 +7807,7 @@ export async function boostVideoSuggestion(input: {
         totalVotes: sql`${videoSuggestions.totalVotes} + ${input.amount}`,
         updatedAt: now,
       })
-      .where(eq(videoSuggestions.id, input.suggestionId));
+      .where(and(eq(videoSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(videoSuggestions.id, input.suggestionId)));
 
     await tx.insert(pointLedger).values({
       id: randomUUID(),
@@ -7854,7 +7858,7 @@ export async function updateVideoSuggestionStatus(input: {
         status: input.status,
         updatedAt,
       })
-      .where(eq(videoSuggestions.id, input.suggestionId))
+      .where(and(eq(videoSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(videoSuggestions.id, input.suggestionId)))
       .returning();
   } catch (error) {
     if (input.status !== "reacted") {
@@ -7867,7 +7871,7 @@ export async function updateVideoSuggestionStatus(input: {
         status: "accepted",
         updatedAt,
       })
-      .where(eq(videoSuggestions.id, input.suggestionId))
+      .where(and(eq(videoSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(videoSuggestions.id, input.suggestionId)))
       .returning();
   }
 

@@ -11,7 +11,7 @@ import {
 } from "@/lib/video-suggestions/service";
 
 export async function POST(request: Request) {
-  const moduleDenial = await guardModuleRequest(request, ["video_suggestions"]);
+  const moduleDenial = await guardModuleRequest(request, ["video_suggestions", "points"]);
   if (moduleDenial) return moduleDenial;
 
   if (!isTrustedAppMutationRequest(request)) {

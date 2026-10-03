@@ -1,5 +1,5 @@
 import { DEFAULT_CREATOR_DOMAIN, DEFAULT_CREATOR_MODULES } from "@/lib/creators/defaults";
-import { isLiveModuleKey } from "@/lib/creators/modules";
+import { isInitialModuleKey } from "@/lib/creators/modules";
 import type { CreatorTenantRecord } from "@/lib/types";
 
 declare global {
@@ -42,7 +42,7 @@ export function insertDemoCreatorTenant(tenant: CreatorTenantRecord) {
 }
 
 export function buildDemoCreatorModules(creatorId: string, currencyLabel = "pontos", liveFeatures = false) {
-  return DEFAULT_CREATOR_MODULES.filter((module) => liveFeatures || !isLiveModuleKey(module.moduleKey)).map((module) => ({
+  return DEFAULT_CREATOR_MODULES.filter((module) => liveFeatures || isInitialModuleKey(module.moduleKey)).map((module) => ({
     ...module,
     id: `${creatorId}_${module.moduleKey}`.slice(0, 64),
     creatorId,

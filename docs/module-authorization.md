@@ -42,7 +42,7 @@ interrompe a validação.
 | Apostas | `/apostas`, resumo inicial, admin | apostas e operações por aposta | `/obs/bets`, comando de aposta (exige Streamer.bot) | Ludylops |
 | Produtos | `/produtinhos`, admin | recomendações | — | Ludylops |
 | Jogos | `/jogos`, admin | sugestões, boosts, busca | sincronização Steam autenticada | Ludylops |
-| Vídeos | `/videos`, admin | sugestões e boosts | — | Ludylops |
+| Vídeos | `/videos` (exige Pontos), admin; `/c/[slug]/videos` e seção Vídeos do dono | sugestões e boosts da Ludylops (exigem Pontos); sugestões e votos por comunidade | — | [Por comunidade](creator-videos.md); legado preso à Ludylops |
 | Criadores indicados | `/indicacoes`, admin | sugestões e boosts | — | Ludylops |
 | Frases | `/quotes`, `/c/[creatorSlug]/quotes`, controle no admin | solicitação de exibição | `/obs/quotes`, comandos de frases | Ler/criar por criador; caminhos pagos/OBS só Ludylops |
 | OBS | overlays, roleta e metas no admin | controle e consultas `/api/obs/*` | bets, likes, quotes, subscribers e wheel | Ludylops |

@@ -64,19 +64,20 @@ describe("owner profile", () => {
 describe("usable community home links", () => {
   it("uses only isolated routes and the configured currency", () => {
     const links = creatorHomeLinks(globalThis.__creatorTenantStore![0]);
-    expect(links.map((l) => l.href)).toEqual(["/c/canal-cristal/resgates", "/c/canal-cristal/moeda", "/c/canal-cristal/ranking", "/c/canal-cristal/quotes", "/c/canal-cristal/produtinhos"]);
+    expect(links.map((l) => l.href)).toEqual(["/c/canal-cristal/resgates", "/c/canal-cristal/moeda", "/c/canal-cristal/ranking", "/c/canal-cristal/quotes", "/c/canal-cristal/produtinhos", "/c/canal-cristal/videos"]);
     expect(links[0].description).toContain("cristais");
   });
   it("hides economy links while production activation is off", () => {
     state.demo = false; state.env.CREATOR_ECONOMY_ENABLED = "false";
-    expect(creatorHomeLinks(globalThis.__creatorTenantStore![0]).map((l) => l.href)).toEqual(["/c/canal-cristal/quotes", "/c/canal-cristal/produtinhos"]);
+    expect(creatorHomeLinks(globalThis.__creatorTenantStore![0]).map((l) => l.href)).toEqual(["/c/canal-cristal/quotes", "/c/canal-cristal/produtinhos", "/c/canal-cristal/videos"]);
   });
   it("respects dependencies and inactive communities", () => {
     const tenant = globalThis.__creatorTenantStore![0];
     tenant.modules.find((m) => m.moduleKey === "streamerbot")!.status = "disabled";
-    expect(creatorHomeLinks(tenant)).toHaveLength(3);
+    expect(creatorHomeLinks(tenant)).toHaveLength(4);
     tenant.modules.find((m) => m.moduleKey === "points")!.status = "disabled";
-    expect(creatorHomeLinks(tenant).map((l) => l.href)).toEqual(["/c/canal-cristal/produtinhos"]);
+    // Videos run on free votes, so they stay without the currency.
+    expect(creatorHomeLinks(tenant).map((l) => l.href)).toEqual(["/c/canal-cristal/produtinhos", "/c/canal-cristal/videos"]);
     tenant.modules.forEach((m) => { m.status = "installed"; }); tenant.creator.status = "archived";
     expect(creatorHomeLinks(tenant)).toEqual([]);
   });

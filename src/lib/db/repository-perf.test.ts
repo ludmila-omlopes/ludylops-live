@@ -19,6 +19,7 @@ import {
   streamerbotCounters, users,
 } from "@/lib/db/schema";
 import { getLeaderboard, listGameSuggestions, listAdminGameSuggestions, listVideoSuggestions } from "./repository";
+import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 
 const date = new Date("2020-01-01T00:00:00Z");
 function suggestion(id: string, totalVotes = 100) {
@@ -41,6 +42,7 @@ function suggestionsDb(rows = [suggestion("one"), suggestion("two", 90), suggest
     boost("d", "missing", 999), boost("e", "one", 1000, "viewer-b"),
   ];
   const boostConditions: ReturnType<PgDialect["sqlToQuery"]>[] = [];
+  const suggestionConditions: ReturnType<PgDialect["sqlToQuery"]>[] = [];
   const returning = vi.fn(async (): Promise<Record<string, unknown>[]> => []);
   const update = vi.fn(() => ({ set: () => ({ where: () => ({ returning }) }) }));
   const db = {
@@ -48,13 +50,16 @@ function suggestionsDb(rows = [suggestion("one"), suggestion("two", 90), suggest
     select: () => ({
       from(table: unknown) {
         if (table === gameSuggestions || table === videoSuggestions) {
-          return { orderBy: async () => rows };
+          return { orderBy: async () => rows, where: (condition: SQL) => {
+            suggestionConditions.push(new PgDialect().sqlToQuery(condition));
+            return { orderBy: async () => rows };
+          } };
         }
         if (table === gameSuggestionBoosts || table === videoSuggestionBoosts) {
           return { where: async (condition: SQL) => {
             const query = new PgDialect().sqlToQuery(condition);
             boostConditions.push(query);
-            return boosts.filter((row) => row.viewerId === query.params[0]);
+            return boosts.filter((row) => row.viewerId === query.params.at(-1));
           } };
         }
         if (table === users) return { where: async () => [] };
@@ -66,7 +71,7 @@ function suggestionsDb(rows = [suggestion("one"), suggestion("two", 90), suggest
     }),
   };
   getDbMock.mockReturnValue(db);
-  return { update, returning, boostConditions };
+  return { update, returning, boostConditions, suggestionConditions };
 }
 
 beforeEach(() => {
@@ -127,10 +132,18 @@ describe("suggestion reads", () => {
       { id: "one", viewerBoostTotal: 24 }, { id: "two", viewerBoostTotal: 7 }, { id: "empty", viewerBoostTotal: 0 },
     ]);
     expect(boostConditions[0].sql).toContain('"viewer_id"');
-    expect(boostConditions[0].params).toEqual(["viewer-a"]);
+    expect(boostConditions[0].params.at(-1)).toBe("viewer-a");
     expect((await read("viewer-b"))[0].viewerBoostTotal).toBe(1000);
     expect((await read()).every((entry) => entry.viewerBoostTotal === 0)).toBe(true);
     expect(boostConditions).toHaveLength(2);
+  });
+
+  it("reads only Ludylops' videos, never community suggestions or votes", async () => {
+    const { boostConditions, suggestionConditions } = suggestionsDb();
+    await listVideoSuggestions("viewer-a");
+    expect(suggestionConditions[0].sql).toContain('"creator_id"');
+    expect(suggestionConditions[0].params).toEqual([DEFAULT_CREATOR_ID]);
+    expect(boostConditions[0].params).toEqual([DEFAULT_CREATOR_ID, "viewer-a"]);
   });
 
   it.each([undefined, "viewer-a"])("uses saved HLTB data for viewer %s with no external calls or writes", async (viewerId) => {
