@@ -35,6 +35,7 @@ export function communityDashboardPath(slug: string) {
 export type CommunitySectionKey =
   | "overview"
   | "identidade"
+  | "modulos"
   | "economia"
   | "resgates"
   | "frases"
@@ -45,6 +46,7 @@ export type CommunitySectionKey =
 export const communitySectionLabels: Record<CommunitySectionKey, string> = {
   overview: "Visão geral",
   identidade: "Identidade",
+  modulos: "Módulos",
   economia: "Economia",
   resgates: "Resgates",
   frases: "Frases",

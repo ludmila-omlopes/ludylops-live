@@ -74,7 +74,7 @@ export const sharedApiGroups = {
   "/api/auth": "Global authentication",
   "/api/owner":
     "Platform-owner recovery and configuration; existing role checks remain mandatory",
-  "/api/me/creator-area": "Builder provisioning, owner-verified currency configuration and isolated economy adjustments",
+  "/api/me/creator-area": "Builder provisioning, owner-verified currency configuration, page module choices and isolated economy adjustments",
   "/api/me/creator-area-access": "Authenticated beta requests and own access status, independent of live modules",
   "/api/admin/creator-area-access": "Platform beta access configuration",
   "/api/admin/periodic-messages": "Admin-only legacy streamer configuration; active creator and installed/disabled Streamer.bot module verified in storage",
@@ -117,6 +117,7 @@ export const sharedPages = {
   "/comunidades/[slug]":
     "Owner-resolved community management; each control keeps its own owner and module checks",
   "/comunidades/[slug]/identidade": "Owner-verified name, colors and currency label",
+  "/comunidades/[slug]/modulos": "Owner-chosen page modules; only self-service modules install, the rest are recorded as requested",
   "/comunidades/[slug]/economia": "Owner-verified chat rewards and isolated balance adjustments",
   "/comunidades/[slug]/resgates": "Owner-scoped catalog, redemptions and integration recovery",
   "/comunidades/[slug]/frases": "Owner quote management for isolated quotes",

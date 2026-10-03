@@ -171,7 +171,7 @@ export async function authorizeStreamerbotOperation(
       events: ["points", "streamerbot"],
       link: ["points", "streamerbot"],
       points: ["points", "streamerbot"],
-      "bets.place": ["bets"],
+      "bets.place": ["bets", "streamerbot"],
       counters: ["streamerbot"],
       deaths: ["streamerbot"],
       "quotes.legacy": ["quotes"],

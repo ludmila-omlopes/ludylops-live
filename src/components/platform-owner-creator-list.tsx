@@ -42,6 +42,7 @@ const moduleStatusLabels: Record<CreatorModuleStatus | "missing", string> = {
   installed: "Habilitado",
   disabled: "Desabilitado",
   archived: "Arquivado",
+  requested: "Escolhido pelo criador",
   missing: "Não instalado",
 };
 

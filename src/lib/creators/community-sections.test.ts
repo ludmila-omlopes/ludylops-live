@@ -10,9 +10,14 @@ function tenant(status: string, modules = allInstalled) {
 }
 
 describe("community sections", () => {
-  it("limits a page-only community to overview, identity and products", () => {
+  it("limits a page-only community to overview, identity, modules and products", () => {
     expect(availableCommunitySections(tenant("active", [{ moduleKey: "product_recommendations", status: "installed" }]), "canal").map(section => section.key))
-      .toEqual(["overview", "identidade", "produtos"]);
+      .toEqual(["overview", "identidade", "modulos", "produtos"]);
+  });
+
+  it("never opens a requested module's section", () => {
+    expect(availableCommunitySections(tenant("active", [{ moduleKey: "product_recommendations", status: "requested" }]), "canal").map(section => section.key))
+      .toEqual(["overview", "identidade", "modulos"]);
   });
 
   it.each(["disabled", "archived"])("hides integration when Streamer.bot is %s", (status) => {
@@ -24,6 +29,7 @@ describe("community sections", () => {
     expect(availableCommunitySections(tenant("active"), "canal").map((section) => [section.key, section.href])).toEqual([
       ["overview", "/comunidades/canal"],
       ["identidade", "/comunidades/canal/identidade"],
+      ["modulos", "/comunidades/canal/modulos"],
       ["economia", "/comunidades/canal/economia"],
       ["resgates", "/comunidades/canal/resgates"],
       ["frases", "/comunidades/canal/frases"],
