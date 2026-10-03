@@ -100,8 +100,10 @@ describe("module dependency policy", () => {
       const plan = planModuleTransition(catalog, rows, "streamerbot", status);
       expect(plan.allowed).toBe(false);
       expect(plan.blocking).toEqual(
-        expect.arrayContaining(["quotes", "redemptions", "bets"]),
+        expect.arrayContaining(["quotes", "redemptions"]),
       );
+      // Bets run on the community page; only the chat command needs Streamer.bot.
+      expect(plan.blocking).not.toContain("bets");
     },
   );
   it("permits leaf removal and ordered dependency repair", () => {

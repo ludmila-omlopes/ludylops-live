@@ -93,7 +93,9 @@ export type CreatorStatus =
 export type CreatorModuleStatus =
   | "installed"
   | "disabled"
-  | "archived";
+  | "archived"
+  /** Chosen by the creator, waiting for its community version; never available. */
+  | "requested";
 
 export interface CreatorRecord {
   id: string;

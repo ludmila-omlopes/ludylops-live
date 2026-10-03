@@ -11,6 +11,7 @@ type SectionTenant = Parameters<typeof modulesAreAvailable>[0];
 const sectionOrder: CommunitySectionKey[] = [
   "overview",
   "identidade",
+  "modulos",
   "economia",
   "resgates",
   "frases",
@@ -31,6 +32,7 @@ export function isCommunitySectionAvailable(tenant: SectionTenant, section: Comm
       // Keep revocation available for inactive communities with an installed integration.
       return getModuleAvailability(tenant?.modules ?? [], "streamerbot").available;
     case "identidade":
+    case "modulos":
       return tenant?.creator.status === "active";
     case "economia":
       return modulesAreAvailable(tenant, ["points"]);

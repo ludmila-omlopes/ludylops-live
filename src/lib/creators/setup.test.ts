@@ -8,13 +8,38 @@ describe("creator setup evidence", () => {
     const pageFacts = { ...facts, modules: [{ moduleKey: "product_recommendations", status: "installed", configJson: {} }], products: { published: 0 } };
     const setup = buildCreatorSetup(pageFacts);
     expect(setup.live).toBe(false);
-    expect(setup.steps.map(step => [step.id, step.state])).toEqual([["profile", "configured"], ["products", "pending"], ["share", "verify"]]);
+    expect(setup.steps.map(step => [step.id, step.state])).toEqual([["profile", "configured"], ["modules", "pending"], ["products", "pending"], ["share", "verify"]]);
+    expect(setup.steps[1]).toMatchObject({ href: "/comunidades/canal-a/modulos", link: "Escolher módulos" });
     expect(buildCreatorSetup({ ...pageFacts, products: { published: 2 } }).steps.find(step => step.id === "products")?.state).toBe("configured");
     for (const status of ["disabled", "archived"]) {
       const inactive = buildCreatorSetup({ ...pageFacts, creator: { ...facts.creator, status } });
       expect(inactive.steps.every(step => step.state === "blocked" && !step.href)).toBe(true);
     }
     expect(buildCreatorSetup({ ...pageFacts, products: null }).steps.find(step => step.id === "products")?.state).toBe("blocked");
+  });
+
+  it("waits for the creator's own module choice and follows it", () => {
+    const chosenAt = "2026-10-03T12:00:00.000Z";
+    const created = buildCreatorSetup({ ...facts, modules: [{ moduleKey: "product_recommendations", status: "installed", configJson: {} }], products: { published: 0 } });
+    expect(created.steps.find(step => step.id === "modules")?.state).toBe("pending");
+
+    const chosen = buildCreatorSetup({ ...facts, products: { published: 0 }, modules: [
+      { moduleKey: "product_recommendations", status: "installed", configJson: { chosenAt } },
+      { moduleKey: "game_suggestions", status: "requested", configJson: { chosenAt } },
+      { moduleKey: "points", status: "requested", configJson: { currencyLabel: "pontos", chosenAt } },
+    ] });
+    expect(chosen.live).toBe(false);
+    expect(chosen.steps.find(step => step.id === "modules")).toMatchObject({
+      state: "configured",
+      detail: "Ativos agora: Produtos indicados. Em breve: Sugestões de jogos e Moeda da comunidade.",
+    });
+
+    const withoutProducts = buildCreatorSetup({ ...facts, products: null, modules: [{ moduleKey: "video_suggestions", status: "requested", configJson: { chosenAt } }] });
+    expect(withoutProducts.steps.map(step => step.id)).toEqual(["profile", "modules", "share"]);
+    expect(withoutProducts.steps[1].detail).toBe("Em breve: Vídeos para reagir.");
+
+    const disabledByPlatform = buildCreatorSetup({ ...facts, products: null, modules: [{ moduleKey: "product_recommendations", status: "disabled", configJson: { chosenAt } }] });
+    expect(disabledByPlatform.steps.map(step => [step.id, step.state])).toEqual([["profile", "configured"], ["modules", "pending"], ["products", "blocked"], ["share", "verify"]]);
   });
 
   it("switches the checklist with the installed live modules", () => {

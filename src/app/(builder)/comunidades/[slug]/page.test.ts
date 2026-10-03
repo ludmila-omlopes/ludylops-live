@@ -68,6 +68,8 @@ describe("community overview", () => {
     mocks.setup.mockResolvedValue(buildCreatorSetup({ creator: community, modules: pageModules, economyEnabled: false, credentials: null, catalog: null, products: { published: 2 } }));
     const markup = renderToStaticMarkup(await CommunityOverviewPage({ params: Promise.resolve({ slug: community.slug }) }));
     expect(markup).toContain("Primeiros passos");
+    expect(markup).toContain("Módulos da página");
+    expect(markup).toContain('href="/comunidades/canal-da-mari/modulos"');
     expect(markup).toContain("Primeiros produtos");
     expect(markup).toContain("Divulgue o endereço");
     expect(markup).not.toMatch(/Streamer\.bot|Moeda|primeira live|Verificar na live/);

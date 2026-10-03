@@ -110,7 +110,7 @@ describe("owner dashboard loaders", () => {
     const [card] = await listOwnedCommunityCards("viewer_1");
 
     expect(card.currencyLabel).toBeNull();
-    expect(card.setup).toMatchObject({ total: 3, configured: 1, authenticated: false, live: false });
+    expect(card.setup).toMatchObject({ total: 4, configured: 1, authenticated: false, live: false });
     expect(card.setup!.configured).toBeLessThanOrEqual(card.setup!.total);
   });
 

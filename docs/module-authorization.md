@@ -39,7 +39,7 @@ interrompe a validação.
 | Pontos | `/me`, preços, airdrop, vínculos | saldo, viewer individual, ajustes | eventos, link, pontos; likes/inscritos com OBS | Ludylops |
 | Ranking | `/ranking`, ranking no admin | `/api/leaderboard`, `/api/viewers` | — | Ludylops |
 | Resgates | `/me`, catálogo, fila e status da bridge | catálogo, resgates, dashboard completo | todos os handlers assinados da bridge | Ludylops |
-| Apostas | `/apostas`, resumo inicial, admin | apostas e operações por aposta | `/obs/bets`, comando de aposta | Ludylops |
+| Apostas | `/apostas`, resumo inicial, admin | apostas e operações por aposta | `/obs/bets`, comando de aposta (exige Streamer.bot) | Ludylops |
 | Produtos | `/produtinhos`, admin | recomendações | — | Ludylops |
 | Jogos | `/jogos`, admin | sugestões, boosts, busca | sincronização Steam autenticada | Ludylops |
 | Vídeos | `/videos`, admin | sugestões e boosts | — | Ludylops |
@@ -71,7 +71,16 @@ Essas exceções não concedem acesso aos dados operacionais dos módulos.
 
 Ativar exige dependências válidas. Desativar ou arquivar exige que todos os
 dependentes instalados, inclusive transitivos, já tenham sido desativados.
-Nenhuma dependência é ativada ou desativada automaticamente.
+Nenhuma dependência é ativada ou desativada automaticamente pelo `/owner`.
+
+Apostas dependem só de Pontos: o público aposta pela página. O comando de aposta
+no chat exige, além de Apostas, o Streamer.bot instalado.
+
+O status `requested` vem da escolha do próprio criador em Módulos
+([Creator Hub](creator-hub.md#módulos-escolhidos-pelo-criador)) e nunca torna um
+módulo disponível. Essa escolha inclui as dependências e só instala os módulos
+que funcionam sem live; ela não altera instalações da administração nem módulos
+`disabled` ou `archived`.
 
 Por exemplo, para desativar OBS, desative primeiro frases. Para ativar frases em
 uma comunidade sem instalações, ative pontos, Streamer.bot e OBS antes de frases.

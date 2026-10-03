@@ -35,6 +35,7 @@ const creatorStatuses = [
   "disabled",
   "archived",
 ] as const satisfies readonly CreatorStatus[];
+// Statuses the platform console sets. `requested` only comes from the creator's own module choice.
 const creatorModuleStatuses = [
   "installed",
   "disabled",
@@ -166,8 +167,8 @@ export function isCreatorStatus(value: string): value is CreatorStatus {
 
 export function isCreatorModuleStatus(
   value: string,
-): value is CreatorModuleStatus {
-  return creatorModuleStatuses.includes(value as CreatorModuleStatus);
+): value is (typeof creatorModuleStatuses)[number] {
+  return (creatorModuleStatuses as readonly string[]).includes(value);
 }
 
 export async function listPlatformCreatorInstances(): Promise<

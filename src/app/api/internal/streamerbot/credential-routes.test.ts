@@ -104,6 +104,12 @@ describe("credential rollout at every Streamer.bot handler", () => {
     for (const legacy of [true, false]) expect((await handler(request(path, legacy, payload))).status).toBe(403);
     expect(state.effect).not.toHaveBeenCalled();
   });
+  it("keeps the chat bet command behind Streamer.bot now that bets run on the community page", async () => {
+    setCreator(DEFAULT_CREATOR_ID);
+    defaultCreatorTenant.modules = originalDefaultModules.map(row => ({ ...row, status: row.moduleKey === "streamerbot" ? "disabled" : row.status }));
+    for (const legacy of [true, false]) expect((await bets(request("bets/place", legacy))).status).toBe(403);
+    expect(state.effect).not.toHaveBeenCalled();
+  });
   it("denies scoped quote actions when a transitive dependency is missing", async () => {
     listDemoCreatorTenants()[0].modules = listDemoCreatorTenants()[0].modules.filter(row => row.moduleKey !== "streamerbot");
     expect((await quotes(request("quotes", false, JSON.stringify({ action: "get", source: "streamerbot_chat" })))).status).toBe(403);

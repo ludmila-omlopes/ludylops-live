@@ -128,7 +128,7 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
               <p className="hub-muted text-sm leading-6">
                 {live
                   ? "Depois de mudar uma configuração, verifique novamente. Itens marcados para verificar na live só se confirmam com um teste real."
-                  : "Escolha suas primeiras indicações e compartilhe com seu público. A divulgação do endereço fica por sua conta."}
+                  : "Escolha o que seu público vai encontrar e compartilhe com ele. A divulgação do endereço fica por sua conta."}
               </p>
             </div>
 

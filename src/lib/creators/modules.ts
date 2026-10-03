@@ -68,7 +68,8 @@ export const creatorModuleCatalog = [
     publicRoutes: ["/apostas"],
     adminPanels: ["apostas-live"],
     obsRoutes: ["/obs/bets"],
-    requiredCapabilities: ["points", "streamerbot"],
+    // The audience bets on the community page; the chat command adds Streamer.bot on its own.
+    requiredCapabilities: ["points"],
     defaultConfig: {
       minBet: 10,
       maxOptions: 6,

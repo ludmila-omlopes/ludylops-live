@@ -54,7 +54,7 @@ A página inicial (`/inicio`) e as áreas internas (builder) usam o tema Estúdi
 
 Os botões de tema do Creator Hub usam `useThemeMode(…, { followSystem: true })`: sem uma escolha salva, a página segue o tema do sistema. A Ludylops continua com o comportamento anterior.
 
-O roteiro inicial tem três etapas: nome e cores, primeiros produtos e divulgação do endereço. A contagem considera todos os produtos ativos e aprovados da própria comunidade, sem depender da paginação, da moeda ou de credenciais. Rascunhos e itens pendentes de moderação não contam. A divulgação é uma ação manual, portanto não é marcada automaticamente como concluída.
+O roteiro inicial tem quatro etapas: nome e cores, módulos da página, primeiros produtos e divulgação do endereço. A etapa de produtos some quando o criador deixa Produtos indicados fora da escolha. A contagem considera todos os produtos ativos e aprovados da própria comunidade, sem depender da paginação, da moeda ou de credenciais. Rascunhos e itens pendentes de moderação não contam. A divulgação é uma ação manual, portanto não é marcada automaticamente como concluída.
 
 Sem módulos de live instalados, a lista e a visão geral não mostram moeda ou Streamer.bot. Identidade só oferece a edição de moeda quando Pontos está disponível. Integração exige Streamer.bot instalado; acessos diretos sem esse módulo voltam à visão geral. Comunidades desativadas que ainda têm Streamer.bot instalado mantêm acesso à revogação de credenciais.
 
@@ -62,9 +62,26 @@ Não há migração nem alteração dos módulos das comunidades existentes, inc
 
 O serviço interno aceita `createCreatorArea(ownerId, input, { liveFeatures: true })` para instalar o pacote de live explicitamente. Essa opção não é aceita como autorização no corpo da requisição pública de criação. É um ponto de extensão para o futuro plano de streamer; esta entrega não implementa cobrança ou assinatura.
 
+### Módulos escolhidos pelo criador
+
+Em **Módulos** (`/comunidades/<slug>/modulos`), o criador escolhe o que entra na comunidade: produtos indicados, sugestões de jogos, vídeos para reagir, inspirações, apostas, moeda e ranking. OBS, Streamer.bot e os módulos que dependem deles (resgates e frases) continuam só no `/owner`.
+
+| Módulo | Ao escolher |
+| --- | --- |
+| Produtos indicados | Instalado na hora (`installed`); desmarcar remove a instalação, sem apagar os produtos |
+| Demais módulos | Registrados como `requested`, com o rótulo “Em breve”, até existir a versão por comunidade |
+
+- Escolher um módulo inclui suas dependências: jogos, vídeos, inspirações, apostas e ranking levam junto a moeda.
+- `requested` nunca conta como disponível: rotas, APIs e navegação continuam bloqueadas como para um módulo ausente.
+- O criador não altera módulos instalados pela administração nem os que estão `disabled` ou `archived`. No `/owner`, os pedidos aparecem como “Escolhido pelo criador” e podem ser instalados pelos controles existentes.
+- A etapa “Módulos da página” só conta como registrada depois que o criador salva uma escolha: cada linha escolhida recebe `config_json.chosenAt`. Os produtos instalados na criação não contam.
+- Quando a versão por comunidade de um módulo existir, as linhas `requested` dele podem passar para `installed`. Salvar de novo a escolha também faz essa troca para os módulos que o criador ativa sozinho.
+
+Sem migração de banco: `creator_modules.status` já é texto, e `requested` reaproveita a mesma linha e o mesmo bloqueio da linha do criador usados pelo `/owner`.
+
 ### Próximos trabalhos
 
-- Sugestões de jogos por comunidade: hoje o fluxo é global da Ludylops e depende da moeda. Antes de implementar, decidir como funcionarão nas contas sem live, incluindo a possibilidade de sugestões sem boost.
+- Versões por comunidade de jogos, vídeos, inspirações e apostas, para ativar os pedidos `requested`. Hoje esses fluxos são globais da Ludylops e dependem da moeda. Antes de implementar, decidir como funcionarão nas contas sem live, incluindo a possibilidade de sugestões sem boost.
 - Corrigir `npm run smoke:auth`: o script pode aceitar um redirecionamento de erro de configuração como sucesso. O comportamento também foi observado com a versão anterior do Auth.js; o conserto exige distinguir o redirecionamento ao provedor de um erro.
 
 ### Separação entre plataforma e operação legada
