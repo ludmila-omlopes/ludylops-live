@@ -29,7 +29,8 @@ describe("community module choices", () => {
   });
 
   it("lets only page modules turn on alone", () => {
-    expect(MODULE_CHOICE_KEYS.filter(isSelfServiceModule)).toEqual(["product_recommendations"]);
+    expect(MODULE_CHOICE_KEYS.filter(isSelfServiceModule)).toEqual(["product_recommendations", "video_suggestions"]);
+    expect(moduleChoiceRequirements("video_suggestions")).toEqual([]);
   });
 
   it("describes a new community: products off until chosen, the rest coming soon", () => {
@@ -67,8 +68,8 @@ describe("community module choices", () => {
     const platform = rows({ product_recommendations: "disabled", points: "installed", ranking: "installed", bets: "archived" });
     expect(planModuleChoices(platform, ["product_recommendations", "bets"])).toEqual({ install: [], request: [], remove: [], keep: [] });
     expect(planModuleChoices(platform, [])).toEqual({ install: [], request: [], remove: [], keep: [] });
-    // The legacy seed is fully installed: only products are the creator's to remove.
-    expect(planModuleChoices(DEFAULT_CREATOR_MODULES, [])).toEqual({ install: [], request: [], remove: ["product_recommendations"], keep: [] });
+    // The legacy seed is fully installed: only the self-service modules are the creator's to remove.
+    expect(planModuleChoices(DEFAULT_CREATOR_MODULES, [])).toEqual({ install: [], request: [], remove: ["product_recommendations", "video_suggestions"], keep: [] });
   });
 
   // Today only products turn on alone; these guard the next modules that will.

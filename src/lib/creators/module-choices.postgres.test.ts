@@ -92,7 +92,8 @@ describe.skipIf(!url)("community module choices on PostgreSQL", () => {
     await Promise.all(choices.map((modules) => updateOwnedModuleChoices("owner-a", "a", { modules })));
     expect([
       { game_suggestions: "requested", points: "requested" },
-      { points: "requested", product_recommendations: "installed", video_suggestions: "requested" },
+      // Videos turn on alone and no longer bring the currency along.
+      { product_recommendations: "installed", video_suggestions: "installed" },
     ]).toContainEqual(await statuses());
   });
 

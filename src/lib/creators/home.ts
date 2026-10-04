@@ -20,5 +20,8 @@ export function creatorHomeLinks(tenant: CreatorTenantRecord) {
     links.push({ href: legacy ? "/quotes" : `${prefix}/quotes`, label: "Frases da live", description: "As pérolas e as histórias que ficaram na memória." });
   if (canUseModules(tenant, ["product_recommendations"], legacy ? "legacy" : "recommendations"))
     links.push({ href: legacy ? "/produtinhos" : `${prefix}/produtinhos`, label: "Produtos indicados", description: "Escolhas para o setup, o jogo e o dia a dia." });
+  // Ludylops keeps its own pipetz video page and navigation.
+  if (!legacy && canUseModules(tenant, ["video_suggestions"], "videos"))
+    links.push({ href: `${prefix}/videos`, label: "Vídeos para reagir", description: "Mande um vídeo do YouTube e vote nos próximos da reação." });
   return legacy ? links.map(link => ({ ...link, href: `https://${DEFAULT_CREATOR_DOMAIN}${link.href}` })) : links;
 }

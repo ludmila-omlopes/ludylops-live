@@ -7,10 +7,12 @@ export const modulePages: Record<string, CreatorModuleKey[]> = {
   "/me": ["points", "redemptions"],
   "/contadores": ["streamerbot"],
   "/jogos": ["game_suggestions"],
-  "/videos": ["video_suggestions"],
+  // Ludylops' video flow spends pipetz; community videos only need the module.
+  "/videos": ["video_suggestions", "points"],
   "/indicacoes": ["creator_suggestions"],
   "/produtinhos": ["product_recommendations"],
   "/c/[creatorSlug]/produtinhos": ["product_recommendations"],
+  "/c/[creatorSlug]/videos": ["video_suggestions"],
   "/quotes": ["quotes"],
   "/c/[creatorSlug]/quotes": ["quotes"],
   "/c/[creatorSlug]/moeda": ["points"],
@@ -25,6 +27,7 @@ export const modulePages: Record<string, CreatorModuleKey[]> = {
 
 export const moduleApiGroups: Record<string, CreatorModuleKey[]> = {
   "/api/c/[creatorSlug]/ranking": ["ranking"],
+  "/api/c/[creatorSlug]/videos": ["video_suggestions"],
   "/api/bets": ["bets"],
   "/api/catalog": ["redemptions"],
   "/api/leaderboard": ["ranking"],
@@ -39,7 +42,7 @@ export const moduleApiGroups: Record<string, CreatorModuleKey[]> = {
   "/api/me/redemptions": ["redemptions"],
   "/api/me/bets": ["bets"],
   "/api/me/game-suggestions": ["game_suggestions"],
-  "/api/me/video-suggestions": ["video_suggestions"],
+  "/api/me/video-suggestions": ["video_suggestions", "points"],
   "/api/me/creator-suggestions": ["creator_suggestions"],
   "/api/me/quotes": ["quotes"],
   "/api/admin/bets": ["bets"],
@@ -74,7 +77,7 @@ export const sharedApiGroups = {
   "/api/auth": "Global authentication",
   "/api/owner":
     "Platform-owner recovery and configuration; existing role checks remain mandatory",
-  "/api/me/creator-area": "Builder provisioning, owner-verified currency configuration, page module choices and isolated economy adjustments",
+  "/api/me/creator-area": "Builder provisioning, owner-verified currency configuration, page module choices, video moderation and isolated economy adjustments",
   "/api/me/creator-area-access": "Authenticated beta requests and own access status, independent of live modules",
   "/api/admin/creator-area-access": "Platform beta access configuration",
   "/api/admin/periodic-messages": "Admin-only legacy streamer configuration; active creator and installed/disabled Streamer.bot module verified in storage",
@@ -122,6 +125,7 @@ export const sharedPages = {
   "/comunidades/[slug]/resgates": "Owner-scoped catalog, redemptions and integration recovery",
   "/comunidades/[slug]/frases": "Owner quote management for isolated quotes",
   "/comunidades/[slug]/produtos": "Owner-managed isolated product recommendations",
+  "/comunidades/[slug]/videos": "Owner moderation of the community's own video suggestions",
   "/comunidades/[slug]/mensagens": "Owner-managed periodic chat messages",
   "/comunidades/[slug]/integracao": "Owner Streamer.bot credentials; revocation stays available when inactive",
   "/owner": "Platform-owner configuration and recovery",

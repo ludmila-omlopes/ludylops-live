@@ -68,7 +68,7 @@ Em **Módulos** (`/comunidades/<slug>/modulos`), o criador escolhe o que entra n
 
 | Módulo | Ao escolher |
 | --- | --- |
-| Produtos indicados | Instalado na hora (`installed`); desmarcar remove a instalação, sem apagar os produtos |
+| Produtos indicados e [Vídeos para reagir](creator-videos.md) | Instalados na hora (`installed`); desmarcar remove a instalação, sem apagar os dados |
 | Demais módulos | Registrados como `requested`, com o rótulo “Em breve”, até existir a versão por comunidade |
 
 - Escolher um módulo inclui suas dependências: jogos, vídeos, inspirações, apostas e ranking levam junto a moeda.
@@ -81,7 +81,8 @@ Sem migração de banco: `creator_modules.status` já é texto, e `requested` re
 
 ### Próximos trabalhos
 
-- Versões por comunidade de jogos, vídeos, inspirações e apostas, para ativar os pedidos `requested`. Hoje esses fluxos são globais da Ludylops e dependem da moeda. Antes de implementar, decidir como funcionarão nas contas sem live, incluindo a possibilidade de sugestões sem boost.
+- Versões por comunidade de jogos e inspirações, no mesmo modelo de [Vídeos para reagir](creator-videos.md): votos grátis, com boost opcional na moeda da comunidade. Apostas vêm por último, com a moeda.
+- Boost com a moeda da comunidade nas sugestões, para comunidades com Pontos ativo.
 - Corrigir `npm run smoke:auth`: o script pode aceitar um redirecionamento de erro de configuração como sucesso. O comportamento também foi observado com a versão anterior do Auth.js; o conserto exige distinguir o redirecionamento ao provedor de um erro.
 
 ### Separação entre plataforma e operação legada

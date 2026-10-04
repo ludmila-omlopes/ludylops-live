@@ -99,7 +99,8 @@ export const creatorModuleCatalog = [
     publicRoutes: ["/videos"],
     adminPanels: ["videos"],
     obsRoutes: [],
-    requiredCapabilities: ["points"],
+    // Votes are free. Ludylops' pipetz flows require points on their own routes.
+    requiredCapabilities: [],
     defaultConfig: {},
   },
   {
@@ -146,11 +147,19 @@ export const defaultCreatorModuleKeys = creatorModuleCatalog.map((module) => mod
 validateModuleCatalog(creatorModuleCatalog);
 
 /**
- * A new community starts with its own page only. Live features (currency,
- * Streamer.bot, redemptions, quotes, overlays and the rest) are turned on per
- * community from the platform console, or at creation for a streamer plan.
+ * Modules that serve a community without live features; the creator turns them
+ * on alone. Live features (currency, Streamer.bot, redemptions, quotes, overlays
+ * and the rest) are turned on from the platform console, or at creation for a
+ * streamer plan.
  */
-export const pageModuleKeys: readonly CreatorModuleKey[] = ["product_recommendations"];
+export const pageModuleKeys: readonly CreatorModuleKey[] = ["product_recommendations", "video_suggestions"];
+
+/** A new community starts with products only; the creator adds the rest in Módulos. */
+export const initialModuleKeys: readonly CreatorModuleKey[] = ["product_recommendations"];
+
+export function isInitialModuleKey(moduleKey: string) {
+  return initialModuleKeys.some((key) => key === moduleKey);
+}
 
 export function isLiveModuleKey(moduleKey: string) {
   return !pageModuleKeys.some((key) => key === moduleKey);

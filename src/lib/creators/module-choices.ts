@@ -49,7 +49,7 @@ export const moduleChoiceOptions: Record<ModuleChoiceKey, { label: string; descr
 };
 
 /** Modules that already serve communities other than Ludylops once installed. */
-const communityReadyKeys: readonly ModuleChoiceKey[] = ["product_recommendations", "points", "ranking"];
+const communityReadyKeys: readonly ModuleChoiceKey[] = ["product_recommendations", "video_suggestions", "points", "ranking"];
 
 /** The creator turns these on alone, right away. Choosing any other one records it until its community version exists. */
 export function isSelfServiceModule(key: string) {

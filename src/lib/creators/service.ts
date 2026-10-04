@@ -18,7 +18,7 @@ import {
   insertDemoCreatorTenant,
 } from "@/lib/creators/demo-store";
 import { creatorSlugFromInput, isReservedCreatorSlug, normalizeCreatorSlug } from "@/lib/creators/identity";
-import { creatorModuleCatalog, isLiveModuleKey } from "@/lib/creators/modules";
+import { creatorModuleCatalog, isInitialModuleKey } from "@/lib/creators/modules";
 import { withCreatorTemplate, type CreatorTemplate } from "@/lib/creators/templates";
 import { resolveCreatorFromRequest, resolvePublicCreatorFromRequest, type ResolveCreatorOptions } from "@/lib/creators/tenant";
 import { getDb } from "@/lib/db/client";
@@ -177,7 +177,7 @@ export async function createCreatorArea(
       });
 
       await tx.insert(creatorModules).values(
-        creatorModuleCatalog.filter((module) => liveFeatures || !isLiveModuleKey(module.key)).map((module) => ({
+        creatorModuleCatalog.filter((module) => liveFeatures || isInitialModuleKey(module.key)).map((module) => ({
           id: `creator_module_${randomUUID()}`.slice(0, 64),
           creatorId,
           moduleKey: module.key,

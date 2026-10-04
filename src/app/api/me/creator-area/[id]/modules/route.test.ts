@@ -39,7 +39,7 @@ describe("owner module choices endpoint", () => {
     const { data } = await response.json();
     expect(states(data)).toMatchObject({
       product_recommendations: ["active", true], game_suggestions: ["soon", true], bets: ["soon", true],
-      points: ["soon", true], video_suggestions: ["soon", false], ranking: ["soon", false],
+      points: ["soon", true], video_suggestions: ["off", false], ranking: ["soon", false],
     });
     expect(statuses(a.creator.id)).toEqual({ product_recommendations: "installed", game_suggestions: "requested", bets: "requested", points: "requested" });
     expect(modulesOf(a.creator.id).every((module) => typeof module.configJson.chosenAt === "string")).toBe(true);
@@ -50,17 +50,19 @@ describe("owner module choices endpoint", () => {
     expect(states((await read.json()).data)).toEqual(states(data));
   });
 
-  it("removes what the creator leaves out", async () => {
+  it("turns videos on alone, without the currency, and removes what the creator leaves out", async () => {
     const a = await createCreatorArea("owner-a", { displayName: "Canal A" });
-    await PUT(request(a.creator.id, { modules: ["video_suggestions"] }), context(a.creator.id));
-    expect(statuses(a.creator.id)).toEqual({ video_suggestions: "requested", points: "requested" });
+    await PUT(request(a.creator.id, { modules: ["video_suggestions", "ranking"] }), context(a.creator.id));
+    expect(statuses(a.creator.id)).toEqual({ video_suggestions: "installed", ranking: "requested", points: "requested" });
+    expect(hasLiveModules(modulesOf(a.creator.id))).toBe(false);
     await PUT(request(a.creator.id, { modules: [] }), context(a.creator.id));
     expect(modulesOf(a.creator.id)).toEqual([]);
   });
 
   it("never touches the live modules installed by the platform", async () => {
     const a = await createCreatorArea("owner-a", { displayName: "Canal A" }, { liveFeatures: true });
-    const before = structuredClone(modulesOf(a.creator.id).filter((module) => module.moduleKey !== "product_recommendations"));
+    // Products and videos are the creator's own; everything else stays as the platform installed it.
+    const before = structuredClone(modulesOf(a.creator.id).filter((module) => !["product_recommendations", "video_suggestions"].includes(module.moduleKey)));
     const response = await PUT(request(a.creator.id, { modules: [] }), context(a.creator.id));
     expect(response.status).toBe(200);
     expect(modulesOf(a.creator.id)).toEqual(before);

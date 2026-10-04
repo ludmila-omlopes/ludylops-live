@@ -8,7 +8,7 @@ import {
 } from "@/lib/db/repository";
 
 export default async function VideosPage() {
-  await requireModulePage(["video_suggestions"]);
+  await requireModulePage(["video_suggestions", "points"]);
 
   const session = await auth();
   const activeViewerId = session?.user?.activeViewerId ?? null;
