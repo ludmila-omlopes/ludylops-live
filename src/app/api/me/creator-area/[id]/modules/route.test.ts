@@ -61,8 +61,8 @@ describe("owner module choices endpoint", () => {
 
   it("never touches the live modules installed by the platform", async () => {
     const a = await createCreatorArea("owner-a", { displayName: "Canal A" }, { liveFeatures: true });
-    // Products and videos are the creator's own; everything else stays as the platform installed it.
-    const before = structuredClone(modulesOf(a.creator.id).filter((module) => !["product_recommendations", "video_suggestions"].includes(module.moduleKey)));
+    // Self-service modules are the creator's own; everything else stays as the platform installed it.
+    const before = structuredClone(modulesOf(a.creator.id).filter((module) => !["product_recommendations", "video_suggestions", "creator_suggestions"].includes(module.moduleKey)));
     const response = await PUT(request(a.creator.id, { modules: [] }), context(a.creator.id));
     expect(response.status).toBe(200);
     expect(modulesOf(a.creator.id)).toEqual(before);

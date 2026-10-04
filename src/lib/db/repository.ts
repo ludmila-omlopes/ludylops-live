@@ -6264,18 +6264,20 @@ export async function listCreatorSuggestions(
 
   try {
     [suggestionRows, boostRows] = await Promise.all([
+      // Community inspirations live in the same tables; the legacy flow only ever sees Ludylops'.
       includeFeatured
         ? db
             .select()
             .from(creatorSuggestions)
+            .where(eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID))
             .orderBy(desc(creatorSuggestions.totalVotes), desc(creatorSuggestions.createdAt))
         : db
             .select()
             .from(creatorSuggestions)
-            .where(sql`${creatorSuggestions.status} <> 'featured'`)
+            .where(and(eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID), sql`${creatorSuggestions.status} <> 'featured'`))
             .orderBy(desc(creatorSuggestions.totalVotes), desc(creatorSuggestions.createdAt)),
       viewerId
-        ? db.select().from(creatorSuggestionBoosts).where(eq(creatorSuggestionBoosts.viewerId, viewerId))
+        ? db.select().from(creatorSuggestionBoosts).where(and(eq(creatorSuggestionBoosts.creatorId, DEFAULT_CREATOR_ID), eq(creatorSuggestionBoosts.viewerId, viewerId)))
         : Promise.resolve([]),
     ]);
   } catch (error) {
@@ -6315,7 +6317,7 @@ export async function listFeaturedCreatorSuggestions() {
     suggestionRows = await db
       .select()
       .from(creatorSuggestions)
-      .where(eq(creatorSuggestions.status, "featured"))
+      .where(and(eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(creatorSuggestions.status, "featured")))
       .orderBy(
         desc(creatorSuggestions.totalVotes),
         desc(creatorSuggestions.createdAt),
@@ -6376,11 +6378,11 @@ export async function deleteCreatorSuggestion(suggestionId: string) {
     await db.transaction(async (tx) => {
       await tx
         .delete(creatorSuggestionBoosts)
-        .where(eq(creatorSuggestionBoosts.suggestionId, suggestionId));
+        .where(and(eq(creatorSuggestionBoosts.creatorId, DEFAULT_CREATOR_ID), eq(creatorSuggestionBoosts.suggestionId, suggestionId)));
 
       [deleted] = await tx
         .delete(creatorSuggestions)
-        .where(eq(creatorSuggestions.id, suggestionId))
+        .where(and(eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(creatorSuggestions.id, suggestionId)))
         .returning();
 
       if (!deleted) {
@@ -7134,6 +7136,7 @@ export async function createCreatorSuggestion(input: {
       .from(creatorSuggestions)
       .where(
         and(
+          eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID),
           sql`(${creatorSuggestions.slug} = ${slug} or lower(${creatorSuggestions.channelUrl}) = ${channelUrl.toLowerCase()})`,
           inArray(creatorSuggestions.status, ["open", "accepted"]),
         ),
@@ -7163,6 +7166,7 @@ export async function createCreatorSuggestion(input: {
 
     await tx.insert(creatorSuggestions).values({
       id: suggestionId,
+      creatorId: DEFAULT_CREATOR_ID,
       viewerId: input.viewerId,
       slug,
       name,
@@ -7249,9 +7253,10 @@ export async function createAdminCreatorSuggestion(input: {
     const [existing] = await db
       .select()
       .from(creatorSuggestions)
-      .where(
+      .where(and(
+        eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID),
         sql`(${creatorSuggestions.slug} = ${slug} or lower(${creatorSuggestions.channelUrl}) = ${channelUrl.toLowerCase()})`,
-      )
+      ))
       .limit(1);
     if (existing) {
       throw new Error("suggestion_already_exists");
@@ -7261,6 +7266,7 @@ export async function createAdminCreatorSuggestion(input: {
       .insert(creatorSuggestions)
       .values({
         id: suggestionId,
+        creatorId: DEFAULT_CREATOR_ID,
         viewerId: input.viewerId,
         slug,
         name,
@@ -7359,7 +7365,7 @@ export async function updateAdminCreatorSuggestion(input: {
     const [existing] = await db
       .select()
       .from(creatorSuggestions)
-      .where(eq(creatorSuggestions.id, input.suggestionId))
+      .where(and(eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(creatorSuggestions.id, input.suggestionId)))
       .limit(1);
     if (!existing) {
       throw new Error("suggestion_not_found");
@@ -7370,6 +7376,7 @@ export async function updateAdminCreatorSuggestion(input: {
       .from(creatorSuggestions)
       .where(
         and(
+          eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID),
           sql`(${creatorSuggestions.slug} = ${slug} or lower(${creatorSuggestions.channelUrl}) = ${channelUrl.toLowerCase()})`,
           sql`${creatorSuggestions.id} <> ${input.suggestionId}`,
         ),
@@ -7382,7 +7389,7 @@ export async function updateAdminCreatorSuggestion(input: {
     const [updated] = await db
       .update(creatorSuggestions)
       .set({ name, slug, channelUrl, reason, updatedAt: new Date() })
-      .where(eq(creatorSuggestions.id, input.suggestionId))
+      .where(and(eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(creatorSuggestions.id, input.suggestionId)))
       .returning();
     if (!updated) {
       throw new Error("suggestion_not_found");
@@ -7489,7 +7496,7 @@ export async function boostCreatorSuggestion(input: {
     const [suggestion] = await tx
       .select()
       .from(creatorSuggestions)
-      .where(eq(creatorSuggestions.id, input.suggestionId))
+      .where(and(eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(creatorSuggestions.id, input.suggestionId)))
       .limit(1);
     if (!suggestion) {
       throw new Error("suggestion_not_found");
@@ -7519,6 +7526,7 @@ export async function boostCreatorSuggestion(input: {
 
     await tx.insert(creatorSuggestionBoosts).values({
       id: randomUUID(),
+      creatorId: DEFAULT_CREATOR_ID,
       suggestionId: input.suggestionId,
       viewerId: input.viewerId,
       amount: input.amount,
@@ -7531,7 +7539,7 @@ export async function boostCreatorSuggestion(input: {
         totalVotes: sql`${creatorSuggestions.totalVotes} + ${input.amount}`,
         updatedAt: now,
       })
-      .where(eq(creatorSuggestions.id, input.suggestionId));
+      .where(and(eq(creatorSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(creatorSuggestions.id, input.suggestionId)));
 
     await tx.insert(pointLedger).values({
       id: randomUUID(),

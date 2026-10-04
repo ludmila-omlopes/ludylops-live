@@ -43,7 +43,7 @@ interrompe a validação.
 | Produtos | `/produtinhos`, admin | recomendações | — | Ludylops |
 | Jogos | `/jogos`, admin | sugestões, boosts, busca | sincronização Steam autenticada | Ludylops |
 | Vídeos | `/videos` (exige Pontos), admin; `/c/[slug]/videos` e seção Vídeos do dono | sugestões e boosts da Ludylops (exigem Pontos); sugestões e votos por comunidade | — | [Por comunidade](creator-videos.md); legado preso à Ludylops |
-| Criadores indicados | `/indicacoes`, admin | sugestões e boosts | — | Ludylops |
+| Criadores indicados | `/indicacoes` (exige Pontos), admin; `/c/[slug]/inspiracoes` e seção Inspirações do dono | sugestões e boosts da Ludylops (exigem Pontos); indicações, votos e destaques por comunidade | — | [Por comunidade](creator-inspirations.md); legado preso à Ludylops |
 | Frases | `/quotes`, `/c/[creatorSlug]/quotes`, controle no admin | solicitação de exibição | `/obs/quotes`, comandos de frases | Ler/criar por criador; caminhos pagos/OBS só Ludylops |
 | OBS | overlays, roleta e metas no admin | controle e consultas `/api/obs/*` | bets, likes, quotes, subscribers e wheel | Ludylops |
 | Streamer.bot | `/contadores`, jogo atual, estado da live, scripts e contadores no admin | configurações e contadores | todos os handlers, verificação de credencial | Autenticação por criador; operações conforme as linhas acima |

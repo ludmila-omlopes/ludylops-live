@@ -13,7 +13,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const moduleDenial = await guardModuleRequest(request, ["creator_suggestions"]);
+  const moduleDenial = await guardModuleRequest(request, ["creator_suggestions", "points"]);
   if (moduleDenial) return moduleDenial;
 
   if (!isTrustedAppMutationRequest(request)) {

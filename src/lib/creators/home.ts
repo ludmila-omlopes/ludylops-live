@@ -23,5 +23,7 @@ export function creatorHomeLinks(tenant: CreatorTenantRecord) {
   // Ludylops keeps its own pipetz video page and navigation.
   if (!legacy && canUseModules(tenant, ["video_suggestions"], "videos"))
     links.push({ href: `${prefix}/videos`, label: "Vídeos para reagir", description: "Mande um vídeo do YouTube e vote nos próximos da reação." });
+  if (!legacy && canUseModules(tenant, ["creator_suggestions"], "inspirations"))
+    links.push({ href: `${prefix}/inspiracoes`, label: "Inspirações", description: "Criadores que vale a pena conhecer, indicados pela comunidade." });
   return legacy ? links.map(link => ({ ...link, href: `https://${DEFAULT_CREATOR_DOMAIN}${link.href}` })) : links;
 }

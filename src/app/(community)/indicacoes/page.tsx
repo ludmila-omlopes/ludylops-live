@@ -84,7 +84,7 @@ function AdminCreatorCard({
 }
 
 export default async function IndicacoesPage() {
-  await requireModulePage(["creator_suggestions"]);
+  await requireModulePage(["creator_suggestions", "points"]);
 
   const session = await auth();
   const activeViewerId = session?.user?.activeViewerId ?? null;
