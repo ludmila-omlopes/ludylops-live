@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 
@@ -8,6 +8,7 @@ import { isDemoMode } from "@/lib/env";
 import type { YoutubeVideoMetadata } from "@/lib/video-suggestions/service";
 import { DEFAULT_CREATOR_ID } from "./defaults";
 import { listDemoCreatorTenants } from "./demo-store";
+import { communityVoteId } from "./community-votes";
 import { canUseModules } from "./module-access";
 import {
   communityVideoStatusSchema,
@@ -31,15 +32,6 @@ const demo = () => globalThis.__communityVideosDemo ??= { videos: [], votes: [] 
 
 const OPEN_LIMIT = 100;
 const HISTORY_LIMIT = 30;
-
-/**
- * Free votes share the boost table with a deterministic ID, so the primary key
- * allows one vote per viewer and video without a new table. Paid boosts use
- * random IDs and are never mistaken for a vote.
- */
-export function communityVoteId(suggestionId: string, viewerId: string) {
-  return `vote_${createHash("sha256").update(JSON.stringify([suggestionId, viewerId])).digest("base64url")}`;
-}
 
 function identity(creatorId: string, viewerId?: string) {
   if (!creatorId || creatorId === DEFAULT_CREATOR_ID || viewerId === "") throw new CommunityVideoAccessError();
