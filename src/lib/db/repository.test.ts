@@ -47,6 +47,7 @@ vi.mock("@/lib/current-game", () => ({
 }));
 
 import { demoBetRecords, demoQuotes } from "@/lib/demo-data";
+import { communityVoteId } from "@/lib/creators/community-votes";
 import {
   betEntries,
   betOptions,
@@ -3242,6 +3243,45 @@ describe("viewer link codes", () => {
 
     const consumed = await getViewerLinkCodeState(stateAfter!.googleAccount.id);
     expect(consumed).toBeNull();
+  });
+
+  it("moves community suggestions, free votes and ownership along with the merged viewer", async () => {
+    getDbMock.mockReturnValue(null);
+    const fallbackViewer = await ensureViewerFromSession({
+      googleUserId: "google_community_merge",
+      email: "community-merge@example.com",
+      name: "Community Merge",
+      image: null,
+    });
+    const source = fallbackViewer!.id;
+    const now = new Date();
+    const suggestion = (id: string, viewerId: string, totalVotes: number) =>
+      ({ id, creatorId: "creator_canal", viewerId, status: "open", totalVotes, createdAt: now, updatedAt: now }) as never;
+    const vote = (suggestionId: string, viewerId: string) =>
+      ({ id: communityVoteId(suggestionId, viewerId), creatorId: "creator_canal", suggestionId, viewerId, amount: 1, createdAt: now }) as never;
+    // Both identities voted for "shared"; only the source voted for "mine", which it also suggested.
+    globalThis.__communityVideosDemo = {
+      videos: [suggestion("shared", "viewer_caio", 2), suggestion("mine", source, 1)],
+      votes: [vote("shared", source), vote("shared", "viewer_lia"), vote("mine", source)],
+    };
+    globalThis.__communityInspirationsDemo = { rows: [suggestion("creator", source, 1)], votes: [vote("creator", source)] };
+    globalThis.__creatorTenantStore = [{ creator: { id: "creator_canal", ownerUserId: source } } as never];
+
+    const state = await getSessionViewerState({ googleUserId: "google_community_merge", email: "community-merge@example.com" });
+    const link = await issueViewerLinkCode(state!.googleAccount.id);
+    const result = await claimViewerLinkCodeFromStreamerbot({ linkCode: link.linkCode, viewerExternalId: "yt_lia", youtubeDisplayName: "Lia Pixel" });
+    expect(result).toMatchObject({ mergedSyntheticViewer: true, viewer: { id: "viewer_lia" } });
+
+    const videos = globalThis.__communityVideosDemo!;
+    expect(videos.videos.map((row) => [row.id, row.viewerId, row.totalVotes])).toEqual([["shared", "viewer_caio", 1], ["mine", "viewer_lia", 1]]);
+    expect(videos.votes.map((row) => row.id).sort()).toEqual([communityVoteId("shared", "viewer_lia"), communityVoteId("mine", "viewer_lia")].sort());
+    expect(videos.votes.every((row) => row.viewerId === "viewer_lia")).toBe(true);
+    expect(globalThis.__communityInspirationsDemo!.rows[0].viewerId).toBe("viewer_lia");
+    expect(globalThis.__communityInspirationsDemo!.votes[0].id).toBe(communityVoteId("creator", "viewer_lia"));
+    expect(globalThis.__creatorTenantStore![0].creator.ownerUserId).toBe("viewer_lia");
+    globalThis.__communityVideosDemo = undefined;
+    globalThis.__communityInspirationsDemo = undefined;
+    globalThis.__creatorTenantStore = [];
   });
 
   it("adds another YouTube channel to an already linked Google account", async () => {
