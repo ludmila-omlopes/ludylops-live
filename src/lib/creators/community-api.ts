@@ -10,15 +10,15 @@ export const communityReply = (body: unknown, status = 200) => Response.json(bod
 export type CommunityViewerContext = { response: Response } | { creatorId: string; viewerId: string };
 
 /**
- * Order matters: trusted origin, then the community and its module (404 before
- * any session or storage), then the viewer's session.
+ * Order matters: trusted origin for writes, then the community and its module
+ * (404 before any session or storage), then the viewer's session.
  */
 export async function communityViewerContext(
   request: Request,
   creatorSlug: string,
   module: { key: CreatorModuleKey; operation: ModuleOperation; unavailable: string },
 ): Promise<CommunityViewerContext> {
-  if (!isTrustedAppMutationRequest(request)) return { response: communityReply({ ok: false, error: "Origem inválida." }, 403) };
+  if (request.method !== "GET" && !isTrustedAppMutationRequest(request)) return { response: communityReply({ ok: false, error: "Origem inválida." }, 403) };
   const tenant = await getCreatorAreaBySlug(creatorSlug, { request });
   if (!tenant || !canUseModules(tenant, [module.key], module.operation)) return { response: communityReply({ ok: false, error: module.unavailable }, 404) };
   const viewerId = (await requireApiSession())?.user?.activeViewerId;

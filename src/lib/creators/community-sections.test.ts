@@ -34,6 +34,7 @@ describe("community sections", () => {
       ["resgates", "/comunidades/canal/resgates"],
       ["frases", "/comunidades/canal/frases"],
       ["produtos", "/comunidades/canal/produtos"],
+      ["jogos", "/comunidades/canal/jogos"],
       ["videos", "/comunidades/canal/videos"],
       ["inspiracoes", "/comunidades/canal/inspiracoes"],
       ["mensagens", "/comunidades/canal/mensagens"],

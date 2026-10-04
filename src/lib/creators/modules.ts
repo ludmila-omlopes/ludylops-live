@@ -90,7 +90,8 @@ export const creatorModuleCatalog = [
     publicRoutes: ["/jogos"],
     adminPanels: ["sugestoes-jogos"],
     obsRoutes: [],
-    requiredCapabilities: ["points"],
+    // Votes are free. Ludylops' pipetz flows require points on their own routes.
+    requiredCapabilities: [],
     defaultConfig: {},
   },
   {
@@ -153,7 +154,7 @@ validateModuleCatalog(creatorModuleCatalog);
  * and the rest) are turned on from the platform console, or at creation for a
  * streamer plan.
  */
-export const pageModuleKeys: readonly CreatorModuleKey[] = ["product_recommendations", "video_suggestions", "creator_suggestions"];
+export const pageModuleKeys: readonly CreatorModuleKey[] = ["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions"];
 
 /** A new community starts with products only; the creator adds the rest in Módulos. */
 export const initialModuleKeys: readonly CreatorModuleKey[] = ["product_recommendations"];

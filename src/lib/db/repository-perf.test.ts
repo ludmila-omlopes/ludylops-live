@@ -138,9 +138,11 @@ describe("suggestion reads", () => {
     expect(boostConditions).toHaveLength(2);
   });
 
-  it("reads only Ludylops' videos, never community suggestions or votes", async () => {
+  it.each([
+    ["videos", listVideoSuggestions], ["games", listGameSuggestions],
+  ] as const)("reads only Ludylops' %s, never community suggestions or votes", async (_, read) => {
     const { boostConditions, suggestionConditions } = suggestionsDb();
-    await listVideoSuggestions("viewer-a");
+    await read("viewer-a");
     expect(suggestionConditions[0].sql).toContain('"creator_id"');
     expect(suggestionConditions[0].params).toEqual([DEFAULT_CREATOR_ID]);
     expect(boostConditions[0].params).toEqual([DEFAULT_CREATOR_ID, "viewer-a"]);

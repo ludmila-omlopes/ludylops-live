@@ -68,7 +68,7 @@ Em **Módulos** (`/comunidades/<slug>/modulos`), o criador escolhe o que entra n
 
 | Módulo | Ao escolher |
 | --- | --- |
-| Produtos indicados, [Vídeos para reagir](creator-videos.md) e [Inspirações](creator-inspirations.md) | Instalados na hora (`installed`); desmarcar remove a instalação, sem apagar os dados |
+| Produtos indicados, [Jogos](creator-games.md), [Vídeos para reagir](creator-videos.md) e [Inspirações](creator-inspirations.md) | Instalados na hora (`installed`); desmarcar remove a instalação, sem apagar os dados |
 | Demais módulos | Registrados como `requested`, com o rótulo “Em breve”, até existir a versão por comunidade |
 
 - Escolher um módulo inclui suas dependências: jogos, vídeos, inspirações, apostas e ranking levam junto a moeda.
@@ -93,8 +93,8 @@ Sem isso, a exclusão da identidade de origem esbarraria nas chaves estrangeiras
 
 ### Próximos trabalhos
 
-- Versão por comunidade de jogos, no mesmo modelo de [Vídeos para reagir](creator-videos.md) e [Inspirações](creator-inspirations.md): votos grátis, com boost opcional na moeda da comunidade. Apostas vêm por último, com a moeda.
-- Boost com a moeda da comunidade nas sugestões, para comunidades com Pontos ativo.
+- Boost com a moeda da comunidade nas sugestões de jogos, vídeos e inspirações, para comunidades com Pontos ativo.
+- Apostas por comunidade, com a moeda, depois de decidir como o público ganha moeda sem live.
 - Corrigir `npm run smoke:auth`: o script pode aceitar um redirecionamento de erro de configuração como sucesso. O comportamento também foi observado com a versão anterior do Auth.js; o conserto exige distinguir o redirecionamento ao provedor de um erro.
 
 ### Separação entre plataforma e operação legada

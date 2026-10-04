@@ -1,6 +1,7 @@
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { consolidateAccountEconomies, lockEconomyIdentity, mergeCreatorEconomies } from "@/lib/creators/economy-identity";
 import { mergeCommunityIdentity, mergeDemoCommunityIdentity } from "@/lib/creators/community-identity.server";
+import { buildHowLongToBeatColumns } from "@/lib/howlongtobeat-columns";
 import { consolidateDemoAccountEconomies, economyDemoStore, mergeDemoEconomies } from "@/lib/creators/economy-demo";
 import { type CreatorContext, requireCreatorContext, requireDefaultCreatorCapability } from "@/lib/creators/context";
 
@@ -86,10 +87,7 @@ import { getCurrentGame } from "@/lib/current-game";
 import { normalizeYoutubeHandle } from "@/lib/youtube/identity";
 import { getObsOverlayStyleConfig } from "@/lib/obs-overlay-settings";
 import { evaluateRedeemability } from "@/lib/redemptions/service";
-import {
-  resolveHowLongToBeatGame,
-  type HowLongToBeatResolution,
-} from "@/lib/howlongtobeat";
+import { resolveHowLongToBeatGame } from "@/lib/howlongtobeat";
 import {
   fetchPsPlusDeluxeCatalog,
   findBestPsPlusCatalogMatch,
@@ -2224,32 +2222,6 @@ function serializeSteamStore(row: typeof gameSuggestions.$inferSelect): GameStea
   };
 }
 
-function buildHowLongToBeatColumns(resolution: HowLongToBeatResolution) {
-  if (!resolution.match) {
-    return {
-      hltbId: null,
-      hltbName: null,
-      hltbMainStoryMinutes: null,
-      hltbMainExtraMinutes: null,
-      hltbCompletionistMinutes: null,
-      hltbSimilarity: null,
-      hltbFetchedAt: resolution.fetchedAt,
-    };
-  }
-
-  return {
-    hltbId: resolution.match.id,
-    hltbName: resolution.match.name,
-    hltbMainStoryMinutes: resolution.match.mainStoryMinutes,
-    hltbMainExtraMinutes: resolution.match.mainExtraMinutes,
-    hltbCompletionistMinutes: resolution.match.completionistMinutes,
-    hltbSimilarity: typeof resolution.match.similarity === "number"
-      ? Math.round(resolution.match.similarity * 100)
-      : null,
-    hltbFetchedAt: resolution.fetchedAt,
-  };
-}
-
 function serializeGameSuggestionBoost(
   row: typeof gameSuggestionBoosts.$inferSelect,
 ): GameSuggestionBoostRecord {
@@ -3631,7 +3603,7 @@ async function refreshStaleHowLongToBeatRows(
       const [updated] = await db
         .update(gameSuggestions)
         .set(howLongToBeatColumns)
-        .where(eq(gameSuggestions.id, row.id))
+        .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, row.id)))
         .returning();
 
       if (updated) {
@@ -3717,7 +3689,7 @@ async function refreshGameSuggestionSteamPrice(suggestionId: string) {
   const [suggestion] = await db
     .select()
     .from(gameSuggestions)
-    .where(eq(gameSuggestions.id, suggestionId))
+    .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, suggestionId)))
     .limit(1);
   if (!suggestion) {
     return null;
@@ -3731,7 +3703,7 @@ async function refreshGameSuggestionSteamPrice(suggestionId: string) {
   await db
     .update(gameSuggestions)
     .set(buildSteamPriceColumns(resolution))
-    .where(eq(gameSuggestions.id, suggestionId));
+    .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, suggestionId)));
 
   return (await listGameSuggestions(suggestion.viewerId)).find((entry) => entry.id === suggestionId) ?? null;
 }
@@ -3914,14 +3886,15 @@ async function ensureFreshPsPlusCatalog({
         });
     });
 
-    const suggestionRows = await db.select().from(gameSuggestions);
+    // PS Plus enrichment belongs to Ludylops' legacy flow; community games are never synced here.
+    const suggestionRows = await db.select().from(gameSuggestions).where(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID));
     let updatedSuggestionCount = 0;
     for (const suggestion of suggestionRows) {
       const update = buildPsPlusAvailabilityUpdate(suggestion, catalog.items, startedAt);
       await db
         .update(gameSuggestions)
         .set(update)
-        .where(eq(gameSuggestions.id, suggestion.id));
+        .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, suggestion.id)));
       updatedSuggestionCount += 1;
     }
 
@@ -3979,7 +3952,7 @@ async function refreshGameSuggestionPsPlusAvailability(suggestionId: string) {
   const [suggestion] = await db
     .select()
     .from(gameSuggestions)
-    .where(eq(gameSuggestions.id, suggestionId))
+    .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, suggestionId)))
     .limit(1);
   if (!suggestion) {
     return null;
@@ -3994,7 +3967,7 @@ async function refreshGameSuggestionPsPlusAvailability(suggestionId: string) {
   await db
     .update(gameSuggestions)
     .set(buildPsPlusAvailabilityUpdate(suggestion, catalog, now))
-    .where(eq(gameSuggestions.id, suggestionId));
+    .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, suggestionId)));
 
   return (await listGameSuggestions(suggestion.viewerId)).find((entry) => entry.id === suggestionId) ?? null;
 }
@@ -4026,7 +3999,7 @@ export async function syncSteamGameSuggestionPrices({
   const rows = await db
     .select()
     .from(gameSuggestions)
-    .where(inArray(gameSuggestions.status, ["open", "accepted", "played"]));
+    .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), inArray(gameSuggestions.status, ["open", "accepted", "played"])));
   const now = Date.now();
   const batchLimit = Number.isInteger(limit) && limit > 0 ? limit : STEAM_PRICE_REFRESH_BATCH_LIMIT;
   const staleRows = rows
@@ -4052,7 +4025,7 @@ export async function syncSteamGameSuggestionPrices({
       await db
         .update(gameSuggestions)
         .set(buildSteamPriceColumns(resolution))
-        .where(eq(gameSuggestions.id, row.id));
+        .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, row.id)));
 
       if (resolution.match) {
         updatedCount += 1;
@@ -6154,9 +6127,11 @@ export async function listGameSuggestions(
 
   try {
     [suggestionRows, boostRows, boostSettings] = await Promise.all([
-      db.select().from(gameSuggestions).orderBy(desc(gameSuggestions.totalVotes), desc(gameSuggestions.createdAt)),
+      // Community games live in the same tables; the legacy flow only ever sees Ludylops'.
+      db.select().from(gameSuggestions).where(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID))
+        .orderBy(desc(gameSuggestions.totalVotes), desc(gameSuggestions.createdAt)),
       viewerId
-        ? db.select().from(gameSuggestionBoosts).where(eq(gameSuggestionBoosts.viewerId, viewerId))
+        ? db.select().from(gameSuggestionBoosts).where(and(eq(gameSuggestionBoosts.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestionBoosts.viewerId, viewerId)))
         : Promise.resolve([]),
       getGameSuggestionBoostSettings(),
     ]);
@@ -6694,6 +6669,7 @@ export async function createGameSuggestion(input: {
       .from(gameSuggestions)
       .where(
         and(
+          eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID),
           input.igdbId
             ? sql`(${gameSuggestions.slug} = ${slug} or ${gameSuggestions.igdbId} = ${input.igdbId})`
             : eq(gameSuggestions.slug, slug),
@@ -6725,6 +6701,7 @@ export async function createGameSuggestion(input: {
 
     await tx.insert(gameSuggestions).values({
       id: suggestionId,
+      creatorId: DEFAULT_CREATOR_ID,
       viewerId: input.viewerId,
       slug,
       name: displayName,
@@ -6856,7 +6833,7 @@ export async function boostGameSuggestion(input: {
     const [suggestion] = await tx
       .select()
       .from(gameSuggestions)
-      .where(eq(gameSuggestions.id, input.suggestionId))
+      .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, input.suggestionId)))
       .limit(1);
     if (!suggestion) {
       throw new Error("suggestion_not_found");
@@ -6886,6 +6863,7 @@ export async function boostGameSuggestion(input: {
 
     await tx.insert(gameSuggestionBoosts).values({
       id: randomUUID(),
+      creatorId: DEFAULT_CREATOR_ID,
       suggestionId: input.suggestionId,
       viewerId: input.viewerId,
       amount: input.amount,
@@ -6898,7 +6876,7 @@ export async function boostGameSuggestion(input: {
         totalVotes: sql`${gameSuggestions.totalVotes} + ${input.amount}`,
         updatedAt: now,
       })
-      .where(eq(gameSuggestions.id, input.suggestionId));
+      .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, input.suggestionId)));
 
     await tx.insert(pointLedger).values({
       id: randomUUID(),
@@ -6947,7 +6925,7 @@ export async function updateGameSuggestionStatus(input: {
       status: input.status,
       updatedAt,
     })
-    .where(eq(gameSuggestions.id, input.suggestionId))
+    .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, input.suggestionId)))
     .returning();
   if (!updated) {
     throw new Error("suggestion_not_found");
@@ -7022,7 +7000,7 @@ export async function updateGameSuggestionCatalog(input: {
       ...buildHowLongToBeatColumns(howLongToBeat),
       updatedAt: new Date(),
     })
-    .where(eq(gameSuggestions.id, input.suggestionId))
+    .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, input.suggestionId)))
     .returning();
 
   if (!updated) {

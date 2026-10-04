@@ -208,6 +208,12 @@ async function fetchIgdbGamesByIds(ids: number[]) {
   );
 }
 
+/** One game by its IGDB ID, read on the server so stored names and covers never come from the client. */
+export async function getIgdbGame(igdbId: number) {
+  const [game] = await fetchIgdbGamesByIds([igdbId]);
+  return game ? mapIgdbGame(game) : null;
+}
+
 export async function searchIgdbGames(query: string) {
   const normalizedQuery = normalizeQuery(query);
   if (normalizedQuery.length < 2) {

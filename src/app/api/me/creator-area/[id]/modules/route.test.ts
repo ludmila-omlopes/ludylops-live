@@ -38,10 +38,10 @@ describe("owner module choices endpoint", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     const { data } = await response.json();
     expect(states(data)).toMatchObject({
-      product_recommendations: ["active", true], game_suggestions: ["soon", true], bets: ["soon", true],
+      product_recommendations: ["active", true], game_suggestions: ["active", true], bets: ["soon", true],
       points: ["soon", true], video_suggestions: ["off", false], ranking: ["soon", false],
     });
-    expect(statuses(a.creator.id)).toEqual({ product_recommendations: "installed", game_suggestions: "requested", bets: "requested", points: "requested" });
+    expect(statuses(a.creator.id)).toEqual({ product_recommendations: "installed", game_suggestions: "installed", bets: "requested", points: "requested" });
     expect(modulesOf(a.creator.id).every((module) => typeof module.configJson.chosenAt === "string")).toBe(true);
     expect(modulesOf(a.creator.id).find((module) => module.moduleKey === "points")?.configJson.currencyLabel).toBe("pontos");
     expect(hasLiveModules(modulesOf(a.creator.id))).toBe(false);
@@ -62,7 +62,7 @@ describe("owner module choices endpoint", () => {
   it("never touches the live modules installed by the platform", async () => {
     const a = await createCreatorArea("owner-a", { displayName: "Canal A" }, { liveFeatures: true });
     // Self-service modules are the creator's own; everything else stays as the platform installed it.
-    const before = structuredClone(modulesOf(a.creator.id).filter((module) => !["product_recommendations", "video_suggestions", "creator_suggestions"].includes(module.moduleKey)));
+    const before = structuredClone(modulesOf(a.creator.id).filter((module) => !["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions"].includes(module.moduleKey)));
     const response = await PUT(request(a.creator.id, { modules: [] }), context(a.creator.id));
     expect(response.status).toBe(200);
     expect(modulesOf(a.creator.id)).toEqual(before);

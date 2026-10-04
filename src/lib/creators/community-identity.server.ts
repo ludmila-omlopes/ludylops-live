@@ -69,6 +69,7 @@ export function mergeDemoCommunityIdentity(sourceId: string, targetId: string) {
   if (sourceId === targetId) return;
   mergeDemoBoard(globalThis.__communityVideosDemo, sourceId, targetId);
   mergeDemoBoard(globalThis.__communityInspirationsDemo, sourceId, targetId);
+  mergeDemoBoard(globalThis.__communityGamesDemo, sourceId, targetId);
   for (const tenant of globalThis.__creatorTenantStore ?? []) {
     if (tenant.creator.ownerUserId === sourceId) tenant.creator.ownerUserId = targetId;
   }
