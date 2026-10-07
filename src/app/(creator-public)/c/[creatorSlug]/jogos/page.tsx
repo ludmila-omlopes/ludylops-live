@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { CommunityGames } from "@/components/community-games";
 import { OwnerManageLink } from "@/components/owner-manage-link";
+import { readCommunityWallet } from "@/lib/creators/community-boosts.server";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { CommunityGameAccessError, listCommunityGames } from "@/lib/creators/games.server";
 import { canUseModules } from "@/lib/creators/module-access";
@@ -23,6 +24,7 @@ export default async function CreatorGamesPage({ params }: { params: Promise<{ c
   if (!canUseModules(tenant, ["game_suggestions"], "games")) notFound();
   const session = await auth();
   const viewerId = session?.user?.activeViewerId ?? undefined;
+  const wallet = await readCommunityWallet(tenant, viewerId);
   let board: Awaited<ReturnType<typeof listCommunityGames>> | null = null;
   try { board = await listCommunityGames(tenant.creator.id, viewerId); }
   catch (error) { if (error instanceof CommunityGameAccessError) notFound(); }
@@ -37,7 +39,7 @@ export default async function CreatorGamesPage({ params }: { params: Promise<{ c
     <div className="mt-10">
       {board
         ? <CommunityGames slug={tenant.creator.slug} board={board} signedIn={Boolean(viewerId)}
-          signInHref={`/api/auth/signin?callbackUrl=${encodeURIComponent(path)}`} />
+          signInHref={`/api/auth/signin?callbackUrl=${encodeURIComponent(path)}`} wallet={wallet} />
         : <p role="alert">Não foi possível consultar os jogos agora. Tente novamente mais tarde.</p>}
     </div>
   </div>;

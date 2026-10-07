@@ -9,6 +9,8 @@ import type { buildHowLongToBeatColumns } from "@/lib/howlongtobeat-columns";
 import { slugify } from "@/lib/utils";
 import { ownedGameScore, readOwnedGameMultiplier } from "@/lib/game-suggestions/ownership";
 import { communityVoteId } from "./community-votes";
+import { communityBoostInputSchema } from "./community-boosts";
+import { spendDemoOnBoost, spendOnBoost } from "./community-boosts.server";
 import { lockEconomyIdentity } from "./economy-identity";
 import { rewardDemoSuggestionAuthor, rewardSuggestionAuthor } from "./page-rewards.server";
 import { DEFAULT_CREATOR_ID } from "./defaults";
@@ -324,5 +326,48 @@ export async function updateCommunityGameBoostSettings(creatorId: string, ownerI
       configJson: sql`${creatorModules.configJson} || ${JSON.stringify(settings)}::jsonb`, updatedAt: new Date(),
     }).where(and(eq(creatorModules.creatorId, creatorId), eq(creatorModules.moduleKey, "game_suggestions")));
     return readBoard(tx, creatorId, undefined, true, settings.ownedGameMultiplier);
+  });
+}
+
+/** viewerId comes from the session. The boost spends the community currency and adds its amount to the votes. */
+export async function boostCommunityGame(creatorId: string, viewerId: string, suggestionId: string, input: unknown) {
+  identity(creatorId, viewerId);
+  if (!viewerId || !/^[0-9a-f-]{36}$/i.test(suggestionId)) throw new CommunityGameAccessError();
+  const { boostId, amount } = communityBoostInputSchema.parse(input);
+  const voteId = communityVoteId(suggestionId, viewerId);
+  if (isDemoMode) {
+    const multiplier = readOwnedGameMultiplier(authorizeDemo(creatorId).configJson);
+    const store = demo();
+    const row = store.rows.find((entry) => entry.creatorId === creatorId && entry.id === suggestionId);
+    if (!row) throw new CommunityGameAccessError();
+    if (row.status !== "open") throw new CommunityGameConflictError("Esse jogo não está mais em votação.");
+    const spent = spendDemoOnBoost({ creatorId, viewerId, boostId, amount, suggestionKey: `games:${row.id}`, name: row.canonicalName ?? row.name });
+    if (!spent.duplicate) {
+      store.votes.unshift({ id: boostId, creatorId, suggestionId, viewerId: spent.viewerId, amount, createdAt: new Date() });
+      row.totalVotes += amount;
+    }
+    const voted = store.votes.some((entry) => entry.id === voteId);
+    return { item: toGame(row, demoNames([row]), new Set(voted ? [row.id] : []), multiplier), wallet: { balance: spent.balance, currencyLabel: spent.currencyLabel } };
+  }
+  return database().transaction(async (tx) => {
+    await lockEconomyIdentity(tx);
+    const multiplier = await authorize(tx, creatorId);
+    const [row] = await tx.select().from(gameSuggestions)
+      .where(and(eq(gameSuggestions.creatorId, creatorId), eq(gameSuggestions.id, suggestionId))).for("update");
+    if (!row) throw new CommunityGameAccessError();
+    if (row.status !== "open") throw new CommunityGameConflictError("Esse jogo não está mais em votação.");
+    const spent = await spendOnBoost(tx, { creatorId, viewerId, boostId, amount, suggestionKey: `games:${row.id}`, name: row.canonicalName ?? row.name });
+    let updated = row;
+    if (!spent.duplicate) {
+      const inserted = await tx.insert(gameSuggestionBoosts).values({ id: boostId, creatorId, suggestionId, viewerId: spent.viewerId, amount })
+        .onConflictDoNothing().returning({ id: gameSuggestionBoosts.id });
+      if (!inserted.length) throw new CommunityGameConflictError("Esse boost já foi usado. Atualize a página e tente de novo.");
+      [updated] = await tx.update(gameSuggestions).set({ totalVotes: sql`${gameSuggestions.totalVotes} + ${amount}` })
+        .where(and(eq(gameSuggestions.creatorId, creatorId), eq(gameSuggestions.id, suggestionId))).returning();
+    }
+    const [vote] = await tx.select({ id: gameSuggestionBoosts.id }).from(gameSuggestionBoosts)
+      .where(and(eq(gameSuggestionBoosts.creatorId, creatorId), eq(gameSuggestionBoosts.id, voteId)));
+    return { item: toGame(updated, await nameOf(tx, row.viewerId), new Set(vote ? [row.id] : []), multiplier),
+      wallet: { balance: spent.balance, currencyLabel: spent.currencyLabel } };
   });
 }

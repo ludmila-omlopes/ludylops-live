@@ -53,7 +53,8 @@ Na [fusão de contas](creator-hub.md#fusão-de-contas), as sugestões e os votos
 
    Jogos não tem dependências, então a troca não deixa nenhum módulo indisponível. Sem esse passo, o criador também ativa ao salvar de novo em Módulos.
 
+- O [boost com a moeda](creator-economy.md#boost-com-a-moeda) soma o valor gasto aos votos, onde a comunidade tem Pontos.
+
 ## Fora desta entrega
 
-- Boost com a moeda da comunidade, para comunidades com Pontos ativo.
 - Disponibilidade no PS Plus e preço na Steam, que continuam só na Ludylops.

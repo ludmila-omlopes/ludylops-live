@@ -4,9 +4,11 @@
 import { useState } from "react";
 import { ThumbsUp } from "lucide-react";
 
+import { CommunityBoost } from "@/components/community-boost";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { CommunityWallet } from "@/lib/creators/community-boosts";
 import type { CommunityVideo, CommunityVideoBoard } from "@/lib/creators/videos";
 
 const cardClass = "hub-card flex min-w-0 flex-col gap-4 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5";
@@ -27,13 +29,16 @@ function VideoThumb({ video }: { video: CommunityVideo }) {
   );
 }
 
-export function CommunityVideos({ slug, board, signedIn, signInHref }: {
+export function CommunityVideos({ slug, board, signedIn, signInHref, wallet }: {
   slug: string;
   board: CommunityVideoBoard;
   signedIn: boolean;
   signInHref: string;
+  /** The signed-in viewer's balance where the community currency is on. */
+  wallet?: CommunityWallet | null;
 }) {
   const [open, setOpen] = useState(board.open);
+  const [currentWallet, setWallet] = useState(wallet ?? null);
   const [videoUrl, setVideoUrl] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -104,6 +109,10 @@ export function CommunityVideos({ slug, board, signedIn, signInHref }: {
                       <ThumbsUp className="size-4" aria-hidden="true" />
                       {video.voted ? "Votado" : "Votar"}
                     </Button>
+                  ) : null}
+                  {signedIn && currentWallet ? (
+                    <CommunityBoost<CommunityVideo> endpoint={`${base}/${encodeURIComponent(video.id)}/boost`} wallet={currentWallet} disabled={busy !== null}
+                      onBoosted={(updated, next) => { setOpen((current) => current.map((entry) => (entry.id === updated.id ? updated : entry))); setWallet(next); }} />
                   ) : null}
                 </div>
               </li>

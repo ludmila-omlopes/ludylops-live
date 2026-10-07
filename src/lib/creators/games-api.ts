@@ -3,11 +3,13 @@ import { ZodError } from "zod";
 import { resolveHowLongToBeatGame } from "@/lib/howlongtobeat";
 import { buildHowLongToBeatColumns } from "@/lib/howlongtobeat-columns";
 import { getIgdbGame, isIgdbConfigured, searchIgdbGames } from "@/lib/igdb";
+import { BoostBalanceError, BoostUnavailableError } from "./community-boosts.server";
 import { communityOwnerContext, communityReply as reply, communityViewerContext } from "./community-api";
 import { communityGameInputSchema } from "./games";
 import {
   CommunityGameAccessError,
   CommunityGameConflictError,
+  boostCommunityGame,
   listOwnedCommunityGames,
   suggestCommunityGame,
   updateCommunityGameStatus,
@@ -20,6 +22,7 @@ const unavailable = "Jogos indisponíveis para esta comunidade.";
 const gamesModule = { key: "game_suggestions", operation: "games", unavailable } as const;
 
 function failure(error: unknown) {
+  if (error instanceof BoostUnavailableError || error instanceof BoostBalanceError) return reply({ ok: false, error: error.message }, 409);
   if (error instanceof CommunityGameAccessError) return reply({ ok: false, error: unavailable }, 404);
   if (error instanceof CommunityGameConflictError) return reply({ ok: false, error: error.message }, 409);
   if (error instanceof ZodError) return reply({ ok: false, error: error.issues[0]?.message ?? "Confira os dados do jogo." }, 400);
@@ -82,5 +85,14 @@ export async function ownerCommunityGamesRequest(request: Request, creatorId: st
     const update = input && typeof input === "object" && "ownedGameMultiplier" in input
       ? updateCommunityGameBoostSettings : updateCommunityGameStatus;
     return reply({ ok: true, data: await update(creatorId, context.ownerId, input) });
+  } catch (error) { return failure(error); }
+}
+
+/** Spends the viewer's community currency on a suggestion still in the vote. */
+export async function boostGameRequest(request: Request, target: { creatorSlug: string; id: string }) {
+  try {
+    const context = await communityViewerContext(request, target.creatorSlug, gamesModule);
+    if ("response" in context) return context.response;
+    return reply({ ok: true, data: await boostCommunityGame(context.creatorId, context.viewerId, target.id, await request.json()) });
   } catch (error) { return failure(error); }
 }

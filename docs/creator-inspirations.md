@@ -45,7 +45,8 @@ Na [fusão de contas](creator-hub.md#fusão-de-contas), as sugestões e os votos
 
    Inspirações não tem dependências, então a troca não deixa nenhum módulo indisponível. Sem esse passo, o criador também ativa ao salvar de novo em Módulos.
 
+- O [boost com a moeda](creator-economy.md#boost-com-a-moeda) soma o valor gasto aos votos, onde a comunidade tem Pontos.
+
 ## Fora desta entrega
 
-- Boost com a moeda da comunidade, para comunidades com Pontos ativo.
 - Edição de indicações e busca automática de nome pelo link do canal (a Ludylops usa a YouTube Data API só no cadastro pelo admin).

@@ -9,6 +9,8 @@ import type { YoutubeVideoMetadata } from "@/lib/video-suggestions/service";
 import { DEFAULT_CREATOR_ID } from "./defaults";
 import { listDemoCreatorTenants } from "./demo-store";
 import { communityVoteId } from "./community-votes";
+import { communityBoostInputSchema } from "./community-boosts";
+import { spendDemoOnBoost, spendOnBoost } from "./community-boosts.server";
 import { lockEconomyIdentity } from "./economy-identity";
 import { rewardDemoSuggestionAuthor, rewardSuggestionAuthor } from "./page-rewards.server";
 import { canUseModules } from "./module-access";
@@ -252,5 +254,53 @@ export async function updateCommunityVideoStatus(creatorId: string, ownerId: str
     if (status === "reacted") await rewardSuggestionAuthor(tx, { creatorId, authorId: row.viewerId, suggestionKey: `videos:${row.id}`, name: row.title });
     const [user] = await tx.select({ name: users.youtubeDisplayName }).from(users).where(eq(users.id, row.viewerId));
     return toVideo(row, new Map(user ? [[row.viewerId, user.name]] : []), new Set());
+  });
+}
+
+async function namesOf(tx: Tx, viewerId: string) {
+  const [user] = await tx.select({ name: users.youtubeDisplayName }).from(users).where(eq(users.id, viewerId));
+  return new Map(user ? [[viewerId, user.name]] : []);
+}
+
+/** viewerId comes from the session. The boost spends the community currency and adds its amount to the votes. */
+export async function boostCommunityVideo(creatorId: string, viewerId: string, suggestionId: string, input: unknown) {
+  identity(creatorId, viewerId);
+  if (!viewerId || !/^[0-9a-f-]{36}$/i.test(suggestionId)) throw new CommunityVideoAccessError();
+  const { boostId, amount } = communityBoostInputSchema.parse(input);
+  const voteId = communityVoteId(suggestionId, viewerId);
+  if (isDemoMode) {
+    authorizeDemo(creatorId);
+    const store = demo();
+    const row = store.videos.find((entry) => entry.creatorId === creatorId && entry.id === suggestionId);
+    if (!row) throw new CommunityVideoAccessError();
+    if (row.status !== "open") throw new CommunityVideoConflictError("Esse vídeo saiu da fila.");
+    const spent = spendDemoOnBoost({ creatorId, viewerId, boostId, amount, suggestionKey: `videos:${row.id}`, name: row.title });
+    if (!spent.duplicate) {
+      store.votes.unshift({ id: boostId, creatorId, suggestionId, viewerId: spent.viewerId, amount, createdAt: new Date() });
+      row.totalVotes += amount;
+    }
+    const voted = store.votes.some((entry) => entry.id === voteId);
+    return { item: toVideo(row, demoNames([row]), new Set(voted ? [row.id] : [])), wallet: { balance: spent.balance, currencyLabel: spent.currencyLabel } };
+  }
+  return database().transaction(async (tx) => {
+    await lockEconomyIdentity(tx);
+    await authorize(tx, creatorId);
+    const [row] = await tx.select().from(videoSuggestions)
+      .where(and(eq(videoSuggestions.creatorId, creatorId), eq(videoSuggestions.id, suggestionId))).for("update");
+    if (!row) throw new CommunityVideoAccessError();
+    if (row.status !== "open") throw new CommunityVideoConflictError("Esse vídeo saiu da fila.");
+    const spent = await spendOnBoost(tx, { creatorId, viewerId, boostId, amount, suggestionKey: `videos:${row.id}`, name: row.title });
+    let updated = row;
+    if (!spent.duplicate) {
+      const inserted = await tx.insert(videoSuggestionBoosts).values({ id: boostId, creatorId, suggestionId, viewerId: spent.viewerId, amount })
+        .onConflictDoNothing().returning({ id: videoSuggestionBoosts.id });
+      if (!inserted.length) throw new CommunityVideoConflictError("Esse boost já foi usado. Atualize a página e tente de novo.");
+      [updated] = await tx.update(videoSuggestions).set({ totalVotes: sql`${videoSuggestions.totalVotes} + ${amount}` })
+        .where(and(eq(videoSuggestions.creatorId, creatorId), eq(videoSuggestions.id, suggestionId))).returning();
+    }
+    const [vote] = await tx.select({ id: videoSuggestionBoosts.id }).from(videoSuggestionBoosts)
+      .where(and(eq(videoSuggestionBoosts.creatorId, creatorId), eq(videoSuggestionBoosts.id, voteId)));
+    return { item: toVideo(updated, await namesOf(tx, row.viewerId), new Set(vote ? [row.id] : [])),
+      wallet: { balance: spent.balance, currencyLabel: spent.currencyLabel } };
   });
 }

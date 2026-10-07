@@ -4,9 +4,11 @@
 import { useEffect, useState } from "react";
 import { Gamepad2, ThumbsUp } from "lucide-react";
 
+import { CommunityBoost } from "@/components/community-boost";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { CommunityWallet } from "@/lib/creators/community-boosts";
 import { compareCommunityGames, gameDetails, type CommunityGame, type CommunityGameBoard, type CommunityGameSearchResult } from "@/lib/creators/games";
 
 const cardClass = "hub-card flex min-w-0 flex-col gap-4 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5";
@@ -45,13 +47,16 @@ function GameCard({ game, children }: { game: CommunityGame; children?: React.Re
   );
 }
 
-export function CommunityGames({ slug, board, signedIn, signInHref }: {
+export function CommunityGames({ slug, board, signedIn, signInHref, wallet }: {
   slug: string;
   board: CommunityGameBoard;
   signedIn: boolean;
   signInHref: string;
+  /** The signed-in viewer's balance where the community currency is on. */
+  wallet?: CommunityWallet | null;
 }) {
   const [open, setOpen] = useState(board.open);
+  const [currentWallet, setWallet] = useState(wallet ?? null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CommunityGameSearchResult[]>([]);
   const [searchNote, setSearchNote] = useState<string | null>(null);
@@ -177,6 +182,10 @@ export function CommunityGames({ slug, board, signedIn, signInHref }: {
                       <ThumbsUp className="size-4" aria-hidden="true" />
                       {game.voted ? "Votado" : "Votar"}
                     </Button>
+                  ) : null}
+                  {signedIn && currentWallet ? (
+                    <CommunityBoost<CommunityGame> endpoint={`${base}/${encodeURIComponent(game.id)}/boost`} wallet={currentWallet} disabled={busy !== null}
+                      onBoosted={(updated, next) => { setOpen((current) => current.map((entry) => (entry.id === updated.id ? updated : entry))); setWallet(next); }} />
                   ) : null}
                 </div>
               </GameCard>

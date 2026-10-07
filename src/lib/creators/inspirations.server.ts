@@ -7,6 +7,8 @@ import { creatorModules, creators, creatorSuggestionBoosts, creatorSuggestions, 
 import { isDemoMode } from "@/lib/env";
 import { slugify } from "@/lib/utils";
 import { communityVoteId } from "./community-votes";
+import { communityBoostInputSchema } from "./community-boosts";
+import { spendDemoOnBoost, spendOnBoost } from "./community-boosts.server";
 import { lockEconomyIdentity } from "./economy-identity";
 import { rewardDemoSuggestionAuthor, rewardSuggestionAuthor } from "./page-rewards.server";
 import { DEFAULT_CREATOR_ID } from "./defaults";
@@ -276,5 +278,48 @@ export async function updateCommunityInspirationStatus(creatorId: string, ownerI
     if (!row) throw new CommunityInspirationAccessError();
     if (status === "featured") await rewardSuggestionAuthor(tx, { creatorId, authorId: row.viewerId, suggestionKey: `inspirations:${row.id}`, name: row.name });
     return toInspiration(row, await nameOf(tx, row.viewerId), new Set());
+  });
+}
+
+/** viewerId comes from the session. The boost spends the community currency and adds its amount to the votes. */
+export async function boostCommunityInspiration(creatorId: string, viewerId: string, suggestionId: string, input: unknown) {
+  identity(creatorId, viewerId);
+  if (!viewerId || !/^[0-9a-f-]{36}$/i.test(suggestionId)) throw new CommunityInspirationAccessError();
+  const { boostId, amount } = communityBoostInputSchema.parse(input);
+  const voteId = communityVoteId(suggestionId, viewerId);
+  if (isDemoMode) {
+    authorizeDemo(creatorId);
+    const store = demo();
+    const row = store.rows.find((entry) => entry.creatorId === creatorId && entry.id === suggestionId);
+    if (!row) throw new CommunityInspirationAccessError();
+    if (row.status !== "open") throw new CommunityInspirationConflictError("Essa indicação não está mais em votação.");
+    const spent = spendDemoOnBoost({ creatorId, viewerId, boostId, amount, suggestionKey: `inspirations:${row.id}`, name: row.name });
+    if (!spent.duplicate) {
+      store.votes.unshift({ id: boostId, creatorId, suggestionId, viewerId: spent.viewerId, amount, createdAt: new Date() });
+      row.totalVotes += amount;
+    }
+    const voted = store.votes.some((entry) => entry.id === voteId);
+    return { item: toInspiration(row, demoNames([row]), new Set(voted ? [row.id] : [])), wallet: { balance: spent.balance, currencyLabel: spent.currencyLabel } };
+  }
+  return database().transaction(async (tx) => {
+    await lockEconomyIdentity(tx);
+    await authorize(tx, creatorId);
+    const [row] = await tx.select().from(creatorSuggestions)
+      .where(and(eq(creatorSuggestions.creatorId, creatorId), eq(creatorSuggestions.id, suggestionId))).for("update");
+    if (!row) throw new CommunityInspirationAccessError();
+    if (row.status !== "open") throw new CommunityInspirationConflictError("Essa indicação não está mais em votação.");
+    const spent = await spendOnBoost(tx, { creatorId, viewerId, boostId, amount, suggestionKey: `inspirations:${row.id}`, name: row.name });
+    let updated = row;
+    if (!spent.duplicate) {
+      const inserted = await tx.insert(creatorSuggestionBoosts).values({ id: boostId, creatorId, suggestionId, viewerId: spent.viewerId, amount })
+        .onConflictDoNothing().returning({ id: creatorSuggestionBoosts.id });
+      if (!inserted.length) throw new CommunityInspirationConflictError("Esse boost já foi usado. Atualize a página e tente de novo.");
+      [updated] = await tx.update(creatorSuggestions).set({ totalVotes: sql`${creatorSuggestions.totalVotes} + ${amount}` })
+        .where(and(eq(creatorSuggestions.creatorId, creatorId), eq(creatorSuggestions.id, suggestionId))).returning();
+    }
+    const [vote] = await tx.select({ id: creatorSuggestionBoosts.id }).from(creatorSuggestionBoosts)
+      .where(and(eq(creatorSuggestionBoosts.creatorId, creatorId), eq(creatorSuggestionBoosts.id, voteId)));
+    return { item: toInspiration(updated, await nameOf(tx, row.viewerId), new Set(vote ? [row.id] : [])),
+      wallet: { balance: spent.balance, currencyLabel: spent.currencyLabel } };
   });
 }

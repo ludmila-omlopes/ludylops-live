@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { CommunityVideos } from "@/components/community-videos";
 import { OwnerManageLink } from "@/components/owner-manage-link";
+import { readCommunityWallet } from "@/lib/creators/community-boosts.server";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { canUseModules } from "@/lib/creators/module-access";
 import { communitySectionPath } from "@/lib/creators/owner-dashboard";
@@ -23,6 +24,7 @@ export default async function CreatorVideosPage({ params }: { params: Promise<{ 
   if (!canUseModules(tenant, ["video_suggestions"], "videos")) notFound();
   const session = await auth();
   const viewerId = session?.user?.activeViewerId ?? undefined;
+  const wallet = await readCommunityWallet(tenant, viewerId);
   let board: Awaited<ReturnType<typeof listCommunityVideos>> | null = null;
   try { board = await listCommunityVideos(tenant.creator.id, viewerId); }
   catch (error) { if (error instanceof CommunityVideoAccessError) notFound(); }
@@ -37,7 +39,7 @@ export default async function CreatorVideosPage({ params }: { params: Promise<{ 
     <div className="mt-10">
       {board
         ? <CommunityVideos slug={tenant.creator.slug} board={board} signedIn={Boolean(viewerId)}
-          signInHref={`/api/auth/signin?callbackUrl=${encodeURIComponent(path)}`} />
+          signInHref={`/api/auth/signin?callbackUrl=${encodeURIComponent(path)}`} wallet={wallet} />
         : <p role="alert">Não foi possível consultar os vídeos agora. Tente novamente mais tarde.</p>}
     </div>
   </div>;
