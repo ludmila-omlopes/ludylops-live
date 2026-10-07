@@ -35,6 +35,7 @@ export const moduleApiGroups: Record<string, CreatorModuleKey[]> = {
   "/api/c/[creatorSlug]/videos": ["video_suggestions"],
   "/api/c/[creatorSlug]/inspirations": ["creator_suggestions"],
   "/api/c/[creatorSlug]/games": ["game_suggestions"],
+  "/api/c/[creatorSlug]/presence": ["points"],
   "/api/bets": ["bets"],
   "/api/catalog": ["redemptions"],
   "/api/leaderboard": ["ranking"],
@@ -85,7 +86,7 @@ export const sharedApiGroups = {
   "/api/auth": "Global authentication",
   "/api/owner":
     "Platform-owner recovery and configuration; existing role checks remain mandatory",
-  "/api/me/creator-area": "Builder provisioning, owner-verified currency configuration, page module choices, video, inspiration and game moderation and isolated economy adjustments",
+  "/api/me/creator-area": "Builder provisioning, owner-verified currency and page reward configuration, page module choices, video, inspiration and game moderation and isolated economy adjustments",
   "/api/me/creator-area-access": "Authenticated beta requests and own access status, independent of live modules",
   "/api/admin/creator-area-access": "Platform beta access configuration",
   "/api/admin/periodic-messages": "Admin-only legacy streamer configuration; active creator and installed/disabled Streamer.bot module verified in storage",

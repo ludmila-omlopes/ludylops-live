@@ -76,7 +76,7 @@ export function CommunityModuleChoicesForm({ creatorId, initial }: { creatorId: 
           const note = dependents.length
             ? `Vem junto com ${joinModuleLabels(dependents)}.`
             : !choice.editable && choice.chosen
-              ? "Gerenciado pela administração."
+              ? choice.key === "points" ? "Guarda os saldos do seu público. Para desativar, fale com a administração." : "Gerenciado pela administração."
               : choice.requires.length
                 ? `Inclui ${joinModuleLabels(choice.requires)}.`
                 : null;

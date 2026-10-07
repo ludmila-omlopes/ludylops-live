@@ -9,6 +9,8 @@ import type { buildHowLongToBeatColumns } from "@/lib/howlongtobeat-columns";
 import { slugify } from "@/lib/utils";
 import { ownedGameScore, readOwnedGameMultiplier } from "@/lib/game-suggestions/ownership";
 import { communityVoteId } from "./community-votes";
+import { lockEconomyIdentity } from "./economy-identity";
+import { rewardDemoSuggestionAuthor, rewardSuggestionAuthor } from "./page-rewards.server";
 import { DEFAULT_CREATOR_ID } from "./defaults";
 import { listDemoCreatorTenants } from "./demo-store";
 import {
@@ -290,13 +292,17 @@ export async function updateCommunityGameStatus(creatorId: string, ownerId: stri
     const row = demo().rows.find((entry) => entry.creatorId === creatorId && entry.id === suggestionId);
     if (!row) throw new CommunityGameAccessError();
     Object.assign(row, changes);
+    if (status === "accepted") rewardDemoSuggestionAuthor({ creatorId, authorId: row.viewerId, suggestionKey: `games:${row.id}`, name: row.canonicalName ?? row.name });
     return toGame(row, demoNames([row]), new Set(), readOwnedGameMultiplier(authorizeDemo(creatorId).configJson));
   }
   return database().transaction(async (tx) => {
+    // Picking a game may credit its author; the identity lock comes first, as in every currency operation.
+    if (status === "accepted") await lockEconomyIdentity(tx);
     const multiplier = await authorize(tx, creatorId, ownerId);
     const [row] = await tx.update(gameSuggestions).set(changes)
       .where(and(eq(gameSuggestions.creatorId, creatorId), eq(gameSuggestions.id, suggestionId))).returning();
     if (!row) throw new CommunityGameAccessError();
+    if (status === "accepted") await rewardSuggestionAuthor(tx, { creatorId, authorId: row.viewerId, suggestionKey: `games:${row.id}`, name: row.canonicalName ?? row.name });
     return toGame(row, await nameOf(tx, row.viewerId), new Set(), multiplier);
   });
 }

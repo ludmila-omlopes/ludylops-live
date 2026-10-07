@@ -10,6 +10,7 @@ import {
   moduleChoiceRequirements,
   moduleChoicesInputSchema,
   planModuleChoices,
+  turnsOnAloneWith,
 } from "./module-choices";
 import { DEFAULT_CREATOR_MODULES } from "./defaults";
 
@@ -29,7 +30,9 @@ describe("community module choices", () => {
   });
 
   it("lets only page modules turn on alone", () => {
-    expect(MODULE_CHOICE_KEYS.filter(isSelfServiceModule)).toEqual(["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions"]);
+    expect(MODULE_CHOICE_KEYS.filter(isSelfServiceModule)).toEqual(["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions", "points", "ranking"]);
+    // Without the community economy switched on, the currency and the ranking wait.
+    expect(MODULE_CHOICE_KEYS.filter(turnsOnAloneWith(false))).toEqual(["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions"]);
     expect(moduleChoiceRequirements("game_suggestions")).toEqual([]);
     expect(moduleChoiceRequirements("video_suggestions")).toEqual([]);
     expect(moduleChoiceRequirements("creator_suggestions")).toEqual([]);
@@ -55,8 +58,13 @@ describe("community module choices", () => {
   });
 
   it("installs products, records the rest with their requirements and removes what was left out", () => {
-    expect(planModuleChoices(rows({ product_recommendations: "installed", ranking: "requested" }), ["product_recommendations", "game_suggestions", "bets"])).toEqual({
+    const current = rows({ product_recommendations: "installed", ranking: "requested" });
+    expect(planModuleChoices(current, ["product_recommendations", "game_suggestions", "bets"], turnsOnAloneWith(false))).toEqual({
       install: ["game_suggestions"], request: ["bets", "points"], remove: ["ranking"], keep: ["product_recommendations"],
+    });
+    // With the economy on, the currency that bets need turns on right away.
+    expect(planModuleChoices(current, ["product_recommendations", "game_suggestions", "bets"], turnsOnAloneWith(true))).toEqual({
+      install: ["game_suggestions", "points"], request: ["bets"], remove: ["ranking"], keep: ["product_recommendations"],
     });
     expect(planModuleChoices(rows({ product_recommendations: "installed" }), [])).toEqual({ install: [], request: [], remove: ["product_recommendations"], keep: [] });
     expect(planModuleChoices([], ["product_recommendations"])).toEqual({ install: ["product_recommendations"], request: [], remove: [], keep: [] });
@@ -68,10 +76,10 @@ describe("community module choices", () => {
 
   it("never changes what the platform installed, disabled or archived", () => {
     const platform = rows({ product_recommendations: "disabled", points: "installed", ranking: "installed", bets: "archived" });
-    expect(planModuleChoices(platform, ["product_recommendations", "bets"])).toEqual({ install: [], request: [], remove: [], keep: [] });
-    expect(planModuleChoices(platform, [])).toEqual({ install: [], request: [], remove: [], keep: [] });
+    expect(planModuleChoices(platform, ["product_recommendations", "bets"], turnsOnAloneWith(false))).toEqual({ install: [], request: [], remove: [], keep: [] });
+    expect(planModuleChoices(platform, [], turnsOnAloneWith(false))).toEqual({ install: [], request: [], remove: [], keep: [] });
     // The legacy seed is fully installed: only the self-service modules are the creator's to remove.
-    expect(planModuleChoices(DEFAULT_CREATOR_MODULES, [])).toEqual({ install: [], request: [], remove: ["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions"], keep: [] });
+    expect(planModuleChoices(DEFAULT_CREATOR_MODULES, [])).toEqual({ install: [], request: [], remove: ["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions", "ranking"], keep: [] });
   });
 
   // No self-service module has requirements yet; these guard the next ones that will, such as bets.
@@ -83,13 +91,11 @@ describe("community module choices", () => {
     expect(planModuleChoices(rows({ points: "installed" }), ["bets"], betsAlone).install).toEqual(["bets"]);
   });
 
-  it("refuses to remove a module an installed one still depends on", () => {
-    const currencyAlone = (key: string) => key === "points";
+  it("keeps the currency once installed, even when unchecked", () => {
     const installed = rows({ points: "installed", bets: "installed", ranking: "installed" });
-    expect(() => planModuleChoices(installed, [], currencyAlone)).toThrow(
-      new ModuleChoiceError("Apostas e Ranking dependem de Moeda da comunidade."),
-    );
-    expect(planModuleChoices(installed, ["ranking"], currencyAlone)).toEqual({ install: [], request: [], remove: [], keep: ["points"] });
+    expect(planModuleChoices(installed, [], turnsOnAloneWith(true))).toEqual({ install: [], request: [], remove: ["ranking"], keep: [] });
+    expect(byKey(describeModuleChoices(installed, turnsOnAloneWith(true))).points).toMatchObject({ state: "active", chosen: true, editable: false });
+    expect(new ModuleChoiceError("x")).toBeInstanceOf(Error);
   });
 
   it("counts only choices the creator saved", () => {

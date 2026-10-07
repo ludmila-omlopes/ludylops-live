@@ -30,6 +30,22 @@ inscrições e preços ainda faz parte da sequência da #203. Os endpoints antig
 de eventos, apostas, sugestões, catálogo/resgates, likes e OBS continuam limitados
 à Ludylops. Este PR não libera essas dependências para outros streamers.
 
+## Ganhos na página
+
+Comunidades sem live também distribuem moeda, sem Streamer.bot. O dono configura em **Economia → Ganhos na página**:
+
+| Ganho | Quando | Chave da operação |
+| --- | --- | --- |
+| Visita do dia | Ao abrir qualquer página `/c/<slug>` logado, uma vez por dia (horário de Brasília) | `presence:<AAAA-MM-DD>:<espectador>` |
+| Sugestão escolhida | Quando o dono escolhe o jogo (“Vai jogar”), marca o vídeo como reagido ou destaca a inspiração indicada pelo espectador | `suggestion:<módulo>:<sugestão>` |
+
+- Os dois créditos usam o ledger e os saldos da comunidade, com a mesma trava de identidade das outras operações. A unicidade de `(creator_id, operation_key)` garante um crédito por visita diária e por sugestão. Voltar a sugestão para a votação e escolhê-la de novo não paga outra vez.
+- O dono nunca recebe bônus pela própria escolha, como as inspirações que ele mesmo cadastra. Sem a moeda instalada, ou com o ganho pausado, a moderação segue normalmente e nada é creditado.
+- A visita é registrada por `POST /api/c/<slug>/presence`, chamado pelo navegador de quem está logado. A página guarda no navegador o dia já registrado, para não repetir a chamada; o servidor continua sendo a fonte da verdade.
+- As regras ficam em `pageRewards`, na configuração do módulo `points`: 1 a 10.000 por visita e por sugestão. Instalações novas da moeda começam com os dois ganhos ligados (10 e 50). Moedas instaladas antes desta entrega ficam com os ganhos desligados até o dono ativar.
+- **Ganhos no chat** só aparecem em Economia quando o Streamer.bot está instalado.
+- Tudo continua dependendo de `CREATOR_ECONOMY_ENABLED=true`.
+
 ## Armazenamento e compatibilidade
 
 A abordagem inicial de trocar a chave de `viewer_balances` foi substituída por

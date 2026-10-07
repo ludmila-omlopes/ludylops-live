@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { startingPageRewards } from "./page-rewards";
 
 const { getDbMock, resolveCreatorMock } = vi.hoisted(() => ({ getDbMock: vi.fn(), resolveCreatorMock: vi.fn() }));
 vi.mock("@/lib/db/client", () => ({ getDb: getDbMock }));
@@ -75,7 +76,7 @@ describe("creator-area database creation", () => {
     await createCreatorArea("owner_1", { ...input, currencyLabel: "corações" }, { liveFeatures: true });
     const modules = committed.find((row) => row.table === creatorModules)?.value;
     expect(modules).toEqual(expect.arrayContaining([
-      expect.objectContaining({ moduleKey: "points", configJson: { currencyLabel: "corações" }, creatorId: committed[0].value.id }),
+      expect.objectContaining({ moduleKey: "points", configJson: { currencyLabel: "corações", pageRewards: startingPageRewards }, creatorId: committed[0].value.id }),
       expect.objectContaining({ moduleKey: "streamerbot", status: "installed" }),
     ]));
   });

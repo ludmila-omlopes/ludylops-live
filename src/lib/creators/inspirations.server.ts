@@ -7,6 +7,8 @@ import { creatorModules, creators, creatorSuggestionBoosts, creatorSuggestions, 
 import { isDemoMode } from "@/lib/env";
 import { slugify } from "@/lib/utils";
 import { communityVoteId } from "./community-votes";
+import { lockEconomyIdentity } from "./economy-identity";
+import { rewardDemoSuggestionAuthor, rewardSuggestionAuthor } from "./page-rewards.server";
 import { DEFAULT_CREATOR_ID } from "./defaults";
 import { listDemoCreatorTenants } from "./demo-store";
 import {
@@ -262,13 +264,17 @@ export async function updateCommunityInspirationStatus(creatorId: string, ownerI
     if (!row) throw new CommunityInspirationAccessError();
     row.status = status;
     row.updatedAt = new Date();
+    if (status === "featured") rewardDemoSuggestionAuthor({ creatorId, authorId: row.viewerId, suggestionKey: `inspirations:${row.id}`, name: row.name });
     return toInspiration(row, demoNames([row]), new Set());
   }
   return database().transaction(async (tx) => {
+    // Featuring may credit the author; the identity lock comes first, as in every currency operation.
+    if (status === "featured") await lockEconomyIdentity(tx);
     await authorize(tx, creatorId, ownerId);
     const [row] = await tx.update(creatorSuggestions).set({ status, updatedAt: new Date() })
       .where(and(eq(creatorSuggestions.creatorId, creatorId), eq(creatorSuggestions.id, suggestionId))).returning();
     if (!row) throw new CommunityInspirationAccessError();
+    if (status === "featured") await rewardSuggestionAuthor(tx, { creatorId, authorId: row.viewerId, suggestionKey: `inspirations:${row.id}`, name: row.name });
     return toInspiration(row, await nameOf(tx, row.viewerId), new Set());
   });
 }

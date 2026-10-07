@@ -9,6 +9,8 @@ import type { YoutubeVideoMetadata } from "@/lib/video-suggestions/service";
 import { DEFAULT_CREATOR_ID } from "./defaults";
 import { listDemoCreatorTenants } from "./demo-store";
 import { communityVoteId } from "./community-votes";
+import { lockEconomyIdentity } from "./economy-identity";
+import { rewardDemoSuggestionAuthor, rewardSuggestionAuthor } from "./page-rewards.server";
 import { canUseModules } from "./module-access";
 import {
   communityVideoStatusSchema,
@@ -237,13 +239,17 @@ export async function updateCommunityVideoStatus(creatorId: string, ownerId: str
     if (!row) throw new CommunityVideoAccessError();
     row.status = status;
     row.updatedAt = new Date();
+    if (status === "reacted") rewardDemoSuggestionAuthor({ creatorId, authorId: row.viewerId, suggestionKey: `videos:${row.id}`, name: row.title });
     return toVideo(row, demoNames([row]), new Set());
   }
   return database().transaction(async (tx) => {
+    // Reacting may credit the author; the identity lock comes first, as in every currency operation.
+    if (status === "reacted") await lockEconomyIdentity(tx);
     await authorize(tx, creatorId, ownerId);
     const [row] = await tx.update(videoSuggestions).set({ status, updatedAt: new Date() })
       .where(and(eq(videoSuggestions.creatorId, creatorId), eq(videoSuggestions.id, suggestionId))).returning();
     if (!row) throw new CommunityVideoAccessError();
+    if (status === "reacted") await rewardSuggestionAuthor(tx, { creatorId, authorId: row.viewerId, suggestionKey: `videos:${row.id}`, name: row.title });
     const [user] = await tx.select({ name: users.youtubeDisplayName }).from(users).where(eq(users.id, row.viewerId));
     return toVideo(row, new Map(user ? [[row.viewerId, user.name]] : []), new Set());
   });

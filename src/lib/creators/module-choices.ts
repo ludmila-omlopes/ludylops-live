@@ -56,6 +56,15 @@ export function isSelfServiceModule(key: string) {
   return pageModuleKeys.some((pageKey) => pageKey === key);
 }
 
+/** Moeda and Ranking only turn on alone where the community economy is switched on. */
+const economyModuleKeys: readonly ModuleChoiceKey[] = ["points", "ranking"];
+export function turnsOnAloneWith(economyEnabled: boolean) {
+  return (key: ModuleChoiceKey) => isSelfServiceModule(key) && (economyEnabled || !economyModuleKeys.includes(key));
+}
+
+/** The currency keeps balances, its name and earning rules; once on, only the platform turns it off. */
+const keptOnceInstalled: readonly ModuleChoiceKey[] = ["points"];
+
 export const moduleChoicesInputSchema = z
   .object({
     modules: z.array(z.enum(MODULE_CHOICE_KEYS, { message: "Escolha módulos válidos." })).max(MODULE_CHOICE_KEYS.length),
@@ -117,13 +126,13 @@ function rowStatus(rows: readonly ModuleRow[], key: string) {
   return matches[0]?.status ?? "missing";
 }
 
-export function describeModuleChoices(rows: readonly ModuleRow[]): ModuleChoice[] {
+export function describeModuleChoices(rows: readonly ModuleRow[], turnsOnAlone: (key: ModuleChoiceKey) => boolean = isSelfServiceModule): ModuleChoice[] {
   return MODULE_CHOICE_KEYS.map((key): ModuleChoice => {
     const status = rowStatus(rows, key);
-    const selfService = isSelfServiceModule(key);
+    const selfService = turnsOnAlone(key);
     const base = { key, ...moduleChoiceOptions[key], requires: moduleChoiceRequirements(key) };
     if (status === "installed") {
-      return { ...base, state: communityReadyKeys.includes(key) ? "active" : "soon", chosen: true, editable: selfService };
+      return { ...base, state: communityReadyKeys.includes(key) ? "active" : "soon", chosen: true, editable: selfService && !keptOnceInstalled.includes(key) };
     }
     if (status === "requested") return { ...base, state: "soon", chosen: true, editable: true };
     if (status === "missing") return { ...base, state: selfService ? "off" : "soon", chosen: false, editable: true };
@@ -177,7 +186,7 @@ export function planModuleChoices(
     } else if (status === "requested") {
       if (!wanted.has(key)) plan.remove.push(key);
       else plan[selfService ? "install" : "keep"].push(key);
-    } else if (status === "installed" && selfService) {
+    } else if (status === "installed" && selfService && !keptOnceInstalled.includes(key)) {
       plan[wanted.has(key) ? "keep" : "remove"].push(key);
     }
   }

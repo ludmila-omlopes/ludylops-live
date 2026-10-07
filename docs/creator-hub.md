@@ -69,9 +69,11 @@ Em **Módulos** (`/comunidades/<slug>/modulos`), o criador escolhe o que entra n
 | Módulo | Ao escolher |
 | --- | --- |
 | Produtos indicados, [Jogos](creator-games.md), [Vídeos para reagir](creator-videos.md) e [Inspirações](creator-inspirations.md) | Instalados na hora (`installed`); desmarcar remove a instalação, sem apagar os dados |
-| Demais módulos | Registrados como `requested`, com o rótulo “Em breve”, até existir a versão por comunidade |
+| Moeda e Ranking | Instalados na hora quando `CREATOR_ECONOMY_ENABLED=true`; sem a economia ligada, ficam “Em breve”. Depois de ativada, a Moeda só é desativada pela administração, porque guarda saldos, nome e regras de ganho |
+| Apostas | Registradas como `requested`, com o rótulo “Em breve”, até existir a versão por comunidade |
 
-- Escolher um módulo inclui suas dependências: jogos, vídeos, inspirações, apostas e ranking levam junto a moeda.
+- Escolher um módulo inclui suas dependências: apostas e ranking levam junto a moeda.
+- Moeda e Ranking servem comunidades sem live: o público ganha moeda [na página](creator-economy.md#ganhos-na-página). Instalá-los não troca o roteiro inicial pelo de live, que continua dependendo dos módulos do Streamer.bot.
 - `requested` nunca conta como disponível: rotas, APIs e navegação continuam bloqueadas como para um módulo ausente.
 - O criador não altera módulos instalados pela administração nem os que estão `disabled` ou `archived`. No `/owner`, os pedidos aparecem como “Escolhido pelo criador” e podem ser instalados pelos controles existentes.
 - A etapa “Módulos da página” só conta como registrada depois que o criador salva uma escolha: cada linha escolhida recebe `config_json.chosenAt`. Os produtos instalados na criação não contam.

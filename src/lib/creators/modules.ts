@@ -2,6 +2,7 @@ import type { CreatorModuleRecord } from "@/lib/types";
 import { moduleAvailability, validateModuleCatalog } from "./module-policy";
 import { modulePages } from "./module-entry-points";
 import { getCurrencyLabel } from "./currency";
+import { startingPageRewards } from "./page-rewards";
 
 export type CreatorModuleKey =
   | "points"
@@ -42,6 +43,8 @@ export const creatorModuleCatalog = [
     requiredCapabilities: [],
     defaultConfig: {
       currencyLabel: "pontos",
+      // Installs from here on earn on the page too; older currencies keep it off until the owner turns it on.
+      pageRewards: startingPageRewards,
     },
   },
   {
@@ -154,7 +157,11 @@ validateModuleCatalog(creatorModuleCatalog);
  * and the rest) are turned on from the platform console, or at creation for a
  * streamer plan.
  */
-export const pageModuleKeys: readonly CreatorModuleKey[] = ["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions"];
+export const pageModuleKeys: readonly CreatorModuleKey[] = [
+  "product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions",
+  // The currency earns on the page too; the module choice server still checks the economy switch.
+  "points", "ranking",
+];
 
 /** A new community starts with products only; the creator adds the rest in Módulos. */
 export const initialModuleKeys: readonly CreatorModuleKey[] = ["product_recommendations"];
