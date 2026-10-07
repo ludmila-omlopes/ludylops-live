@@ -11,6 +11,7 @@ import {
   listOwnedCommunityGames,
   suggestCommunityGame,
   updateCommunityGameStatus,
+  updateCommunityGameBoostSettings,
   voteCommunityGame,
   type CommunityGameDetails,
 } from "./games.server";
@@ -76,8 +77,10 @@ export async function ownerCommunityGamesRequest(request: Request, creatorId: st
   try {
     const context = await communityOwnerContext(request);
     if ("response" in context) return context.response;
-    return reply({ ok: true, data: request.method === "GET"
-      ? await listOwnedCommunityGames(creatorId, context.ownerId)
-      : await updateCommunityGameStatus(creatorId, context.ownerId, await request.json()) });
+    if (request.method === "GET") return reply({ ok: true, data: await listOwnedCommunityGames(creatorId, context.ownerId) });
+    const input = await request.json();
+    const update = input && typeof input === "object" && "ownedGameMultiplier" in input
+      ? updateCommunityGameBoostSettings : updateCommunityGameStatus;
+    return reply({ ok: true, data: await update(creatorId, context.ownerId, input) });
   } catch (error) { return failure(error); }
 }

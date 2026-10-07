@@ -7,11 +7,13 @@ import { creatorModules, creators, gameSuggestionBoosts, gameSuggestions, users 
 import { isDemoMode } from "@/lib/env";
 import type { buildHowLongToBeatColumns } from "@/lib/howlongtobeat-columns";
 import { slugify } from "@/lib/utils";
+import { ownedGameScore, readOwnedGameMultiplier } from "@/lib/game-suggestions/ownership";
 import { communityVoteId } from "./community-votes";
 import { DEFAULT_CREATOR_ID } from "./defaults";
 import { listDemoCreatorTenants } from "./demo-store";
 import {
   communityGameStatusSchema,
+  communityGameBoostSettingsSchema,
   MAX_OPEN_GAMES_PER_VIEWER,
   type CommunityGame,
   type CommunityGameBoard,
@@ -54,15 +56,17 @@ function authorizeDemo(creatorId: string, ownerId?: string) {
   const tenant = listDemoCreatorTenants().find((entry) => entry.creator.id === creatorId);
   if (!canUseModules(tenant ?? null, ["game_suggestions"], "games")
     || (ownerId !== undefined && tenant?.creator.ownerUserId !== ownerId)) throw new CommunityGameAccessError();
+  return tenant!.modules.find((module) => module.moduleKey === "game_suggestions")!;
 }
 
-async function authorize(tx: Tx, creatorId: string, ownerId?: string) {
+async function authorize(tx: Tx, creatorId: string, ownerId?: string, updateSettings = false) {
   const [creator] = await tx.select({ id: creators.id, status: creators.status, ownerUserId: creators.ownerUserId })
     .from(creators).where(eq(creators.id, creatorId)).for("share");
   if (!creator || (ownerId !== undefined && creator.ownerUserId !== ownerId)) throw new CommunityGameAccessError();
-  const modules = await tx.select({ moduleKey: creatorModules.moduleKey, status: creatorModules.status }).from(creatorModules)
-    .where(and(eq(creatorModules.creatorId, creatorId), eq(creatorModules.moduleKey, "game_suggestions"))).for("share");
+  const modules = await tx.select({ moduleKey: creatorModules.moduleKey, status: creatorModules.status, configJson: creatorModules.configJson }).from(creatorModules)
+    .where(and(eq(creatorModules.creatorId, creatorId), eq(creatorModules.moduleKey, "game_suggestions"))).for(updateSettings ? "update" : "share");
   if (!canUseModules({ creator, modules }, ["game_suggestions"], "games")) throw new CommunityGameAccessError();
+  return readOwnedGameMultiplier(modules[0].configJson);
 }
 
 function database() {
@@ -73,8 +77,11 @@ function database() {
 
 const stringList = (value: unknown) => (Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : []);
 
-function toGame(row: Row, names: Map<string, string>, voted: Set<string>): CommunityGame {
+function toGame(row: Row, names: Map<string, string>, voted: Set<string>, ownedGameMultiplier: number): CommunityGame {
   return {
+    isOwned: row.isOwned,
+    boostedScore: ownedGameScore(row.totalVotes, row.isOwned, ownedGameMultiplier),
+    ownedGameMultiplier,
     id: row.id,
     name: row.canonicalName ?? row.name,
     coverImageUrl: row.coverImageUrl,
@@ -91,7 +98,9 @@ function toGame(row: Row, names: Map<string, string>, voted: Set<string>): Commu
   };
 }
 
-const byVotes = (a: Row, b: Row) => b.totalVotes - a.totalVotes || a.createdAt.getTime() - b.createdAt.getTime();
+const byVotes = (multiplier: number) => (a: Row, b: Row) =>
+  ownedGameScore(b.totalVotes, b.isOwned, multiplier) - ownedGameScore(a.totalVotes, a.isOwned, multiplier)
+  || b.totalVotes - a.totalVotes || a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
 const byUpdate = (a: Row, b: Row) => b.updatedAt.getTime() - a.updatedAt.getTime();
 
 function demoNames(rows: Row[]) {
@@ -101,22 +110,25 @@ function demoNames(rows: Row[]) {
 }
 
 function demoBoard(creatorId: string, viewerId: string | undefined, includeRejected: boolean): CommunityGameBoard {
+  const multiplier = readOwnedGameMultiplier(authorizeDemo(creatorId).configJson);
   const rows = demo().rows.filter((row) => row.creatorId === creatorId);
   const voted = new Set(viewerId ? rows.filter((row) => demo().votes.some((vote) => vote.id === communityVoteId(row.id, viewerId))).map((row) => row.id) : []);
   const names = demoNames(rows);
   const pick = (status: CommunityGameStatus, sort: (a: Row, b: Row) => number, limit: number) =>
-    rows.filter((row) => row.status === status).sort(sort).slice(0, limit).map((row) => toGame(row, names, voted));
+    rows.filter((row) => row.status === status).sort(sort).slice(0, limit).map((row) => toGame(row, names, voted, multiplier));
   return {
-    accepted: pick("accepted", byVotes, LIST_LIMIT), open: pick("open", byVotes, LIST_LIMIT),
+    ownedGameMultiplier: multiplier,
+    accepted: pick("accepted", byVotes(multiplier), LIST_LIMIT), open: pick("open", byVotes(multiplier), LIST_LIMIT),
     played: pick("played", byUpdate, HISTORY_LIMIT), rejected: includeRejected ? pick("rejected", byUpdate, HISTORY_LIMIT) : [],
   };
 }
 
-async function readBoard(tx: Tx, creatorId: string, viewerId: string | undefined, includeRejected: boolean): Promise<CommunityGameBoard> {
+async function readBoard(tx: Tx, creatorId: string, viewerId: string | undefined, includeRejected: boolean, multiplier: number): Promise<CommunityGameBoard> {
+  const score = sql`round(${gameSuggestions.totalVotes}::numeric * case when ${gameSuggestions.isOwned} then ${multiplier}::numeric else 1 end)`;
   const select = (status: CommunityGameStatus, limit: number) => {
     const query = tx.select().from(gameSuggestions).where(and(eq(gameSuggestions.creatorId, creatorId), eq(gameSuggestions.status, status)));
     return (status === "open" || status === "accepted"
-      ? query.orderBy(desc(gameSuggestions.totalVotes), asc(gameSuggestions.createdAt), asc(gameSuggestions.id))
+      ? query.orderBy(desc(score), desc(gameSuggestions.totalVotes), asc(gameSuggestions.createdAt), asc(gameSuggestions.id))
       : query.orderBy(desc(gameSuggestions.updatedAt), desc(gameSuggestions.id))).limit(limit);
   };
   const [accepted, open, played, rejected] = await Promise.all([
@@ -134,8 +146,8 @@ async function readBoard(tx: Tx, creatorId: string, viewerId: string | undefined
       .where(and(eq(gameSuggestionBoosts.creatorId, creatorId), inArray(gameSuggestionBoosts.id, voteIds)))
     : [];
   const voted = new Set(votes.map((vote) => vote.suggestionId));
-  const map = (list: Row[]) => list.map((row) => toGame(row, names, voted));
-  return { accepted: map(accepted), open: map(open), played: map(played), rejected: map(rejected) };
+  const map = (list: Row[]) => list.map((row) => toGame(row, names, voted, multiplier));
+  return { ownedGameMultiplier: multiplier, accepted: map(accepted), open: map(open), played: map(played), rejected: map(rejected) };
 }
 
 async function nameOf(tx: Tx, viewerId: string) {
@@ -148,8 +160,8 @@ export async function listCommunityGames(creatorId: string, viewerId?: string) {
   identity(creatorId, viewerId);
   if (isDemoMode) { authorizeDemo(creatorId); return demoBoard(creatorId, viewerId, false); }
   return database().transaction(async (tx) => {
-    await authorize(tx, creatorId);
-    return readBoard(tx, creatorId, viewerId, false);
+    const multiplier = await authorize(tx, creatorId);
+    return readBoard(tx, creatorId, viewerId, false, multiplier);
   }, { isolationLevel: "repeatable read" });
 }
 
@@ -159,8 +171,8 @@ export async function listOwnedCommunityGames(creatorId: string, ownerId: string
   if (!ownerId) throw new CommunityGameAccessError();
   if (isDemoMode) { authorizeDemo(creatorId, ownerId); return demoBoard(creatorId, undefined, true); }
   return database().transaction(async (tx) => {
-    await authorize(tx, creatorId, ownerId);
-    return readBoard(tx, creatorId, undefined, true);
+    const multiplier = await authorize(tx, creatorId, ownerId);
+    return readBoard(tx, creatorId, undefined, true, multiplier);
   }, { isolationLevel: "repeatable read" });
 }
 
@@ -199,10 +211,10 @@ export async function suggestCommunityGame(creatorId: string, viewerId: string, 
     const created = { ...demoRowDefaults(), ...values, id: randomUUID() } as Row;
     store.rows.unshift(created);
     store.votes.unshift({ id: communityVoteId(created.id, viewerId), creatorId, suggestionId: created.id, viewerId, amount: 1, createdAt: now });
-    return toGame(created, demoNames([created]), new Set([created.id]));
+    return toGame(created, demoNames([created]), new Set([created.id]), readOwnedGameMultiplier(authorizeDemo(creatorId).configJson));
   }
   return database().transaction(async (tx) => {
-    await authorize(tx, creatorId);
+    const multiplier = await authorize(tx, creatorId);
     // Serializes suggestions per community, so duplicate and limit checks hold under concurrency.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify([creatorId, "games"])}, 248))`);
     const [existing] = await tx.select({ status: gameSuggestions.status }).from(gameSuggestions)
@@ -215,7 +227,7 @@ export async function suggestCommunityGame(creatorId: string, viewerId: string, 
     if (open >= MAX_OPEN_GAMES_PER_VIEWER) throw new CommunityGameConflictError(limitMessage);
     const [created] = await tx.insert(gameSuggestions).values({ ...values, id: randomUUID() }).returning();
     await tx.insert(gameSuggestionBoosts).values({ id: communityVoteId(created.id, viewerId), creatorId, suggestionId: created.id, viewerId, amount: 1, createdAt: now });
-    return toGame(created, await nameOf(tx, viewerId), new Set([created.id]));
+    return toGame(created, await nameOf(tx, viewerId), new Set([created.id]), multiplier);
   });
 }
 
@@ -223,7 +235,7 @@ function demoRowDefaults(): Partial<Row> {
   return {
     description: null, linkUrl: null, igdbId: null, canonicalName: null, coverImageUrl: null, releaseYear: null, platforms: [], genres: [],
     hltbId: null, hltbName: null, hltbMainStoryMinutes: null, hltbMainExtraMinutes: null, hltbCompletionistMinutes: null, hltbSimilarity: null,
-    hltbFetchedAt: null, psPlusAvailable: false, steamIsFree: false,
+    hltbFetchedAt: null, isOwned: false, psPlusAvailable: false, steamIsFree: false,
   };
 }
 
@@ -246,10 +258,10 @@ export async function voteCommunityGame(creatorId: string, viewerId: string, sug
       store.votes.splice(index, 1);
       row.totalVotes = Math.max(0, row.totalVotes - 1);
     }
-    return toGame(row, demoNames([row]), new Set(vote ? [row.id] : []));
+    return toGame(row, demoNames([row]), new Set(vote ? [row.id] : []), readOwnedGameMultiplier(authorizeDemo(creatorId).configJson));
   }
   return database().transaction(async (tx) => {
-    await authorize(tx, creatorId);
+    const multiplier = await authorize(tx, creatorId);
     const [row] = await tx.select().from(gameSuggestions)
       .where(and(eq(gameSuggestions.creatorId, creatorId), eq(gameSuggestions.id, suggestionId))).for("update");
     if (!row) throw new CommunityGameAccessError();
@@ -263,7 +275,7 @@ export async function voteCommunityGame(creatorId: string, viewerId: string, sug
         .set({ totalVotes: sql`greatest(${gameSuggestions.totalVotes} + ${vote ? 1 : -1}, 0)` })
         .where(and(eq(gameSuggestions.creatorId, creatorId), eq(gameSuggestions.id, suggestionId))).returning();
     }
-    return toGame(updated, await nameOf(tx, row.viewerId), new Set(vote ? [row.id] : []));
+    return toGame(updated, await nameOf(tx, row.viewerId), new Set(vote ? [row.id] : []), multiplier);
   });
 }
 
@@ -271,20 +283,40 @@ export async function voteCommunityGame(creatorId: string, viewerId: string, sug
 export async function updateCommunityGameStatus(creatorId: string, ownerId: string, input: unknown) {
   identity(creatorId, ownerId);
   if (!ownerId) throw new CommunityGameAccessError();
-  const { suggestionId, status } = communityGameStatusSchema.parse(input);
+  const { suggestionId, status, isOwned } = communityGameStatusSchema.parse(input);
+  const changes = { ...(status !== undefined ? { status } : {}), ...(isOwned !== undefined ? { isOwned } : {}), updatedAt: new Date() };
   if (isDemoMode) {
     authorizeDemo(creatorId, ownerId);
     const row = demo().rows.find((entry) => entry.creatorId === creatorId && entry.id === suggestionId);
     if (!row) throw new CommunityGameAccessError();
-    row.status = status;
-    row.updatedAt = new Date();
-    return toGame(row, demoNames([row]), new Set());
+    Object.assign(row, changes);
+    return toGame(row, demoNames([row]), new Set(), readOwnedGameMultiplier(authorizeDemo(creatorId).configJson));
   }
   return database().transaction(async (tx) => {
-    await authorize(tx, creatorId, ownerId);
-    const [row] = await tx.update(gameSuggestions).set({ status, updatedAt: new Date() })
+    const multiplier = await authorize(tx, creatorId, ownerId);
+    const [row] = await tx.update(gameSuggestions).set(changes)
       .where(and(eq(gameSuggestions.creatorId, creatorId), eq(gameSuggestions.id, suggestionId))).returning();
     if (!row) throw new CommunityGameAccessError();
-    return toGame(row, await nameOf(tx, row.viewerId), new Set());
+    return toGame(row, await nameOf(tx, row.viewerId), new Set(), multiplier);
+  });
+}
+
+/** Only the owner can change this community's ranking multiplier. */
+export async function updateCommunityGameBoostSettings(creatorId: string, ownerId: string, input: unknown) {
+  identity(creatorId, ownerId);
+  if (!ownerId) throw new CommunityGameAccessError();
+  const settings = communityGameBoostSettingsSchema.parse(input);
+  if (isDemoMode) {
+    const gamesModule = authorizeDemo(creatorId, ownerId);
+    gamesModule.configJson = { ...gamesModule.configJson, ...settings };
+    gamesModule.updatedAt = new Date().toISOString();
+    return demoBoard(creatorId, undefined, true);
+  }
+  return database().transaction(async (tx) => {
+    await authorize(tx, creatorId, ownerId, true);
+    await tx.update(creatorModules).set({
+      configJson: sql`${creatorModules.configJson} || ${JSON.stringify(settings)}::jsonb`, updatedAt: new Date(),
+    }).where(and(eq(creatorModules.creatorId, creatorId), eq(creatorModules.moduleKey, "game_suggestions")));
+    return readBoard(tx, creatorId, undefined, true, settings.ownedGameMultiplier);
   });
 }

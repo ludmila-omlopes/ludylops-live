@@ -1,0 +1,1 @@
+ALTER TABLE "game_suggestions" ADD COLUMN "is_owned" boolean DEFAULT false NOT NULL;

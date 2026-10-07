@@ -36,7 +36,7 @@ export async function POST(
 
     const suggestion = await updateGameSuggestionStatus({
       suggestionId: id,
-      status: parsed.data.status,
+      ...parsed.data,
     });
 
     return ok(suggestion);

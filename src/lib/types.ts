@@ -443,6 +443,7 @@ export interface PipetzPricingRecord {
 }
 
 export interface GameSuggestionBoostSettingsRecord {
+  ownedGameMultiplier: number;
   psPlusMultiplier: number;
   shortGameMultiplier: number;
   adminSuggestionMultiplier: number;
@@ -645,6 +646,7 @@ export interface BetWithOptionsRecord extends BetRecord {
 }
 
 export interface GameSuggestionRecord {
+  isOwned: boolean;
   id: string;
   viewerId: string;
   slug: string;
@@ -705,7 +707,7 @@ export interface GameSuggestionBoostRecord {
   createdAt: string;
 }
 
-export type GameSuggestionBoostModifierKey = "ps_plus" | "short_game" | "admin_suggestion";
+export type GameSuggestionBoostModifierKey = "ps_plus" | "short_game" | "admin_suggestion" | "owned_game";
 
 export interface GameSuggestionAppliedBoostModifier {
   key: GameSuggestionBoostModifierKey;

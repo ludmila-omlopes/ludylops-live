@@ -15,7 +15,7 @@ type GameSuggestionStatus = GameSuggestionWithMeta["status"];
 
 type BoostSettingField = keyof Pick<
   GameSuggestionBoostSettingsRecord,
-  "psPlusMultiplier" | "shortGameMultiplier" | "adminSuggestionMultiplier"
+  "psPlusMultiplier" | "shortGameMultiplier" | "adminSuggestionMultiplier" | "ownedGameMultiplier"
 >;
 
 const boostSettingFields: Array<{
@@ -23,6 +23,11 @@ const boostSettingFields: Array<{
   label: string;
   description: string;
 }> = [
+  {
+    key: "ownedGameMultiplier",
+    label: "Já possuo o jogo",
+    description: "Aplica aos jogos que você marcou como já possui. Use 1 para não dar bônus.",
+  },
   {
     key: "psPlusMultiplier",
     label: "Disponível na PS Plus",
@@ -95,6 +100,7 @@ function mapSuggestionError(message: string) {
 
 function toBoostFormState(settings: GameSuggestionBoostSettingsRecord) {
   return {
+    ownedGameMultiplier: String(settings.ownedGameMultiplier),
     psPlusMultiplier: String(settings.psPlusMultiplier),
     shortGameMultiplier: String(settings.shortGameMultiplier),
     adminSuggestionMultiplier: String(settings.adminSuggestionMultiplier),
@@ -148,6 +154,7 @@ export function AdminGameSuggestionsPanel({
 
   function saveBoostSettings() {
     const payload = {
+      ownedGameMultiplier: Number(boostForm.ownedGameMultiplier),
       psPlusMultiplier: Number(boostForm.psPlusMultiplier),
       shortGameMultiplier: Number(boostForm.shortGameMultiplier),
       adminSuggestionMultiplier: Number(boostForm.adminSuggestionMultiplier),
@@ -190,25 +197,29 @@ export function AdminGameSuggestionsPanel({
     });
   }
 
-  function submitStatus(suggestionId: string, status: GameSuggestionWithMeta["status"]) {
+  function submitStatus(suggestionId: string, status?: GameSuggestionWithMeta["status"], isOwned?: boolean) {
     setFeedback(null);
     startTransition(async () => {
-      const response = await fetch(`/api/admin/game-suggestions/${suggestionId}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ status }),
-      });
+      try {
+        const response = await fetch(`/api/admin/game-suggestions/${suggestionId}`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ status, isOwned }),
+        });
 
-      const payload = (await response.json()) as { ok: boolean; error?: string };
-      if (!response.ok || !payload.ok) {
-        setFeedback(mapSuggestionError(payload.error ?? "Falha ao atualizar sugestão."));
-        return;
+        const payload = (await response.json()) as { ok: boolean; error?: string };
+        if (!response.ok || !payload.ok) {
+          setFeedback(mapSuggestionError(payload.error ?? "Falha ao atualizar sugestão."));
+          return;
+        }
+
+        setFeedback(isOwned === undefined ? "Status atualizado." : isOwned ? "Jogo marcado como seu." : "Marcação removida.");
+        router.refresh();
+      } catch {
+        setFeedback("Não foi possível atualizar o jogo. Tente novamente.");
       }
-
-      setFeedback("Status atualizado.");
-      router.refresh();
     });
   }
 
@@ -252,7 +263,7 @@ export function AdminGameSuggestionsPanel({
             ) : null}
           </div>
 
-          <div className="mt-5 grid gap-4 xl:grid-cols-3">
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {boostSettingFields.map((field) => (
               <label key={field.key} className="card-brutal-static surface-card grid gap-3 p-4">
                 <div>
@@ -387,6 +398,11 @@ export function AdminGameSuggestionsPanel({
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant={suggestion.isOwned ? "success" : "neutral"}
+                  aria-pressed={suggestion.isOwned} disabled={isPending}
+                  onClick={() => submitStatus(suggestion.id, undefined, !suggestion.isOwned)}>
+                  {suggestion.isOwned ? "Já possuo · desmarcar" : "Marcar como já possuo"}
+                </Button>
                 {suggestion.status !== "accepted" ? (
                   <Button
                     type="button"
