@@ -31,6 +31,8 @@ Segundo módulo de sugestões levado da Ludylops para as comunidades, no padrão
 - **Sem migração.** Os dados ficam em `creator_suggestions` e `creator_suggestion_boosts`, que já tinham `creator_id`. O voto grátis usa o mesmo ID determinístico de Vídeos (`community-votes.ts`).
 - **O fluxo da Ludylops ficou preso a `creator_ludylops`** em todas as leituras e gravações: listas, destaques, criação, cadastro e edição pelo admin, boost e exclusão. Ele continua cobrando pipetz e agora exige Pontos explicitamente nas rotas `/api/me/creator-suggestions` e na página `/indicacoes`. O cadastro pelo admin (`/api/admin/creator-suggestions`) continua exigindo só o módulo.
 
+Na [fusão de contas](creator-hub.md#fusão-de-contas), as sugestões e os votos grátis acompanham a identidade final.
+
 ## Implantação
 
 1. Implantar este código. Os filtros do legado precisam estar no ar antes de existir qualquer inspiração de outra comunidade. Depois disso, um rollback precisa manter esses filtros.

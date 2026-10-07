@@ -79,6 +79,18 @@ Em **Módulos** (`/comunidades/<slug>/modulos`), o criador escolhe o que entra n
 
 Sem migração de banco: `creator_modules.status` já é texto, e `requested` reaproveita a mesma linha e o mesmo bloqueio da linha do criador usados pelo `/owner`.
 
+### Fusão de contas
+
+Quando um espectador sem canal vinculado (sessão Google) vincula um canal do YouTube que já tem histórico, as duas identidades se fundem e a de origem é apagada.
+
+A fusão transfere:
+
+- a propriedade das comunidades (`creators.owner_user_id`);
+- as sugestões de jogos, vídeos e inspirações, da Ludylops e de todas as comunidades, com seus boosts;
+- os votos grátis, re-chaveados para a identidade final. Se as duas identidades votaram na mesma sugestão, fica um voto só e o total é corrigido.
+
+Sem isso, a exclusão da identidade de origem esbarraria nas chaves estrangeiras e o vínculo do canal falharia. A lógica fica em `community-identity.server.ts`, chamada pela fusão real e pela do modo demo.
+
 ### Próximos trabalhos
 
 - Versão por comunidade de jogos, no mesmo modelo de [Vídeos para reagir](creator-videos.md) e [Inspirações](creator-inspirations.md): votos grátis, com boost opcional na moeda da comunidade. Apostas vêm por último, com a moeda.

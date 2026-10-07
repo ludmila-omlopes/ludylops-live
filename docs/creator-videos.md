@@ -20,6 +20,8 @@ Primeiro módulo da Ludylops levado para as comunidades, depois dos produtos. É
 - **Sem migração.** Os dados ficam em `video_suggestions` e `video_suggestion_boosts`, que já tinham `creator_id`. O voto grátis é uma linha de boost com `amount = 1` e ID determinístico (`vote_` + SHA-256 de vídeo e pessoa), então a chave primária garante um voto por pessoa. Boosts pagos usam IDs aleatórios e nunca se confundem com votos.
 - **O fluxo da Ludylops ficou preso a `creator_ludylops`** em todas as leituras e gravações: lista, criação, boost e status. Ele continua cobrando pipetz e agora exige Pontos explicitamente nas rotas `/api/me/video-suggestions` e na página `/videos`.
 
+Na [fusão de contas](creator-hub.md#fusão-de-contas), as sugestões e os votos grátis acompanham a identidade final.
+
 ## Implantação
 
 1. Implantar este código. Os filtros do legado precisam estar no ar antes de existir qualquer vídeo de outra comunidade. Depois disso, um rollback precisa manter esses filtros, porque versões anteriores leem a tabela inteira.

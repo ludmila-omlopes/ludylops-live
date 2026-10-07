@@ -1,5 +1,6 @@
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { consolidateAccountEconomies, lockEconomyIdentity, mergeCreatorEconomies } from "@/lib/creators/economy-identity";
+import { mergeCommunityIdentity, mergeDemoCommunityIdentity } from "@/lib/creators/community-identity.server";
 import { consolidateDemoAccountEconomies, economyDemoStore, mergeDemoEconomies } from "@/lib/creators/economy-demo";
 import { type CreatorContext, requireCreatorContext, requireDefaultCreatorCapability } from "@/lib/creators/context";
 
@@ -1556,6 +1557,7 @@ function mergeDemoViewerIntoTarget(input: {
   const sourceBalance = getBalance(store, sourceViewerId);
   const targetBalance = getBalance(store, targetViewerId);
   mergeDemoEconomies(sourceViewerId, targetViewerId);
+  mergeDemoCommunityIdentity(sourceViewerId, targetViewerId);
   targetViewer.googleUserId ??= sourceViewer.googleUserId;
   targetViewer.email ??= sourceViewer.email;
   targetViewer.avatarUrl ??= sourceViewer.avatarUrl;
@@ -1598,6 +1600,16 @@ function mergeDemoViewerIntoTarget(input: {
     }
   }
   for (const entry of store.videoSuggestionBoosts) {
+    if (entry.viewerId === sourceViewerId) {
+      entry.viewerId = targetViewerId;
+    }
+  }
+  for (const entry of store.creatorSuggestions) {
+    if (entry.viewerId === sourceViewerId) {
+      entry.viewerId = targetViewerId;
+    }
+  }
+  for (const entry of store.creatorSuggestionBoosts) {
     if (entry.viewerId === sourceViewerId) {
       entry.viewerId = targetViewerId;
     }
@@ -1689,14 +1701,8 @@ async function mergeViewerIntoTarget(input: {
     await tx.update(pointLedger).set({ viewerId: input.targetViewerId }).where(eq(pointLedger.viewerId, input.sourceViewerId));
     await tx.update(redemptions).set({ viewerId: input.targetViewerId }).where(eq(redemptions.viewerId, input.sourceViewerId));
     await tx.update(betEntries).set({ viewerId: input.targetViewerId }).where(eq(betEntries.viewerId, input.sourceViewerId));
-    await tx
-      .update(gameSuggestions)
-      .set({ viewerId: input.targetViewerId })
-      .where(eq(gameSuggestions.viewerId, input.sourceViewerId));
-    await tx
-      .update(gameSuggestionBoosts)
-      .set({ viewerId: input.targetViewerId })
-      .where(eq(gameSuggestionBoosts.viewerId, input.sourceViewerId));
+    // Game, video and creator suggestions, free votes and community ownership, for every creator.
+    await mergeCommunityIdentity(tx, input.sourceViewerId, input.targetViewerId);
     await tx
       .update(googleAccounts)
       .set({ activeViewerId: input.targetViewerId })
