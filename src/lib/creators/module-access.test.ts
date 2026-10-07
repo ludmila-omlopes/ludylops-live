@@ -18,6 +18,15 @@ const tenant = (id = DEFAULT_CREATOR_ID) => ({
   modules: structuredClone(DEFAULT_CREATOR_MODULES),
 });
 describe("server module authorization", () => {
+  it("allows scoped stickers without unlocking other overlay or legacy operations", () => {
+    const other = tenant("another");
+    expect(canUseModules(other, ["obs_overlays"], "obs.stickers")).toBe(true);
+    expect(canUseModules(other, ["obs_overlays"])).toBe(false);
+    expect(canUseModules(other, ["points"], "obs.stickers")).toBe(false);
+    expect(canUseModules(other, ["streamerbot"], "obs.stickers")).toBe(false);
+    other.modules.find(entry => entry.moduleKey === "streamerbot")!.status = "disabled";
+    expect(canUseModules(other, ["obs_overlays"], "obs.stickers")).toBe(false);
+  });
   it("allows only the isolated Streamer.bot operation for periodic messages", () => {
     const other = tenant("another");
     expect(canUseModules(other, ["streamerbot"], "periodic-messages")).toBe(true);

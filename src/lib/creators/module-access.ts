@@ -15,7 +15,7 @@ type ModuleTenant = {
   creator: { id: string; status: string };
   modules: { moduleKey: string; status: string }[];
 };
-export type ModuleOperation = "legacy" | "quotes.read" | "quotes.create" | "quotes.manage" | "economy" | "ranking.read" | "recommendations" | "videos" | "inspirations" | "games" | "periodic-messages" | "redemptions";
+export type ModuleOperation = "legacy" | "quotes.read" | "quotes.create" | "quotes.manage" | "economy" | "ranking.read" | "recommendations" | "videos" | "inspirations" | "games" | "periodic-messages" | "redemptions" | "obs.stickers";
 
 /** Lifecycle/dependency check for configuration and authentication, without granting data access. */
 export function modulesAreAvailable(
@@ -37,6 +37,7 @@ export function canUseModules(
   operation: ModuleOperation = "legacy",
 ) {
   if (!tenant || !modulesAreAvailable(tenant, keys)) return false;
+  if (operation === "obs.stickers") return keys.includes("obs_overlays") && keys.every(key => key === "obs_overlays" || key === "streamerbot");
   if (operation === "redemptions") return tenant.creator.id !== DEFAULT_CREATOR_ID && keys.every((key) => key === "redemptions");
   if (operation === "periodic-messages") return keys.every((key) => key === "streamerbot");
   if (operation === "recommendations") return tenant.creator.id !== DEFAULT_CREATOR_ID && keys.every((key) => key === "product_recommendations");

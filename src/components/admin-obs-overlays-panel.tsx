@@ -18,6 +18,16 @@ import type { ObsOverlayStyle } from "@/lib/obs-overlay-style";
 
 const overlays = [
   {
+    id: "stickers",
+    name: "Super Stickers no OBS",
+    description: "Mostra o sticker original enviado pelo YouTube, com nome e valor, um por vez.",
+    liveHref: "/obs/stickers",
+    demoHref: "/obs/stickers?demo=1",
+    minimalHref: "/obs/stickers?style=obscur",
+    minimalDemoHref: "/obs/stickers?demo=1&style=obscur",
+    apiHref: "/api/obs/stickers/current",
+  },
+  {
     id: "quotes",
     name: "Quotes no OBS",
     description: "Overlay das quotes pagas em pipetz, com som embutido e visual pronto para browser source.",

@@ -96,6 +96,16 @@ export const streamerbotGlobalVariables = [
 
 export const streamerbotScriptDefinitions: StreamerbotScriptDefinition[] = [
   {
+    id: "youtube-super-sticker",
+    filename: "youtube-super-sticker.cs",
+    title: "Super Stickers no OBS",
+    description: "Mostra a imagem original do Super Sticker com o nome de quem enviou e o valor.",
+    category: "live",
+    trigger: "YouTube > Chat > Super Sticker",
+    setupInstructions: "Crie uma action dedicada com o trigger Super Sticker e uma sub-action Execute C# Code com este arquivo. Use a credencial exclusiva do streamer. Adicione /obs/stickers como fonte Navegador no OBS (1920 × 1080); para outra comunidade, acrescente ?creator=slug-do-canal. O trigger fornece messageId e stickerImageUrl. Confira docs/youtube-super-stickers.md.",
+    sortOrder: 15,
+  },
+  {
     id: "community-chat-reward",
     filename: "community-chat-reward.cs",
     title: "Ganhos por mensagem da comunidade",
