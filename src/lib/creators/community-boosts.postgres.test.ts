@@ -54,9 +54,10 @@ describe.skipIf(!url)("community boosts on PostgreSQL", () => {
   });
   beforeEach(async () => {
     await pool.query(`TRUNCATE creator_ledger, creator_balances, video_suggestion_boosts, video_suggestions;
-      INSERT INTO creator_balances (creator_id, viewer_id, current_balance, lifetime_earned) VALUES ('a','lia',100,100);
-      INSERT INTO video_suggestions (id,creator_id,viewer_id,youtube_video_id,title,creator_name,thumbnail_url,video_url,status,total_votes)
-        VALUES ($1,'a','ana','aaaaaaaaaaa','Vídeo','Canal','t','u','open',1);`, [videoId]);
+      INSERT INTO creator_balances (creator_id, viewer_id, current_balance, lifetime_earned) VALUES ('a','lia',100,100);`);
+    // A parameterized query is a prepared statement, which takes a single command.
+    await pool.query(`INSERT INTO video_suggestions (id,creator_id,viewer_id,youtube_video_id,title,creator_name,thumbnail_url,video_url,status,total_votes)
+      VALUES ($1,'a','ana','aaaaaaaaaaa','Vídeo','Canal','t','u','open',1)`, [videoId]);
   });
   afterAll(async () => { if (pool) await pool.end(); if (admin) { await admin.query(`DROP SCHEMA ${namespace} CASCADE`); await admin.end(); } });
 
