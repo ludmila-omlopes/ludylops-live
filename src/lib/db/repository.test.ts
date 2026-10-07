@@ -168,22 +168,29 @@ function createDb({
             };
           }
 
+          // Legacy bet reads are pinned to Ludylops with a where clause.
           if (table === bets) {
             return {
-              orderBy: async () => {
-                if (betsError) {
-                  throw betsError;
-                }
-                return betRows;
-              },
+              where: () => ({
+                orderBy: async () => {
+                  if (betsError) {
+                    throw betsError;
+                  }
+                  return betRows;
+                },
+              }),
             };
           }
 
           if (table === betOptions) {
-            if (optionsError) {
-              return Promise.reject(optionsError);
-            }
-            return Promise.resolve(optionRows);
+            return {
+              where: () => {
+                if (optionsError) {
+                  return Promise.reject(optionsError);
+                }
+                return Promise.resolve(optionRows);
+              },
+            };
           }
 
           if (table === betEntries) {
@@ -470,12 +477,14 @@ function createPlaceBetDb(options?: {
 
             if (table === bets) {
               return {
-                orderBy: async () => [betRow],
+                where: () => ({ orderBy: async () => [betRow] }),
               };
             }
 
             if (table === betOptions) {
-              return Promise.resolve(optionRows);
+              return {
+                where: async () => optionRows,
+              };
             }
 
             if (table === betEntries) {

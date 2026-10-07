@@ -15,7 +15,7 @@ type ModuleTenant = {
   creator: { id: string; status: string };
   modules: { moduleKey: string; status: string }[];
 };
-export type ModuleOperation = "legacy" | "quotes.read" | "quotes.create" | "quotes.manage" | "economy" | "ranking.read" | "recommendations" | "videos" | "inspirations" | "games" | "periodic-messages" | "redemptions" | "obs.stickers";
+export type ModuleOperation = "legacy" | "quotes.read" | "quotes.create" | "quotes.manage" | "economy" | "ranking.read" | "recommendations" | "videos" | "inspirations" | "games" | "bets" | "periodic-messages" | "redemptions" | "obs.stickers";
 
 /** Lifecycle/dependency check for configuration and authentication, without granting data access. */
 export function modulesAreAvailable(
@@ -44,6 +44,7 @@ export function canUseModules(
   if (operation === "videos") return tenant.creator.id !== DEFAULT_CREATOR_ID && keys.every((key) => key === "video_suggestions");
   if (operation === "inspirations") return tenant.creator.id !== DEFAULT_CREATOR_ID && keys.every((key) => key === "creator_suggestions");
   if (operation === "games") return tenant.creator.id !== DEFAULT_CREATOR_ID && keys.every((key) => key === "game_suggestions");
+  if (operation === "bets") return tenant.creator.id !== DEFAULT_CREATOR_ID && keys.every((key) => key === "bets");
   if (operation === "quotes.manage") return tenant.creator.id !== DEFAULT_CREATOR_ID && keys.every((key) => key === "quotes");
   if (operation === "ranking.read") return tenant.creator.id !== DEFAULT_CREATOR_ID && keys.every((key) => key === "ranking");
   if (operation === "economy") return tenant.creator.id !== DEFAULT_CREATOR_ID && keys.every((key) => key === "points" || key === "streamerbot");

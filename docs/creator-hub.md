@@ -69,8 +69,7 @@ Em **Módulos** (`/comunidades/<slug>/modulos`), o criador escolhe o que entra n
 | Módulo | Ao escolher |
 | --- | --- |
 | Produtos indicados, [Jogos](creator-games.md), [Vídeos para reagir](creator-videos.md) e [Inspirações](creator-inspirations.md) | Instalados na hora (`installed`); desmarcar remove a instalação, sem apagar os dados |
-| Moeda e Ranking | Instalados na hora quando `CREATOR_ECONOMY_ENABLED=true`; sem a economia ligada, ficam “Em breve”. Depois de ativada, a Moeda só é desativada pela administração, porque guarda saldos, nome e regras de ganho |
-| Apostas | Registradas como `requested`, com o rótulo “Em breve”, até existir a versão por comunidade |
+| Moeda, Ranking e [Apostas](creator-bets.md) | Instalados na hora quando `CREATOR_ECONOMY_ENABLED=true`; sem a economia ligada, ficam “Em breve” (`requested`). Depois de ativada, a Moeda só é desativada pela administração, porque guarda saldos, nome e regras de ganho |
 
 - Escolher um módulo inclui suas dependências: apostas e ranking levam junto a moeda.
 - Moeda e Ranking servem comunidades sem live: o público ganha moeda [na página](creator-economy.md#ganhos-na-página). Instalá-los não troca o roteiro inicial pelo de live, que continua dependendo dos módulos do Streamer.bot.
@@ -95,7 +94,6 @@ Sem isso, a exclusão da identidade de origem esbarraria nas chaves estrangeiras
 
 ### Próximos trabalhos
 
-- Apostas por comunidade, com a moeda.
 - Corrigir `npm run smoke:auth`: o script pode aceitar um redirecionamento de erro de configuração como sucesso. O comportamento também foi observado com a versão anterior do Auth.js; o conserto exige distinguir o redirecionamento ao provedor de um erro.
 
 ### Separação entre plataforma e operação legada

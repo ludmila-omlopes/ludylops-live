@@ -5836,9 +5836,10 @@ export async function listBets(viewerId?: string | null) {
 
   try {
     [betRows, optionRows, entryRows] = await Promise.all([
-      db.select().from(bets).orderBy(desc(bets.createdAt)),
-      db.select().from(betOptions),
-      viewer ? db.select().from(betEntries).where(eq(betEntries.viewerId, viewer.id)) : Promise.resolve([]),
+      // Community bets live in the same tables; the legacy flow only ever sees Ludylops'.
+      db.select().from(bets).where(eq(bets.creatorId, DEFAULT_CREATOR_ID)).orderBy(desc(bets.createdAt)),
+      db.select().from(betOptions).where(eq(betOptions.creatorId, DEFAULT_CREATOR_ID)),
+      viewer ? db.select().from(betEntries).where(and(eq(betEntries.creatorId, DEFAULT_CREATOR_ID), eq(betEntries.viewerId, viewer.id))) : Promise.resolve([]),
     ]);
   } catch (error) {
     if (isMissingBetSchemaError(error)) {
@@ -5876,9 +5877,9 @@ export async function listAdminBets() {
 
   try {
     const [betRows, optionRows, entryRows] = await Promise.all([
-      db.select().from(bets).orderBy(desc(bets.createdAt)),
-      db.select().from(betOptions),
-      db.select().from(betEntries),
+      db.select().from(bets).where(eq(bets.creatorId, DEFAULT_CREATOR_ID)).orderBy(desc(bets.createdAt)),
+      db.select().from(betOptions).where(eq(betOptions.creatorId, DEFAULT_CREATOR_ID)),
+      db.select().from(betEntries).where(eq(betEntries.creatorId, DEFAULT_CREATOR_ID)),
     ]);
 
     const options = optionRows.map(serializeBetOption);
@@ -7936,6 +7937,7 @@ export async function createBet(input: {
   await db.transaction(async (tx) => {
     await tx.insert(bets).values({
       id: bet.id,
+      creatorId: DEFAULT_CREATOR_ID,
       question: bet.question,
       optionMode: bet.optionMode,
       status: bet.status,
@@ -8196,7 +8198,8 @@ async function placeBetForViewer(input: {
   let persistedOption: BetOptionRecord | null = null;
   await db.transaction(async (tx) => {
     const [betRow, optionRows, storedEntry] = await Promise.all([
-      tx.select().from(bets).where(eq(bets.id, input.betId)).limit(1).then((rows) => rows[0] ?? null),
+      // Pinning the bet pins its options and entries: every later step is keyed by this bet.
+      tx.select().from(bets).where(and(eq(bets.creatorId, DEFAULT_CREATOR_ID), eq(bets.id, input.betId))).limit(1).then((rows) => rows[0] ?? null),
       tx.select().from(betOptions).where(eq(betOptions.betId, input.betId)),
       tx
         .select()
@@ -9076,7 +9079,7 @@ export async function lockBet(betId: string) {
     });
   }
 
-  const [betRow] = await db.select().from(bets).where(eq(bets.id, betId)).limit(1);
+  const [betRow] = await db.select().from(bets).where(and(eq(bets.creatorId, DEFAULT_CREATOR_ID), eq(bets.id, betId))).limit(1);
   if (!betRow) {
     throw new Error("Aposta nao encontrada.");
   }
@@ -9254,7 +9257,7 @@ export async function resolveBet({
   }
 
   await db.transaction(async (tx) => {
-    const [betRow] = await tx.select().from(bets).where(eq(bets.id, betId)).limit(1);
+    const [betRow] = await tx.select().from(bets).where(and(eq(bets.creatorId, DEFAULT_CREATOR_ID), eq(bets.id, betId))).limit(1);
     if (!betRow) {
       throw new Error("Aposta nao encontrada.");
     }
@@ -9396,7 +9399,7 @@ export async function cancelBet(betId: string) {
   }
 
   await db.transaction(async (tx) => {
-    const [betRow] = await tx.select().from(bets).where(eq(bets.id, betId)).limit(1);
+    const [betRow] = await tx.select().from(bets).where(and(eq(bets.creatorId, DEFAULT_CREATOR_ID), eq(bets.id, betId))).limit(1);
     if (!betRow) {
       throw new Error("Aposta nao encontrada.");
     }

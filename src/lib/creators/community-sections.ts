@@ -19,6 +19,7 @@ const sectionOrder: CommunitySectionKey[] = [
   "jogos",
   "videos",
   "inspiracoes",
+  "apostas",
   "mensagens",
   "integracao",
 ];
@@ -51,6 +52,8 @@ export function isCommunitySectionAvailable(tenant: SectionTenant, section: Comm
       return canUseModules(tenant, ["video_suggestions"], "videos");
     case "inspiracoes":
       return canUseModules(tenant, ["creator_suggestions"], "inspirations");
+    case "apostas":
+      return canUseModules(tenant, ["bets"], "bets");
     case "mensagens":
       return canUseModules(tenant, ["streamerbot"], "periodic-messages");
   }

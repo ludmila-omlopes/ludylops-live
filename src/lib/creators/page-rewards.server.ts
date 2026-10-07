@@ -40,8 +40,8 @@ export async function lockedCurrency(tx: EconomyTx, creatorId: string) {
   return { ownerUserId: creator.ownerUserId, settings: getPageRewardSettings(config), currencyLabel: getCurrencyLabel(config) };
 }
 
-/** Credits once per operation key; a repeated key is a no-op. Returns whether it credited. */
-async function creditOnce(tx: EconomyTx, input: { creatorId: string; viewerId: string; operationKey: string; kind: string; amount: number; reason: string }) {
+/** Credits once per operation key; a repeated key is a no-op. Returns whether it credited. viewerId must already be canonical. */
+export async function creditCommunityOnce(tx: EconomyTx, input: { creatorId: string; viewerId: string; operationKey: string; kind: string; amount: number; reason: string }) {
   const { creatorId, viewerId, operationKey, amount } = input;
   const [viewer] = await tx.select({ id: users.id }).from(users).where(eq(users.id, viewerId)).for("key share");
   if (!viewer) return false;
@@ -66,7 +66,7 @@ function demoCurrency(creatorId: string) {
   return { ownerUserId: tenant.creator.ownerUserId, settings: getPageRewardSettings(points.configJson), currencyLabel: getCurrencyLabel(points.configJson) };
 }
 
-function creditDemoOnce(creatorId: string, input: { viewerId: string; operationKey: string; kind: string; amount: number; reason: string }) {
+export function creditDemoCommunityOnce(creatorId: string, input: { viewerId: string; operationKey: string; kind: string; amount: number; reason: string }) {
   if (economyDemoStore().entries.some((entry) => entry.creatorId === creatorId && entry.operationKey === input.operationKey)) return false;
   const { entry } = mutateDemoEconomy(creatorId, { kind: "credit", viewerId: input.viewerId, operationKey: input.operationKey, amount: input.amount, reason: input.reason });
   entry.kind = input.kind;
@@ -85,7 +85,7 @@ export async function rewardCommunityPresence(creatorId: string, viewerId: strin
     if (!currency) throw new CurrencyAccessError();
     const { presenceEnabled, presenceAmount } = currency.settings;
     const canonical = creditedDemoEconomyViewer(viewerId);
-    const credited = presenceEnabled && creditDemoOnce(creatorId, { viewerId: canonical, operationKey: `presence:${day}:${canonical}`, kind: "presence_reward", amount: presenceAmount, reason: presenceRewardReason });
+    const credited = presenceEnabled && creditDemoCommunityOnce(creatorId, { viewerId: canonical, operationKey: `presence:${day}:${canonical}`, kind: "presence_reward", amount: presenceAmount, reason: presenceRewardReason });
     return { credited, amount: presenceAmount, currencyLabel: currency.currencyLabel };
   }
   return database().transaction(async (tx) => {
@@ -95,7 +95,7 @@ export async function rewardCommunityPresence(creatorId: string, viewerId: strin
     const { presenceEnabled, presenceAmount } = currency.settings;
     if (!presenceEnabled) return { credited: false, amount: presenceAmount, currencyLabel: currency.currencyLabel };
     const canonical = await creditedEconomyViewer(tx, viewerId);
-    const credited = await creditOnce(tx, { creatorId, viewerId: canonical, operationKey: `presence:${day}:${canonical}`, kind: "presence_reward", amount: presenceAmount, reason: presenceRewardReason });
+    const credited = await creditCommunityOnce(tx, { creatorId, viewerId: canonical, operationKey: `presence:${day}:${canonical}`, kind: "presence_reward", amount: presenceAmount, reason: presenceRewardReason });
     return { credited, amount: presenceAmount, currencyLabel: currency.currencyLabel };
   });
 }
@@ -113,7 +113,7 @@ export async function rewardSuggestionAuthor(tx: EconomyTx, bonus: SuggestionBon
   const currency = await lockedCurrency(tx, bonus.creatorId);
   if (!currency?.settings.suggestionBonusEnabled || bonus.authorId === currency.ownerUserId) return false;
   const canonical = await creditedEconomyViewer(tx, bonus.authorId);
-  return creditOnce(tx, { creatorId: bonus.creatorId, viewerId: canonical, operationKey: `suggestion:${bonus.suggestionKey}`,
+  return creditCommunityOnce(tx, { creatorId: bonus.creatorId, viewerId: canonical, operationKey: `suggestion:${bonus.suggestionKey}`,
     kind: "suggestion_bonus", amount: currency.settings.suggestionBonusAmount, reason: suggestionBonusReason(bonus.name) });
 }
 
@@ -121,7 +121,7 @@ export async function rewardSuggestionAuthor(tx: EconomyTx, bonus: SuggestionBon
 export function rewardDemoSuggestionAuthor(bonus: SuggestionBonus) {
   const currency = demoCurrency(bonus.creatorId);
   if (!currency?.settings.suggestionBonusEnabled || bonus.authorId === currency.ownerUserId) return false;
-  return creditDemoOnce(bonus.creatorId, { viewerId: creditedDemoEconomyViewer(bonus.authorId), operationKey: `suggestion:${bonus.suggestionKey}`,
+  return creditDemoCommunityOnce(bonus.creatorId, { viewerId: creditedDemoEconomyViewer(bonus.authorId), operationKey: `suggestion:${bonus.suggestionKey}`,
     kind: "suggestion_bonus", amount: currency.settings.suggestionBonusAmount, reason: suggestionBonusReason(bonus.name) });
 }
 

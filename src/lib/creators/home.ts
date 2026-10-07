@@ -27,5 +27,7 @@ export function creatorHomeLinks(tenant: CreatorTenantRecord) {
     links.push({ href: `${prefix}/videos`, label: "Vídeos para reagir", description: "Mande um vídeo do YouTube e vote nos próximos da reação." });
   if (!legacy && canUseModules(tenant, ["creator_suggestions"], "inspirations"))
     links.push({ href: `${prefix}/inspiracoes`, label: "Inspirações", description: "Criadores que vale a pena conhecer, indicados pela comunidade." });
+  if (!legacy && economy && canUseModules(tenant, ["bets"], "bets"))
+    links.push({ href: `${prefix}/apostas`, label: "Apostas", description: `Aposte seus ${currency} nos palpites da comunidade.` });
   return legacy ? links.map(link => ({ ...link, href: `https://${DEFAULT_CREATOR_DOMAIN}${link.href}` })) : links;
 }
