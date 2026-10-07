@@ -42,9 +42,10 @@ describe.skipIf(!url)("page rewards on PostgreSQL", () => {
     state.db.mockReturnValue(db());
   });
   beforeEach(async () => {
-    await pool.query(`TRUNCATE creator_ledger, creator_balances, creator_modules; UPDATE creators SET status='active';
-      INSERT INTO creator_modules (id,creator_id,module_key,status,config_json) VALUES ('a-points','a','points','installed',$1);`,
-    [JSON.stringify({ currencyLabel: "cristais", pageRewards: startingPageRewards })]);
+    await pool.query("TRUNCATE creator_ledger, creator_balances, creator_modules; UPDATE creators SET status='active';");
+    // A parameterized query is a prepared statement, which takes a single command.
+    await pool.query("INSERT INTO creator_modules (id,creator_id,module_key,status,config_json) VALUES ('a-points','a','points','installed',$1)",
+      [JSON.stringify({ currencyLabel: "cristais", pageRewards: startingPageRewards })]);
   });
   afterAll(async () => { if (pool) await pool.end(); if (admin) { await admin.query(`DROP SCHEMA ${namespace} CASCADE`); await admin.end(); } });
 
