@@ -35,12 +35,18 @@ describe("streamerbot scripts catalog", () => {
     const body = '{"body":"Você chegou! 🌟"}';
     const secret = "test-vector-secret";
     const scripts = listStreamerbotScripts().filter((script) => script.source.includes("BuildSignature("));
-    expect(scripts).toHaveLength(13);
+    expect(scripts).toHaveLength(14);
     for (const script of scripts) {
       expect(script.source).toContain('"x-streamerbot-credential-id", credentialId');
       expect(script.source).toContain('"lojaneon.streamerbotCredentialId"');
       expect(script.source).toContain('"lojaneon.streamerbotCredentialSecret"');
-      expect(script.source).not.toContain("lojaneon.streamerbotSharedSecret");
+      if (script.id === "youtube-super-sticker") {
+        expect(script.source).toContain("private const bool UseLegacyAuthentication = false;");
+        expect(script.source).toContain('if (!UseLegacyAuthentication) request.Headers.Add("x-streamerbot-credential-id", credentialId)');
+        expect(script.source).toContain('Encoding.UTF8.GetBytes(timestamp + "." + body)');
+      } else {
+        expect(script.source).not.toContain("lojaneon.streamerbotSharedSecret");
+      }
       const format = script.source.match(/string\.Format\("(v2\\n[^"\r\n]+)", timestamp, credentialId, body\)/u)?.[1];
       expect(format, script.filename).toBeDefined();
       const canonical = format!.replaceAll("\\n", "\n").replace("{0}", timestamp).replace("{1}", credentialId).replace("{2}", body);

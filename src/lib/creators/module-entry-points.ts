@@ -26,6 +26,7 @@ export const modulePages: Record<string, CreatorModuleKey[]> = {
   "/obs/bets": ["bets", "obs_overlays"],
   "/obs/likes": ["points", "obs_overlays"],
   "/obs/subscribers": ["points", "obs_overlays"],
+  "/obs/stickers": ["obs_overlays"],
   "/obs/wheel": ["obs_overlays"],
 };
 
@@ -74,6 +75,7 @@ export const moduleApiGroups: Record<string, CreatorModuleKey[]> = {
   "/api/obs/bets": ["bets", "obs_overlays"],
   "/api/obs/likes": ["points", "obs_overlays"],
   "/api/obs/subscribers": ["points", "obs_overlays"],
+  "/api/obs/stickers": ["obs_overlays"],
   "/api/obs/wheel": ["obs_overlays"],
   "/api/obs/live-status": ["obs_overlays"],
 };
@@ -98,6 +100,7 @@ export const integrationApiGroups: Record<string, CreatorModuleKey[]> = {
   "/api/internal/streamerbot/redemptions": ["redemptions"],
   "/api/internal/steam/sync": ["game_suggestions"],
   "/api/internal/streamerbot/events": ["points", "streamerbot"],
+  "/api/internal/streamerbot/stickers": ["obs_overlays", "streamerbot"],
   "/api/internal/streamerbot/economy": ["points", "streamerbot"],
   "/api/internal/streamerbot/chat-rewards": ["points", "streamerbot"],
   "/api/internal/streamerbot/periodic-messages": ["streamerbot"],
