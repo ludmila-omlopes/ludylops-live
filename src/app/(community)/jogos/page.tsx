@@ -5,7 +5,7 @@ import { getPipetzPricing, getViewerPoints, listGameSuggestions } from "@/lib/db
 import { adminEmails, isDemoMode } from "@/lib/env";
 
 export default async function JogosPage() {
-  await requireModulePage(["game_suggestions"]);
+  await requireModulePage(["game_suggestions", "points"]);
 
   const session = await auth();
   const activeViewerId = session?.user?.activeViewerId ?? null;

@@ -41,7 +41,7 @@ interrompe a validação.
 | Resgates | `/me`, catálogo, fila e status da bridge | catálogo, resgates, dashboard completo | todos os handlers assinados da bridge | Ludylops |
 | Apostas | `/apostas`, resumo inicial, admin | apostas e operações por aposta | `/obs/bets`, comando de aposta (exige Streamer.bot) | Ludylops |
 | Produtos | `/produtinhos`, admin | recomendações | — | Ludylops |
-| Jogos | `/jogos`, admin | sugestões, boosts, busca | sincronização Steam autenticada | Ludylops |
+| Jogos | `/jogos` (exige Pontos), admin; `/c/[slug]/jogos` e seção Jogos do dono | sugestões, boosts e busca da Ludylops (exigem Pontos); busca, sugestões e votos por comunidade | sincronização Steam autenticada (só Ludylops) | [Por comunidade](creator-games.md); legado preso à Ludylops |
 | Vídeos | `/videos` (exige Pontos), admin; `/c/[slug]/videos` e seção Vídeos do dono | sugestões e boosts da Ludylops (exigem Pontos); sugestões e votos por comunidade | — | [Por comunidade](creator-videos.md); legado preso à Ludylops |
 | Criadores indicados | `/indicacoes` (exige Pontos), admin; `/c/[slug]/inspiracoes` e seção Inspirações do dono | sugestões e boosts da Ludylops (exigem Pontos); indicações, votos e destaques por comunidade | — | [Por comunidade](creator-inspirations.md); legado preso à Ludylops |
 | Frases | `/quotes`, `/c/[creatorSlug]/quotes`, controle no admin | solicitação de exibição | `/obs/quotes`, comandos de frases | Ler/criar por criador; caminhos pagos/OBS só Ludylops |

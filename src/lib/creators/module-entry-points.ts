@@ -6,7 +6,8 @@ export const modulePages: Record<string, CreatorModuleKey[]> = {
   "/ranking": ["ranking"],
   "/me": ["points", "redemptions"],
   "/contadores": ["streamerbot"],
-  "/jogos": ["game_suggestions"],
+  // Ludylops' games spend pipetz; community games only need the module.
+  "/jogos": ["game_suggestions", "points"],
   // Ludylops' video flow spends pipetz; community videos only need the module.
   "/videos": ["video_suggestions", "points"],
   // Ludylops' inspirations spend pipetz; community inspirations only need the module.
@@ -15,6 +16,7 @@ export const modulePages: Record<string, CreatorModuleKey[]> = {
   "/c/[creatorSlug]/produtinhos": ["product_recommendations"],
   "/c/[creatorSlug]/videos": ["video_suggestions"],
   "/c/[creatorSlug]/inspiracoes": ["creator_suggestions"],
+  "/c/[creatorSlug]/jogos": ["game_suggestions"],
   "/quotes": ["quotes"],
   "/c/[creatorSlug]/quotes": ["quotes"],
   "/c/[creatorSlug]/moeda": ["points"],
@@ -31,6 +33,7 @@ export const moduleApiGroups: Record<string, CreatorModuleKey[]> = {
   "/api/c/[creatorSlug]/ranking": ["ranking"],
   "/api/c/[creatorSlug]/videos": ["video_suggestions"],
   "/api/c/[creatorSlug]/inspirations": ["creator_suggestions"],
+  "/api/c/[creatorSlug]/games": ["game_suggestions"],
   "/api/bets": ["bets"],
   "/api/catalog": ["redemptions"],
   "/api/leaderboard": ["ranking"],
@@ -44,7 +47,7 @@ export const moduleApiGroups: Record<string, CreatorModuleKey[]> = {
   "/api/me/redeem": ["redemptions"],
   "/api/me/redemptions": ["redemptions"],
   "/api/me/bets": ["bets"],
-  "/api/me/game-suggestions": ["game_suggestions"],
+  "/api/me/game-suggestions": ["game_suggestions", "points"],
   "/api/me/video-suggestions": ["video_suggestions", "points"],
   "/api/me/creator-suggestions": ["creator_suggestions", "points"],
   "/api/me/quotes": ["quotes"],
@@ -80,7 +83,7 @@ export const sharedApiGroups = {
   "/api/auth": "Global authentication",
   "/api/owner":
     "Platform-owner recovery and configuration; existing role checks remain mandatory",
-  "/api/me/creator-area": "Builder provisioning, owner-verified currency configuration, page module choices, video and inspiration moderation and isolated economy adjustments",
+  "/api/me/creator-area": "Builder provisioning, owner-verified currency configuration, page module choices, video, inspiration and game moderation and isolated economy adjustments",
   "/api/me/creator-area-access": "Authenticated beta requests and own access status, independent of live modules",
   "/api/admin/creator-area-access": "Platform beta access configuration",
   "/api/admin/periodic-messages": "Admin-only legacy streamer configuration; active creator and installed/disabled Streamer.bot module verified in storage",
@@ -130,6 +133,7 @@ export const sharedPages = {
   "/comunidades/[slug]/produtos": "Owner-managed isolated product recommendations",
   "/comunidades/[slug]/videos": "Owner moderation of the community's own video suggestions",
   "/comunidades/[slug]/inspiracoes": "Owner moderation and curation of the community's own creator inspirations",
+  "/comunidades/[slug]/jogos": "Owner moderation of the community's own game suggestions",
   "/comunidades/[slug]/mensagens": "Owner-managed periodic chat messages",
   "/comunidades/[slug]/integracao": "Owner Streamer.bot credentials; revocation stays available when inactive",
   "/owner": "Platform-owner configuration and recovery",

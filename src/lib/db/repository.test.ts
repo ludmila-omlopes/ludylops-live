@@ -3265,6 +3265,7 @@ describe("viewer link codes", () => {
       votes: [vote("shared", source), vote("shared", "viewer_lia"), vote("mine", source)],
     };
     globalThis.__communityInspirationsDemo = { rows: [suggestion("creator", source, 1)], votes: [vote("creator", source)] };
+    globalThis.__communityGamesDemo = { rows: [suggestion("game", source, 1)], votes: [vote("game", source)] };
     globalThis.__creatorTenantStore = [{ creator: { id: "creator_canal", ownerUserId: source } } as never];
 
     const state = await getSessionViewerState({ googleUserId: "google_community_merge", email: "community-merge@example.com" });
@@ -3278,9 +3279,11 @@ describe("viewer link codes", () => {
     expect(videos.votes.every((row) => row.viewerId === "viewer_lia")).toBe(true);
     expect(globalThis.__communityInspirationsDemo!.rows[0].viewerId).toBe("viewer_lia");
     expect(globalThis.__communityInspirationsDemo!.votes[0].id).toBe(communityVoteId("creator", "viewer_lia"));
+    expect(globalThis.__communityGamesDemo!.votes[0]).toMatchObject({ id: communityVoteId("game", "viewer_lia"), viewerId: "viewer_lia" });
     expect(globalThis.__creatorTenantStore![0].creator.ownerUserId).toBe("viewer_lia");
     globalThis.__communityVideosDemo = undefined;
     globalThis.__communityInspirationsDemo = undefined;
+    globalThis.__communityGamesDemo = undefined;
     globalThis.__creatorTenantStore = [];
   });
 

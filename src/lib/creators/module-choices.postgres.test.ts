@@ -45,11 +45,11 @@ describe.skipIf(!url)("community module choices on PostgreSQL", () => {
   it("keeps products, records the rest with their requirements and stamps only the creator's choice", async () => {
     const choices = await updateOwnedModuleChoices("owner-a", "a", { modules: ["product_recommendations", "game_suggestions", "bets"] });
     expect(choices.filter((choice) => choice.chosen).map((choice) => [choice.key, choice.state])).toEqual([
-      ["product_recommendations", "active"], ["game_suggestions", "soon"], ["bets", "soon"], ["points", "soon"],
+      ["product_recommendations", "active"], ["game_suggestions", "active"], ["bets", "soon"], ["points", "soon"],
     ]);
     const rows = await modules();
     expect(Object.fromEntries(Object.entries(rows).map(([key, row]) => [key, row.status]))).toEqual({
-      bets: "requested", game_suggestions: "requested", points: "requested", product_recommendations: "installed",
+      bets: "requested", game_suggestions: "installed", points: "requested", product_recommendations: "installed",
     });
     for (const row of Object.values(rows)) expect(typeof row.config.chosenAt).toBe("string");
     expect(rows.points.config.currencyLabel).toBe("pontos");
@@ -91,7 +91,7 @@ describe.skipIf(!url)("community module choices on PostgreSQL", () => {
     const choices = [["game_suggestions"], ["product_recommendations", "video_suggestions"]] as const;
     await Promise.all(choices.map((modules) => updateOwnedModuleChoices("owner-a", "a", { modules })));
     expect([
-      { game_suggestions: "requested", points: "requested" },
+      { game_suggestions: "installed" },
       // Videos turn on alone and no longer bring the currency along.
       { product_recommendations: "installed", video_suggestions: "installed" },
     ]).toContainEqual(await statuses());
