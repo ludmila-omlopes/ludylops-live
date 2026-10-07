@@ -160,7 +160,7 @@ validateModuleCatalog(creatorModuleCatalog);
 export const pageModuleKeys: readonly CreatorModuleKey[] = [
   "product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions",
   // The currency earns on the page too; the module choice server still checks the economy switch.
-  "points", "ranking",
+  "points", "ranking", "bets",
 ];
 
 /** A new community starts with products only; the creator adds the rest in Módulos. */

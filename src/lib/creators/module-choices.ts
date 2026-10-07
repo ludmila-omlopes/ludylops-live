@@ -49,15 +49,15 @@ export const moduleChoiceOptions: Record<ModuleChoiceKey, { label: string; descr
 };
 
 /** Modules that already serve communities other than Ludylops once installed. */
-const communityReadyKeys: readonly ModuleChoiceKey[] = ["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions", "points", "ranking"];
+const communityReadyKeys: readonly ModuleChoiceKey[] = ["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions", "bets", "points", "ranking"];
 
 /** The creator turns these on alone, right away. Choosing any other one records it until its community version exists. */
 export function isSelfServiceModule(key: string) {
   return pageModuleKeys.some((pageKey) => pageKey === key);
 }
 
-/** Moeda and Ranking only turn on alone where the community economy is switched on. */
-const economyModuleKeys: readonly ModuleChoiceKey[] = ["points", "ranking"];
+/** Moeda, Ranking and Apostas only turn on alone where the community economy is switched on. */
+const economyModuleKeys: readonly ModuleChoiceKey[] = ["points", "ranking", "bets"];
 export function turnsOnAloneWith(economyEnabled: boolean) {
   return (key: ModuleChoiceKey) => isSelfServiceModule(key) && (economyEnabled || !economyModuleKeys.includes(key));
 }

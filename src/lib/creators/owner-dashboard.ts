@@ -43,6 +43,7 @@ export type CommunitySectionKey =
   | "jogos"
   | "videos"
   | "inspiracoes"
+  | "apostas"
   | "mensagens"
   | "integracao";
 
@@ -57,6 +58,7 @@ export const communitySectionLabels: Record<CommunitySectionKey, string> = {
   jogos: "Jogos",
   videos: "Vídeos para reagir",
   inspiracoes: "Inspirações",
+  apostas: "Apostas",
   mensagens: "Mensagens no chat",
   integracao: "Integração",
 };

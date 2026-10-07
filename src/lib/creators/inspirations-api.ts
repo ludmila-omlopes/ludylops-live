@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 
-import { BoostBalanceError, BoostUnavailableError } from "./community-boosts.server";
+import { CurrencySpendError, CurrencyUnavailableError } from "./community-boosts.server";
 import { communityOwnerContext, communityReply as reply, communityViewerContext } from "./community-api";
 import {
   CommunityInspirationAccessError,
@@ -17,7 +17,7 @@ const unavailable = "Inspirações indisponíveis para esta comunidade.";
 const inspirationsModule = { key: "creator_suggestions", operation: "inspirations", unavailable } as const;
 
 function failure(error: unknown) {
-  if (error instanceof BoostUnavailableError || error instanceof BoostBalanceError) return reply({ ok: false, error: error.message }, 409);
+  if (error instanceof CurrencyUnavailableError || error instanceof CurrencySpendError) return reply({ ok: false, error: error.message }, 409);
   if (error instanceof CommunityInspirationAccessError) return reply({ ok: false, error: unavailable }, 404);
   if (error instanceof CommunityInspirationConflictError) return reply({ ok: false, error: error.message }, 409);
   if (error instanceof ZodError) return reply({ ok: false, error: error.issues[0]?.message ?? "Confira os dados da indicação." }, 400);

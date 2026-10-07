@@ -64,7 +64,7 @@ describe("owner profile", () => {
 describe("usable community home links", () => {
   it("uses only isolated routes and the configured currency", () => {
     const links = creatorHomeLinks(globalThis.__creatorTenantStore![0]);
-    expect(links.map((l) => l.href)).toEqual(["/c/canal-cristal/resgates", "/c/canal-cristal/moeda", "/c/canal-cristal/ranking", "/c/canal-cristal/quotes", "/c/canal-cristal/produtinhos", "/c/canal-cristal/jogos", "/c/canal-cristal/videos", "/c/canal-cristal/inspiracoes"]);
+    expect(links.map((l) => l.href)).toEqual(["/c/canal-cristal/resgates", "/c/canal-cristal/moeda", "/c/canal-cristal/ranking", "/c/canal-cristal/quotes", "/c/canal-cristal/produtinhos", "/c/canal-cristal/jogos", "/c/canal-cristal/videos", "/c/canal-cristal/inspiracoes", "/c/canal-cristal/apostas"]);
     expect(links[0].description).toContain("cristais");
   });
   it("hides economy links while production activation is off", () => {
@@ -74,9 +74,10 @@ describe("usable community home links", () => {
   it("respects dependencies and inactive communities", () => {
     const tenant = globalThis.__creatorTenantStore![0];
     tenant.modules.find((m) => m.moduleKey === "streamerbot")!.status = "disabled";
-    expect(creatorHomeLinks(tenant)).toHaveLength(6);
+    // Redemptions and quotes leave with the integration; bets run on the page and stay.
+    expect(creatorHomeLinks(tenant)).toHaveLength(7);
     tenant.modules.find((m) => m.moduleKey === "points")!.status = "disabled";
-    // Games, videos and inspirations run on free votes, so they stay without the currency.
+    // Games, videos and inspirations run on free votes, so they stay without the currency; bets go with it.
     expect(creatorHomeLinks(tenant).map((l) => l.href)).toEqual(["/c/canal-cristal/produtinhos", "/c/canal-cristal/jogos", "/c/canal-cristal/videos", "/c/canal-cristal/inspiracoes"]);
     tenant.modules.forEach((m) => { m.status = "installed"; }); tenant.creator.status = "archived";
     expect(creatorHomeLinks(tenant)).toEqual([]);

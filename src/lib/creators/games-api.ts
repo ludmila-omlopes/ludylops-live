@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 import { resolveHowLongToBeatGame } from "@/lib/howlongtobeat";
 import { buildHowLongToBeatColumns } from "@/lib/howlongtobeat-columns";
 import { getIgdbGame, isIgdbConfigured, searchIgdbGames } from "@/lib/igdb";
-import { BoostBalanceError, BoostUnavailableError } from "./community-boosts.server";
+import { CurrencySpendError, CurrencyUnavailableError } from "./community-boosts.server";
 import { communityOwnerContext, communityReply as reply, communityViewerContext } from "./community-api";
 import { communityGameInputSchema } from "./games";
 import {
@@ -22,7 +22,7 @@ const unavailable = "Jogos indisponíveis para esta comunidade.";
 const gamesModule = { key: "game_suggestions", operation: "games", unavailable } as const;
 
 function failure(error: unknown) {
-  if (error instanceof BoostUnavailableError || error instanceof BoostBalanceError) return reply({ ok: false, error: error.message }, 409);
+  if (error instanceof CurrencyUnavailableError || error instanceof CurrencySpendError) return reply({ ok: false, error: error.message }, 409);
   if (error instanceof CommunityGameAccessError) return reply({ ok: false, error: unavailable }, 404);
   if (error instanceof CommunityGameConflictError) return reply({ ok: false, error: error.message }, 409);
   if (error instanceof ZodError) return reply({ ok: false, error: error.issues[0]?.message ?? "Confira os dados do jogo." }, 400);

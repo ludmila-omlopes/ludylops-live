@@ -56,6 +56,8 @@ Em comunidades com Pontos, quem está logado pode gastar a moeda para dar boost 
 - Sem a moeda, ou com a economia desligada, o boost não aparece e a API responde que está indisponível. Saldo insuficiente e sugestão fora da votação também respondem 409, com a mensagem para o público.
 - A linha do boost fica na tabela de boosts do módulo, com o próprio `boostId`, e acompanha a [fusão de contas](creator-hub.md#fusão-de-contas) como os outros boosts pagos.
 
+[Apostas por comunidade](creator-bets.md) gastam a moeda da mesma forma, com `kind = "bet"`, e creditam prêmios (`bet_payout`) e devoluções (`bet_refund`) uma única vez.
+
 ## Armazenamento e compatibilidade
 
 A abordagem inicial de trocar a chave de `viewer_balances` foi substituída por
@@ -221,7 +223,7 @@ em `src/` e `scripts/`, base `46662a3`:
 | Leituras | `getLeaderboard`, `getViewerByYoutubeChannelId`, `getViewerPoints`, `getViewerDashboard`, `listAdminViewerDirectory` | Continuam no armazenamento legado e sob os limites de módulos existentes |
 | Quotes pagas | `refundQueuedQuoteOverlay`, `enqueueQuoteOverlay`, `activateQuoteOverlay` | Operações econômicas ainda exclusivas da Ludylops |
 | Sugestões | `createGameSuggestion`, `boostGameSuggestion`, `createCreatorSuggestion`, `boostCreatorSuggestion`, `createVideoSuggestion`, `boostVideoSuggestion` | Continuam exclusivas da Ludylops |
-| Apostas | `placeBetForViewer`, `lockBet`, `resolveBet`, `cancelBet` | Continuam exclusivas da Ludylops |
+| Apostas | `placeBetForViewer`, `lockBet`, `resolveBet`, `cancelBet` | Continuam exclusivas da Ludylops; as comunidades usam [Apostas por comunidade](creator-bets.md) |
 | Resgates | `redeemItem`, `bridgeFail` | Continuam exclusivos da Ludylops |
 | Recompensas | `getDatabasePresentViewerIds`, `adjustViewerBalance`, `ingestStreamerbotEvent` | Contrato antigo preservado; novo endpoint econômico é separado |
 | Scripts | `cleanup-offline-streamerbot-events.ts`, `verify-quote-isolation.ts` | Operam somente tabelas legadas; não acessam moeda nova |

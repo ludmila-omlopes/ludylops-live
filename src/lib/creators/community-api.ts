@@ -16,13 +16,13 @@ export type CommunityViewerContext = { response: Response } | { creatorId: strin
 export async function communityViewerContext(
   request: Request,
   creatorSlug: string,
-  module: { key: CreatorModuleKey; operation: ModuleOperation; unavailable: string },
+  module: { key: CreatorModuleKey; operation: ModuleOperation; unavailable: string; signIn?: string },
 ): Promise<CommunityViewerContext> {
   if (request.method !== "GET" && !isTrustedAppMutationRequest(request)) return { response: communityReply({ ok: false, error: "Origem inválida." }, 403) };
   const tenant = await getCreatorAreaBySlug(creatorSlug, { request });
   if (!tenant || !canUseModules(tenant, [module.key], module.operation)) return { response: communityReply({ ok: false, error: module.unavailable }, 404) };
   const viewerId = (await requireApiSession())?.user?.activeViewerId;
-  if (!viewerId) return { response: communityReply({ ok: false, error: "Entre para sugerir e votar." }, 401) };
+  if (!viewerId) return { response: communityReply({ ok: false, error: module.signIn ?? "Entre para sugerir e votar." }, 401) };
   return { creatorId: tenant.creator.id, viewerId };
 }
 
