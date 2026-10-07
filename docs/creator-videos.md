@@ -34,7 +34,8 @@ Na [fusão de contas](creator-hub.md#fusão-de-contas), as sugestões e os votos
 
    Vídeos não tem dependências, então a troca não deixa nenhum módulo indisponível. Sem esse passo, o criador também ativa ao salvar de novo em Módulos.
 
+- O [boost com a moeda](creator-economy.md#boost-com-a-moeda) soma o valor gasto aos votos, onde a comunidade tem Pontos.
+
 ## Fora desta entrega
 
-- Boost com a moeda da comunidade, para comunidades com Pontos ativo.
 - Busca, paginação e edição de sugestões. A fila mostra até 100 vídeos e os 30 últimos reagidos.

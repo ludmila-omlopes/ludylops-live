@@ -31,7 +31,7 @@ function database() {
 }
 
 /** Active community with the currency installed; its settings come from the locked module row. */
-async function lockedCurrency(tx: EconomyTx, creatorId: string) {
+export async function lockedCurrency(tx: EconomyTx, creatorId: string) {
   const [creator] = await tx.select({ status: creators.status, ownerUserId: creators.ownerUserId }).from(creators).where(eq(creators.id, creatorId)).for("share");
   const [points] = await tx.select({ status: creatorModules.status, configJson: creatorModules.configJson }).from(creatorModules)
     .where(and(eq(creatorModules.creatorId, creatorId), eq(creatorModules.moduleKey, "points"))).for("share");

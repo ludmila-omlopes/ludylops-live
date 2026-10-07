@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { ExternalLink, ThumbsUp } from "lucide-react";
 
+import { CommunityBoost } from "@/components/community-boost";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { CommunityWallet } from "@/lib/creators/community-boosts";
 import { inspirationLinkLabels, type CommunityInspiration, type CommunityInspirationBoard } from "@/lib/creators/inspirations";
 
 const cardClass = "hub-card flex min-w-0 flex-col gap-4 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5";
@@ -29,14 +31,17 @@ function ChannelLink({ inspiration, endorsed }: { inspiration: CommunityInspirat
   );
 }
 
-export function CommunityInspirations({ slug, displayName, board, signedIn, signInHref }: {
+export function CommunityInspirations({ slug, displayName, board, signedIn, signInHref, wallet }: {
   slug: string;
   displayName: string;
   board: CommunityInspirationBoard;
   signedIn: boolean;
   signInHref: string;
+  /** The signed-in viewer's balance where the community currency is on. */
+  wallet?: CommunityWallet | null;
 }) {
   const [open, setOpen] = useState(board.open);
+  const [currentWallet, setWallet] = useState(wallet ?? null);
   const [draft, setDraft] = useState({ name: "", channelUrl: "", reason: "" });
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
@@ -129,6 +134,10 @@ export function CommunityInspirations({ slug, displayName, board, signedIn, sign
                       <ThumbsUp className="size-4" aria-hidden="true" />
                       {inspiration.voted ? "Votado" : "Votar"}
                     </Button>
+                  ) : null}
+                  {signedIn && currentWallet ? (
+                    <CommunityBoost<CommunityInspiration> endpoint={`${base}/${encodeURIComponent(inspiration.id)}/boost`} wallet={currentWallet} disabled={busy !== null}
+                      onBoosted={(updated, next) => { setOpen((current) => current.map((entry) => (entry.id === updated.id ? updated : entry))); setWallet(next); }} />
                   ) : null}
                 </div>
               </li>

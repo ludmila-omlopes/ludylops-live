@@ -95,8 +95,7 @@ Sem isso, a exclusão da identidade de origem esbarraria nas chaves estrangeiras
 
 ### Próximos trabalhos
 
-- Boost com a moeda da comunidade nas sugestões de jogos, vídeos e inspirações, para comunidades com Pontos ativo.
-- Apostas por comunidade, com a moeda, depois de decidir como o público ganha moeda sem live.
+- Apostas por comunidade, com a moeda.
 - Corrigir `npm run smoke:auth`: o script pode aceitar um redirecionamento de erro de configuração como sucesso. O comportamento também foi observado com a versão anterior do Auth.js; o conserto exige distinguir o redirecionamento ao provedor de um erro.
 
 ### Separação entre plataforma e operação legada

@@ -1,9 +1,11 @@
 import { ZodError } from "zod";
 
+import { BoostBalanceError, BoostUnavailableError } from "./community-boosts.server";
 import { communityOwnerContext, communityReply as reply, communityViewerContext } from "./community-api";
 import {
   CommunityInspirationAccessError,
   CommunityInspirationConflictError,
+  boostCommunityInspiration,
   featureNewCommunityInspiration,
   listOwnedCommunityInspirations,
   suggestCommunityInspiration,
@@ -15,6 +17,7 @@ const unavailable = "Inspirações indisponíveis para esta comunidade.";
 const inspirationsModule = { key: "creator_suggestions", operation: "inspirations", unavailable } as const;
 
 function failure(error: unknown) {
+  if (error instanceof BoostUnavailableError || error instanceof BoostBalanceError) return reply({ ok: false, error: error.message }, 409);
   if (error instanceof CommunityInspirationAccessError) return reply({ ok: false, error: unavailable }, 404);
   if (error instanceof CommunityInspirationConflictError) return reply({ ok: false, error: error.message }, 409);
   if (error instanceof ZodError) return reply({ ok: false, error: error.issues[0]?.message ?? "Confira os dados da indicação." }, 400);
@@ -46,5 +49,14 @@ export async function ownerCommunityInspirationsRequest(request: Request, creato
     if (request.method === "GET") return reply({ ok: true, data: await listOwnedCommunityInspirations(creatorId, context.ownerId) });
     if (request.method === "POST") return reply({ ok: true, data: await featureNewCommunityInspiration(creatorId, context.ownerId, await request.json()) }, 201);
     return reply({ ok: true, data: await updateCommunityInspirationStatus(creatorId, context.ownerId, await request.json()) });
+  } catch (error) { return failure(error); }
+}
+
+/** Spends the viewer's community currency on a suggestion still in the vote. */
+export async function boostInspirationRequest(request: Request, target: { creatorSlug: string; id: string }) {
+  try {
+    const context = await communityViewerContext(request, target.creatorSlug, inspirationsModule);
+    if ("response" in context) return context.response;
+    return reply({ ok: true, data: await boostCommunityInspiration(context.creatorId, context.viewerId, target.id, await request.json()) });
   } catch (error) { return failure(error); }
 }

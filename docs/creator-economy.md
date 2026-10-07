@@ -46,6 +46,16 @@ Comunidades sem live também distribuem moeda, sem Streamer.bot. O dono configur
 - **Ganhos no chat** só aparecem em Economia quando o Streamer.bot está instalado.
 - Tudo continua dependendo de `CREATOR_ECONOMY_ENABLED=true`.
 
+## Boost com a moeda
+
+Em comunidades com Pontos, quem está logado pode gastar a moeda para dar boost numa sugestão em votação (Jogos, Vídeos para reagir ou Inspirações). O valor gasto soma aos votos, ao lado do voto grátis.
+
+- `POST /api/c/<slug>/{games|videos|inspirations}/<id>/boost` com `{ boostId, amount }`. O valor vai de 1 a 10.000, limitado ao saldo.
+- O navegador gera o `boostId` ao abrir o boost e o reaproveita se a pessoa tentar de novo. A chave da operação é `boost:<módulo>:<sugestão>:<boostId>`, então repetir o mesmo pedido nunca cobra duas vezes.
+- O débito usa `kind = "boost"`, que a API genérica de ajustes não estorna, e acontece na mesma transação que soma os votos. A sugestão e o saldo ficam travados durante a operação, então boosts simultâneos nunca deixam o saldo negativo.
+- Sem a moeda, ou com a economia desligada, o boost não aparece e a API responde que está indisponível. Saldo insuficiente e sugestão fora da votação também respondem 409, com a mensagem para o público.
+- A linha do boost fica na tabela de boosts do módulo, com o próprio `boostId`, e acompanha a [fusão de contas](creator-hub.md#fusão-de-contas) como os outros boosts pagos.
+
 ## Armazenamento e compatibilidade
 
 A abordagem inicial de trocar a chave de `viewer_balances` foi substituída por
