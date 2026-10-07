@@ -283,6 +283,7 @@ const PIPETZ_PRICING_SETTING_KEYS = {
 } as const;
 const GAME_SUGGESTION_BOOST_SETTING_SCOPE_KEY = "game_suggestion_boosts";
 const GAME_SUGGESTION_BOOST_SETTING_KEYS = {
+  ownedGameMultiplier: "game_boost_owned",
   psPlusMultiplier: "game_boost_ps_plus",
   shortGameMultiplier: "game_boost_short_game",
   adminSuggestionMultiplier: "game_boost_admin",
@@ -300,6 +301,7 @@ const DEFAULT_PIPETZ_PRICING: PipetzPricingRecord = {
   updatedBy: null,
 };
 const DEFAULT_GAME_SUGGESTION_BOOST_SETTINGS: GameSuggestionBoostSettingsRecord = {
+  ownedGameMultiplier: 1,
   psPlusMultiplier: 1,
   shortGameMultiplier: 1,
   adminSuggestionMultiplier: 1,
@@ -944,6 +946,7 @@ export async function getGameSuggestionBoostSettings(): Promise<GameSuggestionBo
 }
 
 export async function updateGameSuggestionBoostSettings(input: {
+  ownedGameMultiplier?: number;
   psPlusMultiplier: number;
   shortGameMultiplier: number;
   adminSuggestionMultiplier: number;
@@ -952,6 +955,7 @@ export async function updateGameSuggestionBoostSettings(input: {
   const db = getDb();
   const updatedAt = new Date();
   const values = {
+    ownedGameMultiplier: input.ownedGameMultiplier === undefined ? undefined : normalizeGameSuggestionBoostMultiplier(input.ownedGameMultiplier),
     psPlusMultiplier: normalizeGameSuggestionBoostMultiplier(input.psPlusMultiplier),
     shortGameMultiplier: normalizeGameSuggestionBoostMultiplier(input.shortGameMultiplier),
     adminSuggestionMultiplier: normalizeGameSuggestionBoostMultiplier(input.adminSuggestionMultiplier),
@@ -961,6 +965,7 @@ export async function updateGameSuggestionBoostSettings(input: {
     const store = getDemoStore();
     for (const [field, key] of Object.entries(GAME_SUGGESTION_BOOST_SETTING_KEYS)) {
       const multiplier = values[field as keyof typeof values];
+      if (multiplier === undefined) continue;
       const value = Math.round(multiplier * GAME_SUGGESTION_BOOST_MULTIPLIER_STORAGE_FACTOR);
       const existing = store.streamerbotCounters.find((entry) => entry.key === key);
       if (existing) {
@@ -994,6 +999,7 @@ export async function updateGameSuggestionBoostSettings(input: {
   await db.transaction(async (tx) => {
     for (const [field, key] of Object.entries(GAME_SUGGESTION_BOOST_SETTING_KEYS)) {
       const multiplier = values[field as keyof typeof values];
+      if (multiplier === undefined) continue;
       const value = Math.round(multiplier * GAME_SUGGESTION_BOOST_MULTIPLIER_STORAGE_FACTOR);
       await tx
         .insert(streamerbotCounters)
@@ -2186,6 +2192,7 @@ function serializeGameSuggestion(row: typeof gameSuggestions.$inferSelect): Game
           fetchedAt: hltbFetchedAt.toISOString(),
         }
       : null,
+    isOwned: row.isOwned,
     psPlusAvailable: row.psPlusAvailable,
     psPlusRegion: row.psPlusRegion ?? null,
     psPlusTier: row.psPlusTier ?? null,
@@ -2558,6 +2565,10 @@ function getAppliedGameSuggestionBoostModifiers(
   settings: GameSuggestionBoostSettingsRecord,
 ): GameSuggestionAppliedBoostModifier[] {
   const modifiers: GameSuggestionAppliedBoostModifier[] = [];
+
+  if (suggestion.isOwned) {
+    modifiers.push({ key: "owned_game", label: "Já possui", multiplier: settings.ownedGameMultiplier });
+  }
 
   if (suggestion.psPlusAvailable) {
     modifiers.push({
@@ -6627,6 +6638,7 @@ export async function createGameSuggestion(input: {
       platforms,
       genres,
       howLongToBeat: null,
+      isOwned: false,
       psPlusAvailable: false,
       psPlusRegion: null,
       psPlusTier: null,
@@ -6714,6 +6726,7 @@ export async function createGameSuggestion(input: {
       platforms,
       genres,
       ...buildHowLongToBeatColumns(howLongToBeat),
+      isOwned: false,
       psPlusAvailable: false,
       status: "open",
       totalVotes: 0,
@@ -6899,7 +6912,8 @@ export async function boostGameSuggestion(input: {
 
 export async function updateGameSuggestionStatus(input: {
   suggestionId: string;
-  status: GameSuggestionRecord["status"];
+  status?: GameSuggestionRecord["status"];
+  isOwned?: boolean;
 }) {
   const db = getDb();
 
@@ -6909,7 +6923,8 @@ export async function updateGameSuggestionStatus(input: {
     if (!suggestion) {
       throw new Error("suggestion_not_found");
     }
-    suggestion.status = input.status;
+    if (input.status !== undefined) suggestion.status = input.status;
+    if (input.isOwned !== undefined) suggestion.isOwned = input.isOwned;
     suggestion.updatedAt = new Date().toISOString();
     return buildGameSuggestionWithMeta({
       suggestion,
@@ -6922,7 +6937,8 @@ export async function updateGameSuggestionStatus(input: {
   const [updated] = await db
     .update(gameSuggestions)
     .set({
-      status: input.status,
+      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.isOwned !== undefined ? { isOwned: input.isOwned } : {}),
       updatedAt,
     })
     .where(and(eq(gameSuggestions.creatorId, DEFAULT_CREATOR_ID), eq(gameSuggestions.id, input.suggestionId)))

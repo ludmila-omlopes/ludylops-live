@@ -18,14 +18,15 @@ import {
   gameSuggestions, gameSuggestionBoosts, videoSuggestions, videoSuggestionBoosts,
   streamerbotCounters, users,
 } from "@/lib/db/schema";
-import { getLeaderboard, listGameSuggestions, listAdminGameSuggestions, listVideoSuggestions } from "./repository";
+import { getLeaderboard, listGameSuggestions, listAdminGameSuggestions, listVideoSuggestions,
+  updateGameSuggestionStatus, updateGameSuggestionBoostSettings, getGameSuggestionBoostSettings } from "./repository";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 
 const date = new Date("2020-01-01T00:00:00Z");
 function suggestion(id: string, totalVotes = 100) {
   return {
     id, viewerId: "author", slug: id, name: id, title: id, totalVotes,
-    status: "open", platforms: ["PC"], genres: [], psPlusAvailable: false,
+    status: "open", platforms: ["PC"], genres: [], isOwned: false, psPlusAvailable: false,
     hltbId: "saved" as string | null, hltbMainStoryMinutes: 300 as number | null,
     hltbFetchedAt: date as Date | null,
     createdAt: date, updatedAt: date,
@@ -123,6 +124,23 @@ describe("bounded leaderboard", () => {
 });
 
 describe("suggestion reads", () => {
+  it("combines ownership with existing bonuses and removes it without changing votes or status", async () => {
+    const [original] = await listGameSuggestions();
+    await updateGameSuggestionBoostSettings({ psPlusMultiplier: 1.5, shortGameMultiplier: 2, adminSuggestionMultiplier: 1, ownedGameMultiplier: 3, updatedBy: null });
+    const before = (await listGameSuggestions()).find((game) => game.id === original.id)!;
+    const owned = await updateGameSuggestionStatus({ suggestionId: original.id, isOwned: true });
+    const otherMultiplier = owned.appliedBoostModifiers.filter((modifier) => modifier.key !== "owned_game")
+      .reduce((result, modifier) => result * modifier.multiplier, 1);
+    expect(owned.boostedScore).toBe(Math.round(original.totalVotes * otherMultiplier * 3));
+    expect(owned).toMatchObject({ isOwned: true, status: original.status, totalVotes: original.totalVotes });
+    expect(owned.appliedBoostModifiers).toContainEqual({ key: "owned_game", label: "Já possui", multiplier: 3 });
+    await updateGameSuggestionBoostSettings({ psPlusMultiplier: 1.5, shortGameMultiplier: 2, adminSuggestionMultiplier: 1, updatedBy: null });
+    expect((await getGameSuggestionBoostSettings()).ownedGameMultiplier).toBe(3);
+    const cleared = await updateGameSuggestionStatus({ suggestionId: original.id, isOwned: false });
+    expect(cleared.boostedScore).toBe(before.boostedScore);
+    expect(cleared).toMatchObject({ isOwned: false, status: original.status, totalVotes: original.totalVotes });
+  });
+
   it.each([
     ["games", listGameSuggestions], ["videos", listVideoSuggestions],
   ] as const)("groups %s boosts without mixing suggestions or viewers", async (_, read) => {

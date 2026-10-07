@@ -15,7 +15,7 @@ export default async function CommunityGamesPage({ params }: { params: Promise<{
     <>
       <CommunitySectionHeading
         title="Jogos"
-        description="Os jogos que seu público sugeriu, dos mais votados para os menos. Escolha o que vai jogar, marque o que já jogou e recuse o que não combina com você."
+        description="Escolha o que vai jogar entre as sugestões do seu público. Os votos e os bônus definem a prioridade. Marque os jogos que você já possui ou já jogou e recuse o que não combina com você."
       />
       {board
         ? <CommunityGamesManager creatorId={community.id} initial={board} />

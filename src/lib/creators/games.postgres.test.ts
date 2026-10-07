@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import ws from "ws";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
@@ -8,7 +9,7 @@ vi.mock("@/lib/db/client", () => ({ getDb: state.db }));
 vi.mock("@/lib/env", () => ({ isDemoMode: false, env: {}, adminEmails: new Set() }));
 import * as schema from "@/lib/db/schema";
 import { CommunityGameAccessError, CommunityGameConflictError, listCommunityGames, listOwnedCommunityGames,
-  suggestCommunityGame, updateCommunityGameStatus, voteCommunityGame } from "./games.server";
+  suggestCommunityGame, updateCommunityGameStatus, updateCommunityGameBoostSettings, voteCommunityGame } from "./games.server";
 const url = process.env.MODULE_TEST_DATABASE_URL;
 const details = (name: string, igdbId: number | null = null) => ({ igdbId, name, coverImageUrl: igdbId ? `https://images.igdb.com/${igdbId}.jpg` : null, releaseYear: 2017, platforms: ["PC"], genres: ["Platform"] });
 const suggest = (creatorId: string, viewerId: string, name: string, igdbId: number | null = null) =>
@@ -47,6 +48,7 @@ describe.skipIf(!url)("community games on PostgreSQL", () => {
         amount integer NOT NULL, created_at timestamptz DEFAULT now() NOT NULL);
       INSERT INTO creators VALUES ('creator_ludylops','ludylops','Ludylops',null,'active'),('a','canal-a','Canal A','owner-a','active'),('b','canal-b','Canal B','owner-b','active');
       INSERT INTO users (id,youtube_channel_id,youtube_display_name) VALUES ('ana','UCana','Ana'),('caio','UCcaio','Caio'),('lia','UClia','Lia');`);
+    await pool.query(readFileSync(new URL("../../../drizzle/0030_game_owned.sql", import.meta.url), "utf8"));
     state.db.mockReturnValue(drizzle({ client: pool, schema }));
   });
   beforeEach(async () => {
@@ -89,7 +91,7 @@ describe.skipIf(!url)("community games on PostgreSQL", () => {
     expect(await updateCommunityGameStatus("a", "owner-a", { suggestionId: created.id, status: "accepted" })).toMatchObject({ status: "accepted" });
     await expect(voteCommunityGame("a", "lia", created.id, true)).rejects.toBeInstanceOf(CommunityGameConflictError);
     await updateCommunityGameStatus("a", "owner-a", { suggestionId: created.id, status: "rejected" });
-    expect(await listCommunityGames("a")).toEqual({ accepted: [], open: [], played: [], rejected: [] });
+    expect(await listCommunityGames("a")).toEqual({ ownedGameMultiplier: 1, accepted: [], open: [], played: [], rejected: [] });
     expect((await listOwnedCommunityGames("a", "owner-a")).rejected.map((game) => game.id)).toEqual([created.id]);
     expect((await pool.query("SELECT status FROM game_suggestions WHERE id='legacy-1'")).rows[0].status).toBe("open");
   });
@@ -104,5 +106,57 @@ describe.skipIf(!url)("community games on PostgreSQL", () => {
       await expect(listCommunityGames("a")).rejects.toBeInstanceOf(CommunityGameAccessError);
     }
     await expect(listCommunityGames("creator_ludylops")).rejects.toBeInstanceOf(CommunityGameAccessError);
+  });
+
+  it("keeps ownership and its optional bonus independent for each channel", async () => {
+    const a = await suggest("a", "ana", "Hollow Knight", 7346);
+    const b = await suggest("b", "ana", "Hollow Knight", 7346);
+    const other = await suggest("a", "caio", "Celeste", 26226);
+    await voteCommunityGame("a", "lia", other.id, true);
+    await updateCommunityGameStatus("a", "owner-a", { suggestionId: a.id, isOwned: true });
+    expect((await listCommunityGames("a")).open.map((game) => game.id)).toEqual([other.id, a.id]);
+    await pool.query(`UPDATE creator_modules SET config_json='{"preserve":"value"}' WHERE creator_id='a'`);
+    const boosted = await updateCommunityGameBoostSettings("a", "owner-a", { ownedGameMultiplier: 3 });
+    expect(boosted.open.map((game) => game.id)).toEqual([a.id, other.id]);
+    expect(boosted.open[0]).toMatchObject({ isOwned: true, votes: 1, boostedScore: 3, status: "open" });
+    expect((await listCommunityGames("b")).open[0]).toMatchObject({ id: b.id, isOwned: false, ownedGameMultiplier: 1, boostedScore: 1 });
+    expect((await pool.query("SELECT config_json FROM creator_modules WHERE creator_id='a'")).rows[0].config_json)
+      .toEqual({ preserve: "value", ownedGameMultiplier: 3 });
+    await updateCommunityGameStatus("a", "owner-a", { suggestionId: a.id, isOwned: true });
+    expect((await listCommunityGames("a")).open[0].boostedScore).toBe(3);
+    await updateCommunityGameStatus("a", "owner-a", { suggestionId: a.id, status: "accepted" });
+    expect((await listCommunityGames("a")).accepted[0]).toMatchObject({ isOwned: true, boostedScore: 3 });
+    await updateCommunityGameStatus("a", "owner-a", { suggestionId: a.id, isOwned: false });
+    expect((await listCommunityGames("a")).accepted[0]).toMatchObject({ status: "accepted", boostedScore: 1, votes: 1 });
+    await updateCommunityGameStatus("a", "owner-a", { suggestionId: a.id, status: "open" });
+    expect((await listCommunityGames("a")).open.map((game) => game.id)).toEqual([other.id, a.id]);
+    expect((await pool.query("SELECT sum(amount)::int AS votes FROM game_suggestion_boosts WHERE creator_id='a'")).rows[0].votes).toBe(3);
+    expect((await pool.query("SELECT is_owned,total_votes FROM game_suggestions WHERE id='legacy-1'")).rows[0])
+      .toEqual({ is_owned: false, total_votes: 40 });
+  });
+
+  it("rejects ownership and multiplier edits by other owners or with foreign game IDs", async () => {
+    const game = await suggest("a", "ana", "Celeste");
+    await expect(updateCommunityGameStatus("a", "owner-b", { suggestionId: game.id, isOwned: true })).rejects.toBeInstanceOf(CommunityGameAccessError);
+    await expect(updateCommunityGameStatus("b", "owner-b", { suggestionId: game.id, isOwned: true })).rejects.toBeInstanceOf(CommunityGameAccessError);
+    await expect(updateCommunityGameBoostSettings("a", "owner-b", { ownedGameMultiplier: 5 })).rejects.toBeInstanceOf(CommunityGameAccessError);
+    await expect(updateCommunityGameBoostSettings("creator_ludylops", "owner-a", { ownedGameMultiplier: 5 })).rejects.toBeInstanceOf(CommunityGameAccessError);
+    await pool.query("UPDATE creator_modules SET status='requested' WHERE creator_id='a'");
+    await expect(updateCommunityGameStatus("a", "owner-a", { suggestionId: game.id, isOwned: true })).rejects.toBeInstanceOf(CommunityGameAccessError);
+    await expect(updateCommunityGameBoostSettings("a", "owner-a", { ownedGameMultiplier: 5 })).rejects.toBeInstanceOf(CommunityGameAccessError);
+  });
+
+  it("ranks with the bonus before limiting the list and disables it at 1x", async () => {
+    await pool.query(`INSERT INTO game_suggestions (id,creator_id,viewer_id,slug,name,status,total_votes)
+      SELECT 'game-'||n,'a','ana','game-'||n,'Game '||n,'open',100 FROM generate_series(1,101) n`);
+    const owned = await suggest("a", "lia", "Celeste");
+    await pool.query("UPDATE game_suggestions SET total_votes=51 WHERE id=$1", [owned.id]);
+    await updateCommunityGameStatus("a", "owner-a", { suggestionId: owned.id, isOwned: true });
+    const board = await updateCommunityGameBoostSettings("a", "owner-a", { ownedGameMultiplier: 2.5 });
+    expect(board.open).toHaveLength(100);
+    expect(board.open[0]).toMatchObject({ id: owned.id, votes: 51, boostedScore: 128 });
+    expect((await listCommunityGames("a")).open[0].id).toBe(owned.id);
+    const disabled = await updateCommunityGameBoostSettings("a", "owner-a", { ownedGameMultiplier: 1 });
+    expect(disabled.open.some((game) => game.id === owned.id)).toBe(false);
   });
 });

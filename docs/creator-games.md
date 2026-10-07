@@ -7,7 +7,7 @@ Terceiro módulo de sugestões levado da Ludylops para as comunidades, no padrã
 - O dono ativa **Sugestões de jogos** em Módulos. O módulo é instalado na hora e não depende da moeda nem do Streamer.bot.
 - `/c/<slug>/jogos`:
   - **Vai jogar:** os jogos que o dono escolheu.
-  - **Em votação:** os mais votados primeiro.
+  - **Em votação:** maior prioridade primeiro, considerando votos e o bônus para jogos que o criador já possui.
   - **Já jogados:** os jogos marcados como jogados.
 - **Sugerir:** quem está logado busca o jogo pelo nome e escolhe um resultado do IGDB. Se o jogo não aparece, ou se a busca está fora do ar, dá para sugerir só pelo nome digitado. O motivo é opcional.
 - **Dados do jogo:** nome, capa, ano, plataformas e gêneros vêm do IGDB, **lidos no servidor pelo ID escolhido**; o corpo da requisição nunca define nome nem capa. A duração da história vem do HowLongToBeat; se a consulta falhar, a sugestão entra sem ela.
@@ -18,6 +18,8 @@ Terceiro módulo de sugestões levado da Ludylops para as comunidades, no padrã
   - um jogo recusado pode ser sugerido de novo;
   - comunidades diferentes têm listas independentes.
 - **Jogos, no Creator Hub:** o dono escolhe o que vai jogar, marca como jogado, devolve à votação ou recusa. Mudar o status mantém os votos. Recusados não aparecem para o público.
+- **Já possuo:** o dono marca ou desmarca qualquer jogo, independentemente do status. A marcação aparece para o público e pertence apenas àquela comunidade.
+- **Bônus para jogos que já possuo:** cada dono define um multiplicador (0 a 10, padrão 1). A prioridade é o número de votos multiplicado por esse valor e arredondado; 1 mantém a prioridade original. O bônus não altera votos nem saldos. Ao desmarcar, o jogo volta à prioridade sem esse bônus. Na Ludylops, ele se combina por multiplicação com os bônus existentes de PS Plus, duração e indicação do admin.
 
 ## Autorização e persistência
 
@@ -26,8 +28,9 @@ Terceiro módulo de sugestões levado da Ludylops para as comunidades, no padrã
   - A busca também exige sessão, para não expor a cota do IGDB a visitantes anônimos.
   - Quem sugere e vota vem da sessão, nunca do corpo.
 - `GET`/`PATCH /api/me/creator-area/<id>/games`: sessão do dono e origem confiável para escrita.
+- No `PATCH`, `{ suggestionId, isOwned }` altera a posse; `{ ownedGameMultiplier }` configura o bônus e retorna a lista reordenada. O status pode ser alterado junto da posse. A configuração de bônus deve ser enviada separadamente.
 - **Transações:** cada operação repete, dentro da transação, a checagem de comunidade ativa, dono e módulo (`canUseModules(…, "games")`), com `FOR SHARE` no criador e no módulo. Sugestões usam um advisory lock por comunidade; votos bloqueiam a linha do jogo.
-- **Sem migração:** os dados ficam em `game_suggestions` e `game_suggestion_boosts`, que já tinham `creator_id`. O voto grátis usa o mesmo ID determinístico de Vídeos e Inspirações.
+- **Persistência:** `game_suggestions.is_owned` é um booleano com padrão `false`. O multiplicador das comunidades fica em `creator_modules.config_json.ownedGameMultiplier`, preservando as demais configurações, com bloqueio de escrita do módulo. Na Ludylops, fica no contador `game_boost_owned`, como os bônus existentes. O voto grátis usa o mesmo ID determinístico de Vídeos e Inspirações.
 - **Legado da Ludylops:** o fluxo ficou preso a `creator_ludylops` em todas as leituras e gravações:
   - lista, criação, boost, status e edição do catálogo;
   - atualização do HowLongToBeat, do PS Plus e dos preços da Steam, inclusive as sincronizações em lote.
@@ -39,8 +42,9 @@ Na [fusão de contas](creator-hub.md#fusão-de-contas), as sugestões e os votos
 
 ## Implantação
 
-1. Implantar este código. Os filtros do legado precisam estar no ar antes de existir qualquer jogo de outra comunidade. Depois disso, um rollback precisa manter esses filtros.
-2. Comunidades que escolheram Jogos enquanto ele estava “Em breve” têm a linha `requested`. Para ativá-las, rode no banco, após revisão:
+1. Revisar `drizzle/0030_game_owned.sql`: a única alteração é adicionar `game_suggestions.is_owned boolean DEFAULT false NOT NULL`. Aplicar essa alteração antes do código, seguindo [o fluxo de banco](database-migrations.md). A geração do arquivo não aplica a coluna ao banco. Jogos existentes começam desmarcados; nenhum voto muda.
+2. Implantar este código. Os filtros do legado precisam estar no ar antes de existir qualquer jogo de outra comunidade. Depois disso, um rollback precisa manter esses filtros. A coluna nova é compatível com o código anterior e não precisa ser removida num rollback.
+3. Comunidades que escolheram Jogos enquanto ele estava “Em breve” têm a linha `requested`. Para ativá-las, rode no banco, após revisão:
 
    ```sql
    UPDATE creator_modules SET status = 'installed', updated_at = now()

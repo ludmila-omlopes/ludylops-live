@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ownedGameMultiplierSchema } from "./ownership";
 
 export const gameSuggestionStatusSchema = z.enum(["open", "accepted", "played", "rejected"]);
 
@@ -23,7 +24,10 @@ export const boostGameSuggestionSchema = z.object({
 });
 
 export const updateGameSuggestionStatusSchema = z.object({
-  status: gameSuggestionStatusSchema,
+  status: gameSuggestionStatusSchema.optional(),
+  isOwned: z.boolean().optional(),
+}).strict().refine((value) => value.status !== undefined || value.isOwned !== undefined, {
+  message: "Informe o status ou se você já possui o jogo.",
 });
 
 export const updateGameSuggestionCatalogSchema = z.object({
@@ -36,6 +40,7 @@ export const updateGameSuggestionCatalogSchema = z.object({
 });
 
 export const updateGameSuggestionBoostSettingsSchema = z.object({
+  ownedGameMultiplier: ownedGameMultiplierSchema.optional(),
   psPlusMultiplier: z.number().min(0).max(10),
   shortGameMultiplier: z.number().min(0).max(10),
   adminSuggestionMultiplier: z.number().min(0).max(10),

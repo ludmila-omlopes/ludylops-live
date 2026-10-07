@@ -117,7 +117,7 @@ describe("community games API", () => {
     expect((await (await suggest({ igdbId: 7346, name: "Hollow Knight" })).json()).error).toBe("Esse jogo já foi jogado.");
     as("owner-a");
     await owner(ids.a, { suggestionId: game.id, status: "rejected" });
-    expect(await listCommunityGames(ids.a)).toEqual({ accepted: [], open: [], played: [], rejected: [] });
+    expect(await listCommunityGames(ids.a)).toEqual({ ownedGameMultiplier: 1, accepted: [], open: [], played: [], rejected: [] });
     expect((await (await owner(ids.a)).json()).data.rejected).toHaveLength(1);
     as("viewer_caio");
     expect((await suggest({ igdbId: 7346, name: "Hollow Knight" })).status).toBe(201);
@@ -143,5 +143,32 @@ describe("community games API", () => {
     expect((await suggest({ name: "Hollow Knight", viewerId: "viewer_caio" })).status).toBe(400);
     expect((await vote("not-a-uuid")).status).toBe(404);
     expect((await listCommunityGames(ids.a)).open).toEqual([]);
+  });
+
+  it("lets owners mark their games and set an optional bonus without changing votes or balances", async () => {
+    const balance = await getViewerPoints("viewer_ana");
+    const game = await data(await suggest({ name: "Celeste" }));
+    const otherChannel = await data(await suggest({ name: "Celeste" }, "canal-b"));
+    expect((await owner(ids.a, { suggestionId: game.id, isOwned: true })).status).toBe(404);
+    as("owner-a");
+    expect(await data(await owner(ids.a, { suggestionId: game.id, isOwned: true }))).toMatchObject({ isOwned: true, boostedScore: 1 });
+    expect((await owner(ids.a, { ownedGameMultiplier: 2.5 })).status).toBe(200);
+    expect((await listCommunityGames(ids.a)).open[0]).toMatchObject({ votes: 1, boostedScore: 3, isOwned: true });
+    expect((await listCommunityGames(ids.b)).open[0]).toMatchObject({ id: otherChannel.id, isOwned: false, boostedScore: 1 });
+    expect(await getViewerPoints("viewer_ana")).toEqual(balance);
+    expect(await data(await owner(ids.a, { suggestionId: game.id, isOwned: false }))).toMatchObject({ status: "open", boostedScore: 1 });
+    expect((await owner(ids.a, { suggestionId: game.id })).status).toBe(400);
+    expect((await owner(ids.a, { suggestionId: game.id, isOwned: "true" })).status).toBe(400);
+    for (const ownedGameMultiplier of [-1, 11, "2", null]) {
+      expect((await owner(ids.a, { ownedGameMultiplier })).status).toBe(400);
+    }
+    expect((await owner(ids.a, { ownedGameMultiplier: 2, suggestionId: game.id, isOwned: true })).status).toBe(400);
+    const forged = await OWNER_PATCH(send(`/api/me/creator-area/${ids.a}/games`, "PATCH", { ownedGameMultiplier: 5 }, "https://attacker.example"), { params: Promise.resolve({ id: ids.a }) });
+    expect(forged.status).toBe(403);
+    as("owner-b");
+    expect((await owner(ids.a, { ownedGameMultiplier: 5 })).status).toBe(404);
+    expect((await owner(ids.b, { suggestionId: game.id, isOwned: true })).status).toBe(404);
+    as(null);
+    expect((await owner(ids.a, { ownedGameMultiplier: 5 })).status).toBe(401);
   });
 });

@@ -490,6 +490,7 @@ export const gameSuggestions = pgTable("game_suggestions", {
   hltbCompletionistMinutes: integer("hltb_completionist_minutes"),
   hltbSimilarity: integer("hltb_similarity"),
   hltbFetchedAt: timestamp("hltb_fetched_at", { withTimezone: true }),
+  isOwned: boolean("is_owned").default(false).notNull(),
   psPlusAvailable: boolean("ps_plus_available").default(false).notNull(),
   psPlusRegion: varchar("ps_plus_region", { length: 16 }),
   psPlusTier: varchar("ps_plus_tier", { length: 32 }),

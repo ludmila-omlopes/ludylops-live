@@ -7,7 +7,7 @@ import { Gamepad2, ThumbsUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { gameDetails, type CommunityGame, type CommunityGameBoard, type CommunityGameSearchResult } from "@/lib/creators/games";
+import { compareCommunityGames, gameDetails, type CommunityGame, type CommunityGameBoard, type CommunityGameSearchResult } from "@/lib/creators/games";
 
 const cardClass = "hub-card flex min-w-0 flex-col gap-4 border-[3px] border-[var(--color-ink)] bg-[var(--color-paper)] p-5";
 const votesLabel = (votes: number) => (votes === 1 ? "1 voto" : `${votes.toLocaleString("pt-BR")} votos`);
@@ -36,6 +36,7 @@ function GameCard({ game, children }: { game: CommunityGame; children?: React.Re
           <h3 className="break-words text-lg font-black leading-snug">{game.name}</h3>
           {details ? <p className="hub-muted break-words text-sm">{details}</p> : null}
           <p className="hub-muted break-words text-sm">Sugerido por {game.suggestedBy}</p>
+          {game.isOwned ? <p className="text-sm font-bold">Já possui · {game.ownedGameMultiplier.toLocaleString("pt-BR")}x</p> : null}
         </div>
       </div>
       {game.reason ? <p className="whitespace-pre-wrap break-words text-sm leading-6">{game.reason}</p> : null}
@@ -100,7 +101,7 @@ export function CommunityGames({ slug, board, signedIn, signInHref }: {
     } finally { setBusy(null); }
   }
 
-  const ranked = [...open].sort((a, b) => b.votes - a.votes || a.createdAt.localeCompare(b.createdAt));
+  const ranked = [...open].sort(compareCommunityGames);
   const typed = query.trim();
 
   return (
@@ -166,7 +167,10 @@ export function CommunityGames({ slug, board, signedIn, signInHref }: {
             {ranked.map((game) => (
               <GameCard key={game.id} game={game}>
                 <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-2">
-                  <p className="text-sm font-bold">{votesLabel(game.votes)}</p>
+                  <div className="text-sm font-bold">
+                    <p>{votesLabel(game.votes)}</p>
+                    {game.boostedScore !== game.votes ? <p>Prioridade: {game.boostedScore.toLocaleString("pt-BR")}</p> : null}
+                  </div>
                   {signedIn ? (
                     <Button type="button" size="sm" variant={game.voted ? "neutral" : "default"} aria-pressed={game.voted}
                       disabled={busy !== null} onClick={() => void vote(game)}>

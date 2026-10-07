@@ -24,6 +24,7 @@ function suggestion(input: {
     platforms: [],
     genres: [],
     howLongToBeat: null,
+    isOwned: false,
     psPlusAvailable: false,
     psPlusRegion: null,
     psPlusTier: null,

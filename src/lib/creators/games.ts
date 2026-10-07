@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ownedGameMultiplierSchema } from "@/lib/game-suggestions/ownership";
 
 // Games the community suggests for the creator to play. Client-safe: the
 // public page, the owner section and the APIs share these schemas and shapes.
@@ -20,9 +21,14 @@ export const communityGameInputSchema = z
 export const communityGameStatusSchema = z
   .object({
     suggestionId: z.string().uuid(),
-    status: z.enum(COMMUNITY_GAME_STATUSES),
+    status: z.enum(COMMUNITY_GAME_STATUSES).optional(),
+    isOwned: z.boolean().optional(),
   })
-  .strict();
+  .strict().refine((value) => value.status !== undefined || value.isOwned !== undefined, {
+    message: "Informe o status ou se você já possui o jogo.",
+  });
+
+export const communityGameBoostSettingsSchema = z.object({ ownedGameMultiplier: ownedGameMultiplierSchema }).strict();
 
 export type CommunityGameSearchResult = {
   igdbId: number;
@@ -34,6 +40,9 @@ export type CommunityGameSearchResult = {
 };
 
 export type CommunityGame = {
+  isOwned: boolean;
+  boostedScore: number;
+  ownedGameMultiplier: number;
   id: string;
   name: string;
   coverImageUrl: string | null;
@@ -52,15 +61,19 @@ export type CommunityGame = {
 };
 
 export type CommunityGameBoard = {
+  ownedGameMultiplier: number;
   /** Picked by the creator to play next. */
   accepted: CommunityGame[];
-  /** In the vote, most voted first. */
+  /** In the vote, highest score (votes with the optional ownership bonus) first. */
   open: CommunityGame[];
   /** Most recent first. */
   played: CommunityGame[];
   /** Only in the owner's board. */
   rejected: CommunityGame[];
 };
+
+export const compareCommunityGames = (a: CommunityGame, b: CommunityGame) =>
+  b.boostedScore - a.boostedScore || b.votes - a.votes || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 
 export function formatPlayTime(minutes: number | null) {
   if (!minutes) return null;
