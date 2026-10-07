@@ -74,6 +74,8 @@ const expectedApiRoutes = new Set([
   "/api/c/[creatorSlug]/inspirations",
   "/api/c/[creatorSlug]/inspirations/[id]/vote",
   "/api/me/creator-area/[id]/games",
+  "/api/me/creator-area/[id]/page-rewards",
+  "/api/c/[creatorSlug]/presence",
   "/api/c/[creatorSlug]/games",
   "/api/c/[creatorSlug]/games/search",
   "/api/c/[creatorSlug]/games/[id]/vote",

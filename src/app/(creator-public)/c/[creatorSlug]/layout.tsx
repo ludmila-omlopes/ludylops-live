@@ -1,6 +1,10 @@
 import { headers } from "next/headers";
 
+import { auth } from "@/auth";
+import { CommunityPresence } from "@/components/community-presence";
 import { hubMono } from "@/components/hub-home/fonts";
+import { canUseModules } from "@/lib/creators/module-access";
+import { communityEconomyEnabled } from "@/lib/creators/economy-switch";
 import { DEFAULT_CREATOR_ID } from "@/lib/creators/defaults";
 import { creatorColorInk, safeCreatorColor } from "@/lib/creators/profile";
 import { getCreatorAreaBySlug } from "@/lib/creators/service";
@@ -35,6 +39,9 @@ export default async function CreatorCommunityLayout({
   }
 
   const template = creatorTemplateFrom(tenant.branding.themeJson);
+  // Only signed-in viewers of a community with its currency claim the daily visit.
+  const claimsPresence = communityEconomyEnabled() && canUseModules(tenant, ["points"], "economy")
+    && Boolean((await auth())?.user?.activeViewerId);
   const primary = safeCreatorColor(tenant.branding.primaryColor, "#c7a2e9");
   const accent = safeCreatorColor(tenant.branding.accentColor, "#40a9ff");
 
@@ -52,6 +59,7 @@ export default async function CreatorCommunityLayout({
       }
     >
       {children}
+      {claimsPresence ? <CommunityPresence slug={tenant.creator.slug} /> : null}
     </div>
   );
 }

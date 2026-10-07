@@ -39,9 +39,10 @@ describe("owner module choices endpoint", () => {
     const { data } = await response.json();
     expect(states(data)).toMatchObject({
       product_recommendations: ["active", true], game_suggestions: ["active", true], bets: ["soon", true],
-      points: ["soon", true], video_suggestions: ["off", false], ranking: ["soon", false],
+      points: ["active", true], video_suggestions: ["off", false], ranking: ["off", false],
     });
-    expect(statuses(a.creator.id)).toEqual({ product_recommendations: "installed", game_suggestions: "installed", bets: "requested", points: "requested" });
+    // Demo runs with the community economy on, so the currency bets need turns on too.
+    expect(statuses(a.creator.id)).toEqual({ product_recommendations: "installed", game_suggestions: "installed", bets: "requested", points: "installed" });
     expect(modulesOf(a.creator.id).every((module) => typeof module.configJson.chosenAt === "string")).toBe(true);
     expect(modulesOf(a.creator.id).find((module) => module.moduleKey === "points")?.configJson.currencyLabel).toBe("pontos");
     expect(hasLiveModules(modulesOf(a.creator.id))).toBe(false);
@@ -53,16 +54,17 @@ describe("owner module choices endpoint", () => {
   it("turns videos on alone, without the currency, and removes what the creator leaves out", async () => {
     const a = await createCreatorArea("owner-a", { displayName: "Canal A" });
     await PUT(request(a.creator.id, { modules: ["video_suggestions", "ranking"] }), context(a.creator.id));
-    expect(statuses(a.creator.id)).toEqual({ video_suggestions: "installed", ranking: "requested", points: "requested" });
+    expect(statuses(a.creator.id)).toEqual({ video_suggestions: "installed", ranking: "installed", points: "installed" });
     expect(hasLiveModules(modulesOf(a.creator.id))).toBe(false);
     await PUT(request(a.creator.id, { modules: [] }), context(a.creator.id));
-    expect(modulesOf(a.creator.id)).toEqual([]);
+    // The currency keeps balances, so it stays once on.
+    expect(Object.keys(statuses(a.creator.id))).toEqual(["points"]);
   });
 
   it("never touches the live modules installed by the platform", async () => {
     const a = await createCreatorArea("owner-a", { displayName: "Canal A" }, { liveFeatures: true });
     // Self-service modules are the creator's own; everything else stays as the platform installed it.
-    const before = structuredClone(modulesOf(a.creator.id).filter((module) => !["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions"].includes(module.moduleKey)));
+    const before = structuredClone(modulesOf(a.creator.id).filter((module) => !["product_recommendations", "game_suggestions", "video_suggestions", "creator_suggestions", "ranking"].includes(module.moduleKey)));
     const response = await PUT(request(a.creator.id, { modules: [] }), context(a.creator.id));
     expect(response.status).toBe(200);
     expect(modulesOf(a.creator.id)).toEqual(before);

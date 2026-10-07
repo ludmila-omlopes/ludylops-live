@@ -2,7 +2,8 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ tenant: vi.fn() }));
+const mocks = vi.hoisted(() => ({ tenant: vi.fn(), session: vi.fn() }));
+vi.mock("@/auth", () => ({ auth: mocks.session }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ host: "localhost" }) }));
 vi.mock("next/font/google", () => ({
   Geist: () => ({ variable: "font-hub" }),
@@ -18,6 +19,7 @@ function tenant(themeJson: Record<string, unknown>, id = "creator_mari") {
   return {
     creator: { id, slug: "canal-da-mari", status: "active" },
     branding: { primaryColor: "#ff7ac6", accentColor: "#102030", themeJson },
+    modules: [],
   };
 }
 

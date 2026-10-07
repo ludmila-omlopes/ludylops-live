@@ -8,8 +8,11 @@ import { isDemoMode } from "@/lib/env";
 import type { CreatorModuleRecord } from "@/lib/types";
 import { DEFAULT_CREATOR_ID } from "./defaults";
 import { listDemoCreatorTenants } from "./demo-store";
-import { describeModuleChoices, moduleChoicesInputSchema, planModuleChoices, type ModuleChoiceKey, type ModuleChoicePlan } from "./module-choices";
+import { describeModuleChoices, moduleChoicesInputSchema, planModuleChoices, turnsOnAloneWith, type ModuleChoiceKey, type ModuleChoicePlan } from "./module-choices";
+import { communityEconomyEnabled } from "./economy-switch";
 import { getCreatorModuleManifest } from "./modules";
+
+const turnsOnAlone = () => turnsOnAloneWith(communityEconomyEnabled());
 
 export class ModuleChoicesAccessError extends Error {
   constructor() { super("Módulos indisponíveis para esta comunidade."); }
@@ -55,7 +58,7 @@ function applyDemoPlan(modules: CreatorModuleRecord[], creatorId: string, plan: 
 /** ownerUserId must come from the authenticated session, never the request body. */
 export async function getOwnedModuleChoices(ownerUserId: string, creatorId: string) {
   assertIdentity(ownerUserId, creatorId);
-  if (isDemoMode) return describeModuleChoices(demoTenant(ownerUserId, creatorId).modules);
+  if (isDemoMode) return describeModuleChoices(demoTenant(ownerUserId, creatorId).modules, turnsOnAlone());
   const db = getDb();
   if (!db) throw new Error("module_choices_unavailable");
   const [creator] = await db.select({ id: creators.id }).from(creators)
@@ -63,7 +66,7 @@ export async function getOwnedModuleChoices(ownerUserId: string, creatorId: stri
   if (!creator) throw new ModuleChoicesAccessError();
   const rows = await db.select({ moduleKey: creatorModules.moduleKey, status: creatorModules.status })
     .from(creatorModules).where(eq(creatorModules.creatorId, creatorId));
-  return describeModuleChoices(rows);
+  return describeModuleChoices(rows, turnsOnAlone());
 }
 
 export async function updateOwnedModuleChoices(ownerUserId: string, creatorId: string, input: unknown) {
@@ -72,8 +75,8 @@ export async function updateOwnedModuleChoices(ownerUserId: string, creatorId: s
   const chosenAt = new Date().toISOString();
   if (isDemoMode) {
     const tenant = demoTenant(ownerUserId, creatorId);
-    tenant.modules = applyDemoPlan(tenant.modules, creatorId, planModuleChoices(tenant.modules, chosen), chosenAt);
-    return describeModuleChoices(tenant.modules);
+    tenant.modules = applyDemoPlan(tenant.modules, creatorId, planModuleChoices(tenant.modules, chosen, turnsOnAlone()), chosenAt);
+    return describeModuleChoices(tenant.modules, turnsOnAlone());
   }
   const db = getDb();
   if (!db) throw new Error("module_choices_unavailable");
@@ -85,7 +88,7 @@ export async function updateOwnedModuleChoices(ownerUserId: string, creatorId: s
     if (!creator) throw new ModuleChoicesAccessError();
     const rows = await tx.select({ moduleKey: creatorModules.moduleKey, status: creatorModules.status })
       .from(creatorModules).where(eq(creatorModules.creatorId, creatorId));
-    const plan = planModuleChoices(rows, chosen);
+    const plan = planModuleChoices(rows, chosen, turnsOnAlone());
     const now = new Date(chosenAt);
     const stamp = sql`${creatorModules.configJson} || ${JSON.stringify({ chosenAt })}::jsonb`;
 
@@ -115,6 +118,6 @@ export async function updateOwnedModuleChoices(ownerUserId: string, creatorId: s
 
     const next = await tx.select({ moduleKey: creatorModules.moduleKey, status: creatorModules.status })
       .from(creatorModules).where(eq(creatorModules.creatorId, creatorId));
-    return describeModuleChoices(next);
+    return describeModuleChoices(next, turnsOnAlone());
   });
 }

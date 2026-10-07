@@ -57,8 +57,9 @@ export default async function CommunityOverviewPage({ params }: { params: Promis
   const live = hasLiveModules(tenant.modules);
 
   const setup = await getOwnedCreatorSetup(viewerId, community.id).catch(() => null);
+  // Chat rewards only apply with the Streamer.bot action installed.
   const chatRewards =
-    community.status === "active" && isCommunitySectionAvailable(tenant, "economia")
+    community.status === "active" && isCommunitySectionAvailable(tenant, "economia") && isCommunitySectionAvailable(tenant, "integracao")
       ? await getOwnedChatRewards(viewerId, community.id).catch(() => null)
       : null;
   const progress = setup ? summarizeSetup(setup) : null;
