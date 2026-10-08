@@ -25,11 +25,21 @@ async function main() {
   console.log(`[auth-smoke] Providers OK: ${result.providerIds.join(", ")}`);
   console.log(`[auth-smoke] Selected provider: ${result.selectedProviderId}`);
   console.log(`[auth-smoke] Providers URL: ${result.providersUrl}`);
+  console.log(`[auth-smoke] CSRF OK: ${result.csrfUrl}`);
+
+  if (!result.signInUrl || !result.signInRedirectLocation) {
+    console.log("[auth-smoke] Sign-in start skipped for credentials: posting would try to sign in.");
+    return;
+  }
+
+  // The full location carries state and PKCE values; the provider endpoint is enough.
+  const provider = new URL(result.signInRedirectLocation);
   console.log(`[auth-smoke] Sign-in URL: ${result.signInUrl}`);
   console.log(`[auth-smoke] Sign-in status: ${result.signInStatus}`);
+  console.log(`[auth-smoke] Provider: ${provider.origin}${provider.pathname}`);
 
-  if (result.signInRedirectLocation) {
-    console.log(`[auth-smoke] Redirect location: ${result.signInRedirectLocation}`);
+  if (result.providerRedirectUri) {
+    console.log(`[auth-smoke] Provider redirect URI: ${result.providerRedirectUri}`);
   }
 }
 
