@@ -2,13 +2,20 @@ export type AuthSmokeResult = {
   providerIds: string[];
   selectedProviderId: string;
   providersUrl: string;
-  signInUrl: string;
-  signInStatus: number;
+  csrfUrl: string;
+  /** Null for credentials: posting would try to sign in, so only the CSRF step is checked. */
+  signInUrl: string | null;
+  signInStatus: number | null;
   signInRedirectLocation: string | null;
+  /** Where the provider will send the user back; it must be registered with the provider. */
+  providerRedirectUri: string | null;
 };
 
 type ProviderMap = Record<string, { id?: string; name?: string }>;
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
+const userAgent = "lojinha-auth-smoke/1.0";
+const redirectStatuses = [302, 303, 307, 308];
 
 function normalizeBaseUrl(baseUrl: string) {
   return baseUrl.replace(/\/+$/, "");
@@ -20,6 +27,15 @@ function assertProviderMap(value: unknown): ProviderMap {
   }
 
   return value as ProviderMap;
+}
+
+/** Turns the Set-Cookie headers of a response into a Cookie header for the next request. */
+function cookieHeader(response: Response) {
+  return response.headers
+    .getSetCookie()
+    .map((cookie) => cookie.split(";")[0]?.trim())
+    .filter(Boolean)
+    .join("; ");
 }
 
 export function pickAuthSmokeProvider(providerIds: string[]) {
@@ -39,15 +55,34 @@ export function pickAuthSmokeProvider(providerIds: string[]) {
   return firstProvider;
 }
 
-export function isHealthySignInStartResponse(providerId: string, response: Response) {
-  const isRedirect = [302, 303, 307, 308].includes(response.status);
+/**
+ * Returns why the sign-in start response is unhealthy, or null when it sends
+ * the user to the provider. Auth.js answers a broken configuration with a
+ * redirect too, to its error page, so a redirect alone proves nothing.
+ */
+export function signInStartProblem(response: Response, baseUrl: string): string | null {
   const location = response.headers.get("location");
-
-  if (providerId === "credentials") {
-    return response.status >= 200 && response.status < 400 && (!isRedirect || Boolean(location));
+  if (!redirectStatuses.includes(response.status) || !location) {
+    return `expected a redirect to the provider, got status ${response.status}`;
   }
 
-  return isRedirect && Boolean(location);
+  let target: URL;
+  try {
+    target = new URL(location, baseUrl);
+  } catch {
+    return `redirect location is not a URL: ${location}`;
+  }
+
+  const error = target.searchParams.get("error");
+  if (error) {
+    return `redirected to an error page (error=${error}) at ${target.origin}${target.pathname}`;
+  }
+
+  if (target.origin === new URL(baseUrl).origin) {
+    return `redirected back to the app (${target.pathname}) instead of the provider`;
+  }
+
+  return null;
 }
 
 export async function runAuthSmokeTest(input: {
@@ -60,7 +95,7 @@ export async function runAuthSmokeTest(input: {
   const providersResponse = await fetchFn(providersUrl, {
     headers: {
       accept: "application/json",
-      "user-agent": "lojinha-auth-smoke/1.0",
+      "user-agent": userAgent,
     },
     redirect: "manual",
   });
@@ -72,27 +107,66 @@ export async function runAuthSmokeTest(input: {
   const providers = assertProviderMap(await providersResponse.json());
   const providerIds = Object.keys(providers);
   const selectedProviderId = pickAuthSmokeProvider(providerIds);
-  const signInUrl = `${baseUrl}/api/auth/signin/${selectedProviderId}?callbackUrl=${encodeURIComponent("/")}`;
-  const signInResponse = await fetchFn(signInUrl, {
+
+  // Auth.js starts a sign-in only on POST, with the CSRF token and its cookie.
+  const csrfUrl = `${baseUrl}/api/auth/csrf`;
+  const csrfResponse = await fetchFn(csrfUrl, {
     headers: {
-      accept: "text/html,application/xhtml+xml",
-      "user-agent": "lojinha-auth-smoke/1.0",
+      accept: "application/json",
+      "user-agent": userAgent,
     },
     redirect: "manual",
   });
 
-  if (!isHealthySignInStartResponse(selectedProviderId, signInResponse)) {
-    throw new Error(
-      `Sign-in start path for ${selectedProviderId} returned an unexpected response (${signInResponse.status}).`,
-    );
+  if (!csrfResponse.ok) {
+    throw new Error(`Auth CSRF endpoint failed with status ${csrfResponse.status}.`);
   }
 
-  return {
+  const csrfToken = ((await csrfResponse.json()) as { csrfToken?: unknown } | null)?.csrfToken;
+  const cookie = cookieHeader(csrfResponse);
+  if (typeof csrfToken !== "string" || !csrfToken || !cookie) {
+    throw new Error("Auth CSRF endpoint did not return a token and its cookie.");
+  }
+
+  const result: AuthSmokeResult = {
     providerIds,
     selectedProviderId,
     providersUrl,
+    csrfUrl,
+    signInUrl: null,
+    signInStatus: null,
+    signInRedirectLocation: null,
+    providerRedirectUri: null,
+  };
+
+  if (selectedProviderId === "credentials") {
+    return result;
+  }
+
+  const signInUrl = `${baseUrl}/api/auth/signin/${encodeURIComponent(selectedProviderId)}`;
+  const signInResponse = await fetchFn(signInUrl, {
+    method: "POST",
+    headers: {
+      accept: "text/html,application/xhtml+xml",
+      "content-type": "application/x-www-form-urlencoded",
+      cookie,
+      "user-agent": userAgent,
+    },
+    body: new URLSearchParams({ csrfToken, callbackUrl: `${baseUrl}/` }).toString(),
+    redirect: "manual",
+  });
+
+  const problem = signInStartProblem(signInResponse, baseUrl);
+  if (problem) {
+    throw new Error(`Sign-in start for ${selectedProviderId} failed: ${problem}.`);
+  }
+
+  const location = signInResponse.headers.get("location")!;
+  return {
+    ...result,
     signInUrl,
     signInStatus: signInResponse.status,
-    signInRedirectLocation: signInResponse.headers.get("location"),
+    signInRedirectLocation: location,
+    providerRedirectUri: new URL(location).searchParams.get("redirect_uri"),
   };
 }
