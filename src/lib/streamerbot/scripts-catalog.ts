@@ -47,7 +47,7 @@ export const streamerbotScriptCategories: Record<
   },
   chat: {
     label: "Chat e comandos",
-    description: "Respostas locais no chat sem chamada HTTP ao app.",
+    description: "Comandos e avisos automáticos no chat da live.",
   },
 };
 
@@ -83,6 +83,16 @@ export const streamerbotGlobalVariables = [
     required: false,
   },
   {
+    name: "lojaneon.overlayChatYoutubeChannelId",
+    description: "ID UC… do canal que receberá os avisos de quotes e novas inscrições. Obrigatório para essa ação.",
+    required: false,
+  },
+  {
+    name: "lojaneon.overlayChatCreatorSlug",
+    description: "Comunidade dos avisos de quotes e inscrições, igual ao parâmetro creator das fontes do OBS. Em domínio próprio, pode ficar vazio.",
+    required: false,
+  },
+  {
     name: "lojaneon.counterGameKey",
     description: "Chave do jogo ativo para o contador de mortes quando não vem do argumento da action.",
     required: false,
@@ -95,6 +105,16 @@ export const streamerbotGlobalVariables = [
 ];
 
 export const streamerbotScriptDefinitions: StreamerbotScriptDefinition[] = [
+  {
+    id: "overlay-chat-announcements",
+    filename: "overlay-chat-announcements.cs",
+    title: "Quotes e novas inscrições no chat",
+    description: "Publica a quote que entrou na tela e dá boas-vindas a quem acabou de se inscrever.",
+    category: "chat",
+    trigger: "Core > Timed Actions (a cada 2 segundos)",
+    setupInstructions: "Crie uma única ação com este C#, Find Refs e Compile. Configure um timer repetido de 2 segundos, Lines = 0, uma fila dedicada e as variáveis appBaseUrl, overlayChatYoutubeChannelId e, se necessário, overlayChatCreatorSlug. Só envia com uma única live monitorada do canal configurado e com status ao vivo no app. O registro persistido evita repetir os mesmos alertas. Não adicione outro envio de boas-vindas ou do texto da quote às ações existentes. Confira docs/overlay-chat-announcements.md. As restrições de comunidade dos overlays continuam valendo.",
+    sortOrder: 16,
+  },
   {
     id: "youtube-super-sticker",
     filename: "youtube-super-sticker.cs",

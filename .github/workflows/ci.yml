@@ -35,6 +35,9 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - name: Test overlay chat script with simulated HTTP and YouTube
+        shell: pwsh
+        run: ./scripts/test-overlay-chat.ps1
       - name: Start the test database WebSocket adapter
         env:
           MODULE_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/modules_185_test

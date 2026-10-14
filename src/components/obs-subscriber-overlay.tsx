@@ -33,6 +33,9 @@ const DEMO_ALERTS: SubscriberAlertRecord[] = [
 let subscriberAudioContext: AudioContext | null = null;
 
 function clampDuration(value: string | null) {
+  if (!value?.trim()) {
+    return DEFAULT_DURATION_MS;
+  }
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
     return DEFAULT_DURATION_MS;
