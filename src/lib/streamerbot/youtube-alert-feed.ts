@@ -79,7 +79,7 @@ export function createYoutubeAlertFeed<Schema extends z.ZodType, Alert extends B
         .map(alert => {
           const publicAlert: Partial<DemoAlert<Alert>> = { ...alert };
           delete publicAlert.creatorId;
-          return publicAlert as Alert;
+          return publicAlert as unknown as Alert;
         });
       const last = alerts.at(-1);
       if (last) nextCursor = `${last.receivedAt}|${last.id}`;
