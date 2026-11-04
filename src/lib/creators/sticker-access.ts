@@ -7,3 +7,10 @@ export async function resolveStickerTenant(request: Request) {
   const tenant = await resolvePublicCreatorFromRequest({ request, pathname: "/", ...(slugs.length ? { slug: slugs[0] } : {}) });
   return canUseModules(tenant, ["obs_overlays"], "obs.stickers") ? tenant : null;
 }
+
+export async function resolveGiftTenant(request: Request) {
+  const slugs = new URL(request.url).searchParams.getAll("creator");
+  if (slugs.length > 1) return null;
+  const tenant = await resolvePublicCreatorFromRequest({ request, pathname: "/", ...(slugs.length ? { slug: slugs[0] } : {}) });
+  return canUseModules(tenant, ["obs_overlays"], "obs.gifts") ? tenant : null;
+}

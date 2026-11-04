@@ -27,6 +27,13 @@ describe("server module authorization", () => {
     other.modules.find(entry => entry.moduleKey === "streamerbot")!.status = "disabled";
     expect(canUseModules(other, ["obs_overlays"], "obs.stickers")).toBe(false);
   });
+  it("scopes jewel gifts exactly like Super Stickers", () => {
+    const other = tenant("another");
+    expect(canUseModules(other, ["obs_overlays"], "obs.gifts")).toBe(true);
+    expect(canUseModules(other, ["points"], "obs.gifts")).toBe(false);
+    other.modules.find(entry => entry.moduleKey === "streamerbot")!.status = "disabled";
+    expect(canUseModules(other, ["obs_overlays"], "obs.gifts")).toBe(false);
+  });
   it("allows only the isolated Streamer.bot operation for periodic messages", () => {
     const other = tenant("another");
     expect(canUseModules(other, ["streamerbot"], "periodic-messages")).toBe(true);

@@ -133,7 +133,7 @@ export const creatorModuleCatalog = [
     label: "Overlays OBS",
     publicRoutes: [],
     adminPanels: ["overlays", "roleta", "metas-likes"],
-    obsRoutes: ["/obs/bets", "/obs/likes", "/obs/quotes", "/obs/subscribers", "/obs/stickers", "/obs/wheel"],
+    obsRoutes: ["/obs/bets", "/obs/likes", "/obs/quotes", "/obs/subscribers", "/obs/stickers", "/obs/gifts", "/obs/wheel"],
     requiredCapabilities: ["streamerbot"],
     defaultConfig: {},
   },
