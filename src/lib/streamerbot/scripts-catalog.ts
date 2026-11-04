@@ -126,6 +126,16 @@ export const streamerbotScriptDefinitions: StreamerbotScriptDefinition[] = [
     sortOrder: 15,
   },
   {
+    id: "youtube-jewel-gift",
+    filename: "youtube-jewel-gift.cs",
+    title: "Presentes com joias no OBS",
+    description: "Mostra a imagem do presente enviado com joias, com o nome de quem enviou e os combos agrupados.",
+    category: "live",
+    trigger: "YouTube > Chat > Jewels Gifted",
+    setupInstructions: "Requer Streamer.bot 1.0.5 ou mais recente. Crie uma action dedicada com o trigger Jewels Gifted e uma sub-action Execute C# Code com este arquivo. Use a credencial exclusiva do streamer. Adicione /obs/gifts como fonte Navegador no OBS (1920 × 1080); para outra comunidade, acrescente ?creator=slug-do-canal. O trigger fornece gift.name, gift.url e gift.jewelsAmount. Confira docs/youtube-jewel-gifts.md.",
+    sortOrder: 15,
+  },
+  {
     id: "community-chat-reward",
     filename: "community-chat-reward.cs",
     title: "Ganhos por mensagem da comunidade",

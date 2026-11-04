@@ -53,6 +53,7 @@ const expectedPageRoutes = new Set([
   "/obs/quotes",
   "/obs/subscribers",
   "/obs/stickers",
+  "/obs/gifts",
   "/obs/wheel",
 ]);
 
@@ -143,6 +144,7 @@ const expectedApiRoutes = new Set([
   "/api/internal/streamerbot/deaths",
   "/api/internal/streamerbot/events",
   "/api/internal/streamerbot/stickers",
+  "/api/internal/streamerbot/gifts",
   "/api/internal/streamerbot/economy",
   "/api/internal/streamerbot/chat-rewards",
   "/api/internal/streamerbot/link",
@@ -175,6 +177,7 @@ const expectedApiRoutes = new Set([
   "/api/obs/quotes/current",
   "/api/obs/subscribers/current",
   "/api/obs/stickers/current",
+  "/api/obs/gifts/current",
   "/api/obs/wheel/current",
   "/api/owner/creators/[id]",
   "/api/owner/creators/[id]/modules/[moduleKey]",

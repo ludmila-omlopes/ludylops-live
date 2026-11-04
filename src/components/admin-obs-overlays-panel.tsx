@@ -28,6 +28,16 @@ const overlays = [
     apiHref: "/api/obs/stickers/current",
   },
   {
+    id: "gifts",
+    name: "Presentes com joias no OBS",
+    description: "Mostra o presente enviado com joias no YouTube, com nome, joias e combos agrupados num só alerta.",
+    liveHref: "/obs/gifts",
+    demoHref: "/obs/gifts?demo=1",
+    minimalHref: "/obs/gifts?style=obscur",
+    minimalDemoHref: "/obs/gifts?demo=1&style=obscur",
+    apiHref: "/api/obs/gifts/current",
+  },
+  {
     id: "quotes",
     name: "Quotes no OBS",
     description: "Overlay das quotes pagas em pipetz, com som embutido e visual pronto para browser source.",

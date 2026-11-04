@@ -124,6 +124,7 @@ export async function authenticateStreamerbotRequest(
 
 export type StreamerbotOperation =
   | "stickers"
+  | "gifts"
   | "redemptions"
   | "periodic-messages"
   | "economy"
@@ -144,6 +145,7 @@ export async function authorizeStreamerbotOperation(
   operation: StreamerbotOperation,
 ): Promise<Response | null> {
   if (operation === "stickers") return guardVerifiedModules(context, ["obs_overlays", "streamerbot"], "obs.stickers");
+  if (operation === "gifts") return guardVerifiedModules(context, ["obs_overlays", "streamerbot"], "obs.gifts");
   if (operation === "redemptions") return guardVerifiedModules(context, ["redemptions"], "redemptions");
   if (operation === "periodic-messages") return guardVerifiedModules(context, ["streamerbot"], "periodic-messages");
   if (operation === "economy") return guardVerifiedModules(context, ["points", "streamerbot"], "economy");
