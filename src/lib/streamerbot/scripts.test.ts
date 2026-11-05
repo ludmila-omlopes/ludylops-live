@@ -40,7 +40,7 @@ describe("streamerbot scripts catalog", () => {
       expect(script.source).toContain('"x-streamerbot-credential-id", credentialId');
       expect(script.source).toContain('"lojaneon.streamerbotCredentialId"');
       expect(script.source).toContain('"lojaneon.streamerbotCredentialSecret"');
-      if (script.id === "youtube-super-sticker") {
+      if (script.id === "youtube-super-sticker" || script.id === "youtube-jewel-gift") {
         expect(script.source).toContain("private const bool UseLegacyAuthentication = false;");
         expect(script.source).toContain('if (!UseLegacyAuthentication) request.Headers.Add("x-streamerbot-credential-id", credentialId)');
         expect(script.source).toContain('Encoding.UTF8.GetBytes(timestamp + "." + body)');
