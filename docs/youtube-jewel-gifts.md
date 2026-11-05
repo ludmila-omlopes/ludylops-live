@@ -11,7 +11,7 @@ Requer **Streamer.bot 1.0.5 ou mais recente**, versão que adicionou o trigger d
 1. Conecte o canal do YouTube no Streamer.bot e monitore a transmissão.
 2. Crie uma action **Presentes com joias no OBS** com o trigger **YouTube → Chat → Jewels Gifted**.
 3. Adicione **Core → C# → Execute C# Code** e cole `streamerbot/youtube-jewel-gift.cs`. Clique **Find Refs** e depois **Compile**; o script usa `System.Net.Http` e `Newtonsoft.Json` (disponíveis na instalação do Streamer.bot). Aguarde `Compiled successfully` antes de salvar.
-4. Use as globals persistidas `lojaneon.appBaseUrl`, `lojaneon.streamerbotCredentialId` e `lojaneon.streamerbotCredentialSecret`, já usadas nas outras integrações (veja `docs/streamerbot-credentials.md`). Este script não tem modo de autenticação legada.
+4. Use as globals persistidas `lojaneon.appBaseUrl`, `lojaneon.streamerbotCredentialId` e `lojaneon.streamerbotCredentialSecret`, já usadas nas outras integrações (veja `docs/streamerbot-credentials.md`). Na instalação antiga da Ludylops, que só tem `lojaneon.streamerbotSharedSecret`, defina `UseLegacyAuthentication = true` no C#, como no script de Super Stickers, enquanto `STREAMERBOT_LEGACY_AUTH_ENABLED` estiver habilitado no servidor. O arquivo distribuído vem com `false`.
 5. Ative os módulos Streamer.bot e Overlays OBS para a comunidade. A credencial determina o canal que recebe o alerta; o corpo da requisição não aceita outro canal.
 
 O script lê `user`, `userId`, `publishedAt`, `gift.name`, `gift.altText`, `gift.url`, `gift.jewelsAmount` e `gift.comboCount` e envia `eventId`, `displayName`, `giftName`, `giftAltText`, `giftImageUrl`, `jewelsAmount` e `comboCount`.
