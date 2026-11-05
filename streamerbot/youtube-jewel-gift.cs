@@ -8,19 +8,22 @@ using Newtonsoft.Json.Linq;
 
 public class CPHInline
 {
+    // Only the existing Ludylops installation may opt in while legacy auth remains enabled.
+    // Never switch authentication automatically after an error or a missing credential.
+    private const bool UseLegacyAuthentication = false;
     private static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 
     public bool Execute()
     {
         string appBaseUrl = ReadGlobal("lojaneon.appBaseUrl");
         string credentialId = ReadGlobal("lojaneon.streamerbotCredentialId");
-        string secret = ReadGlobal("lojaneon.streamerbotCredentialSecret");
+        string secret = ReadGlobal(UseLegacyAuthentication ? "lojaneon.streamerbotSharedSecret" : "lojaneon.streamerbotCredentialSecret");
         string giftName = ReadArg("gift.name");
         string eventId = BuildEventId(giftName);
         Uri appUri;
         if (!Uri.TryCreate(appBaseUrl, UriKind.Absolute, out appUri) ||
             (appUri.Scheme != "https" && !(appUri.Scheme == "http" && appUri.IsLoopback)) ||
-            !string.IsNullOrEmpty(appUri.UserInfo) || string.IsNullOrWhiteSpace(credentialId) ||
+            !string.IsNullOrEmpty(appUri.UserInfo) || (!UseLegacyAuthentication && string.IsNullOrWhiteSpace(credentialId)) ||
             string.IsNullOrWhiteSpace(secret) || string.IsNullOrWhiteSpace(eventId))
         {
             CPH.LogWarn("[Presente com joias] Configure URL, credencial e o trigger YouTube > Chat > Jewels Gifted.");
@@ -42,9 +45,9 @@ public class CPHInline
             using (var request = new HttpRequestMessage(HttpMethod.Post, appBaseUrl.TrimEnd('/') + "/api/internal/streamerbot/gifts"))
             {
                 request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-                request.Headers.Add("x-streamerbot-credential-id", credentialId);
+                if (!UseLegacyAuthentication) request.Headers.Add("x-streamerbot-credential-id", credentialId);
                 request.Headers.Add("x-timestamp", timestamp);
-                request.Headers.Add("x-signature", BuildSignature(secret, timestamp, body, credentialId));
+                request.Headers.Add("x-signature", UseLegacyAuthentication ? BuildLegacySignature(secret, timestamp, body) : BuildSignature(secret, timestamp, body, credentialId));
                 using (var response = Http.SendAsync(request).GetAwaiter().GetResult())
                 {
                     CPH.LogInfo(string.Format("[Presente com joias] HTTP {0}", (int)response.StatusCode));
@@ -97,6 +100,15 @@ public class CPHInline
         using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret)))
         {
             byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(string.Format("v2\n{0}\n{1}\nPOST\n/api/internal/streamerbot/gifts\n{2}", timestamp, credentialId, body)));
+            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+        }
+    }
+
+    private static string BuildLegacySignature(string secret, string timestamp, string body)
+    {
+        using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret)))
+        {
+            byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(timestamp + "." + body));
             return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
     }
