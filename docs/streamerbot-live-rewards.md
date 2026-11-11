@@ -26,11 +26,11 @@ Esta integração usa `POST /api/internal/streamerbot/events` com HMAC, como os 
 - Cada alerta toca o som uma vez, fica visível por 7 segundos por padrão e sai automaticamente. Eventos consecutivos são exibidos em sequência.
 - Parâmetros opcionais do Browser Source:
   - `imageUrl` ou `image`: imagem exibida no alerta. Sem esse parâmetro, o overlay não mostra imagem.
-  - `soundUrl` ou `sound`: arquivo de áudio do alerta. Sem esse parâmetro, o overlay usa um som sintético embutido.
+  - `soundUrl` ou `sound`: arquivo de áudio do alerta. Sem esse parâmetro, o overlay usa um som sintético embutido; `sound=off` deixa o alerta sem som.
   - `durationMs` ou `duration`: duração em milissegundos, entre 3000 e 20000.
   - `title`: texto do selo principal. Padrão: `Nova inscrição`.
   - `subtitle`: texto abaixo do nome. Padrão: `chegou no canal`.
-  - `volume`: volume do `soundUrl`, de `0` a `1`.
+  - `volume`: volume do som, de `0` a `1`; padrão `0.8`. `volume=0` também deixa o alerta sem som.
   - `style`: override manual opcional; use `obscur`, `minimal` ou `minimalista` para o visual mais leve.
 
 ## Metas de likes

@@ -24,6 +24,8 @@ Parâmetros opcionais:
 
 - `duration=8000`: duração de cada alerta em milissegundos, entre 3000 e 30000; padrão 8000.
 - `style=obscur`: apresentação escura com destaque dourado.
+- `sound=https://…/arquivo.mp3`: troca o som do alerta por um arquivo próprio. Sem o parâmetro, toca o mesmo "plim" do alerta de novos inscritos; `sound=off` deixa o alerta sem som.
+- `volume=0.8`: volume do som, de 0 a 1; padrão 0.8.
 - `demo=1`: prévia do enquadramento com texto de exemplo, sem gravar eventos ou usar uma imagem fictícia do YouTube.
 
 Exemplo: `/obs/stickers?duration=12000&style=obscur`.

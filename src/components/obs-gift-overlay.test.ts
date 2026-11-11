@@ -53,6 +53,21 @@ describe("Jewel gift overlay", () => {
     await mount(); await act(async () => container.querySelector("img")!.dispatchEvent(new Event("error")));
     expect(container.querySelector("img")).toBeNull(); expect(container.textContent).toContain("Estrela");
   });
+  it("plays the alert sound once per alert, not on each combo repeat", async () => {
+    const plays: string[] = [];
+    vi.stubGlobal("Audio", class { volume = 1; constructor(public src: string) {} play() { plays.push(this.src); return Promise.resolve(); } });
+    navigation.query = "sound=https://cdn.test/plim.mp3";
+    fetchMock.mockResolvedValueOnce(batch([gift(1)])).mockResolvedValueOnce(batch([gift(2, { comboCount: 2 }), gift(3, { displayName: "Bia" })]));
+    await mount(); expect(plays).toEqual(["https://cdn.test/plim.mp3"]);
+    await advance(2000); expect(container.textContent).toContain("×2"); expect(plays).toHaveLength(1);
+    await advance(6000); expect(container.textContent).toContain("Bia"); expect(plays).toHaveLength(2);
+  });
+  it("stays silent with sound=off", async () => {
+    const play = vi.fn(() => Promise.resolve());
+    vi.stubGlobal("Audio", class { volume = 1; play = play; });
+    navigation.query = "sound=off"; fetchMock.mockResolvedValueOnce(batch([gift(1)]));
+    await mount(); expect(container.textContent).toContain("Ana"); expect(play).not.toHaveBeenCalled();
+  });
   it("previews layout without network calls", async () => {
     navigation.query = "demo=1"; await mount(); await advance(30_000);
     expect(container.textContent).toContain("Teste de presente"); expect(fetchMock).not.toHaveBeenCalled();
