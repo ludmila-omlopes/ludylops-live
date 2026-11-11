@@ -247,7 +247,7 @@ Checklist de deploy para Google OAuth:
 - No Google Cloud Console, em **Authorized redirect URIs**, cadastre uma callback para cada domínio público usado pelo app, no formato `https://seu-dominio/api/auth/callback/google`.
 - Para este projeto, o domínio principal deve ter `https://ludylops.live/api/auth/callback/google`; se o deploy da Vercel também for usado para login, cadastre também a URL equivalente de `*.vercel.app`.
 - Depois do deploy, confira `GET /api/health/public`: `data.auth.googleOAuthConfigured` deve ser `true` e `data.auth.googleOAuthCallbackUrls` mostra as callbacks esperadas.
-- Rode `npm run smoke:auth -- https://seu-dominio` para validar `/api/auth/providers` e o início do login antes de divulgar o deploy.
+- Rode `npm run smoke:auth -- https://seu-dominio` antes de divulgar o deploy. O script confere `/api/auth/providers`, obtém o token CSRF e inicia o login como o navegador faz, com um `POST`. Ele só passa se o redirecionamento levar ao provedor; um redirecionamento para a página de erro do Auth.js (por exemplo, `error=Configuration`) falha. A saída mostra a URL de retorno (`redirect_uri`) que precisa estar cadastrada no Google.
 
 Para Google Cross-Account Protection (RISC), configure também:
 
