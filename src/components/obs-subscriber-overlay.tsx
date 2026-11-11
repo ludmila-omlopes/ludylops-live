@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { playAlertSound, readAlertSoundSettings } from "@/lib/obs-alert-sound";
 import { getObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-style";
 import type { SubscriberAlertRecord } from "@/lib/types";
 
@@ -30,7 +31,6 @@ const DEMO_ALERTS: SubscriberAlertRecord[] = [
   },
 ];
 
-let subscriberAudioContext: AudioContext | null = null;
 
 function clampDuration(value: string | null) {
   if (!value?.trim()) {
@@ -53,59 +53,6 @@ function readParam(searchParams: ReturnType<typeof useSearchParams>, keys: strin
   return null;
 }
 
-async function playSubscriberChime() {
-  const AudioContextCtor =
-    window.AudioContext ||
-    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-
-  if (!AudioContextCtor) {
-    return;
-  }
-
-  subscriberAudioContext ??= new AudioContextCtor();
-
-  if (subscriberAudioContext.state === "suspended") {
-    await subscriberAudioContext.resume();
-  }
-
-  const startAt = subscriberAudioContext.currentTime + 0.02;
-  const notes = [
-    { frequency: 392, delay: 0, duration: 0.14, gain: 0.045 },
-    { frequency: 523.25, delay: 0.1, duration: 0.16, gain: 0.05 },
-    { frequency: 659.25, delay: 0.22, duration: 0.2, gain: 0.052 },
-    { frequency: 783.99, delay: 0.36, duration: 0.22, gain: 0.045 },
-  ];
-
-  notes.forEach((note) => {
-    const oscillator = subscriberAudioContext!.createOscillator();
-    const gainNode = subscriberAudioContext!.createGain();
-    const noteStart = startAt + note.delay;
-    const noteEnd = noteStart + note.duration;
-
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(note.frequency, noteStart);
-    gainNode.gain.setValueAtTime(0.0001, noteStart);
-    gainNode.gain.exponentialRampToValueAtTime(note.gain, noteStart + 0.03);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(subscriberAudioContext!.destination);
-    oscillator.start(noteStart);
-    oscillator.stop(noteEnd + 0.03);
-  });
-}
-
-async function playAlertSound(soundUrl: string | null, volume: number) {
-  if (soundUrl) {
-    const audio = new Audio(soundUrl);
-    audio.volume = volume;
-    await audio.play();
-    return;
-  }
-
-  await playSubscriberChime();
-}
-
 export function ObsSubscriberOverlay({ initialStyle = "classic" }: { initialStyle?: ObsOverlayStyle }) {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
@@ -116,11 +63,9 @@ export function ObsSubscriberOverlay({ initialStyle = "classic" }: { initialStyl
   const isObscurStyle = (getObsOverlayStyle(searchParams) ?? initialStyle) === "obscur";
   const durationMs = clampDuration(readParam(searchParams, ["durationMs", "duration"]));
   const imageUrl = readParam(searchParams, ["imageUrl", "image"]);
-  const soundUrl = readParam(searchParams, ["soundUrl", "sound"]);
   const title = readParam(searchParams, ["title"]) ?? "Nova inscrição";
   const subtitle = readParam(searchParams, ["subtitle"]) ?? "chegou no canal";
-  const rawVolume = Number(searchParams.get("volume") ?? "0.8");
-  const volume = Number.isFinite(rawVolume) ? Math.min(Math.max(rawVolume, 0), 1) : 0.8;
+  const { muted, soundUrl, volume } = readAlertSoundSettings(searchParams);
   const [alerts, setAlerts] = useState<SubscriberAlertRecord[]>(isDemo ? DEMO_ALERTS : []);
   const currentAlert = isDemo || isLive ? alerts[0] ?? null : null;
   const seenEventIds = useRef(new Set<string>());
@@ -242,7 +187,7 @@ export function ObsSubscriberOverlay({ initialStyle = "classic" }: { initialStyl
       return undefined;
     }
 
-    void playAlertSound(soundUrl, volume).catch(() => {
+    void playAlertSound({ muted, soundUrl, volume }).catch(() => {
       // Browser autoplay can block audio outside OBS; visual alert still works.
     });
 
@@ -253,7 +198,7 @@ export function ObsSubscriberOverlay({ initialStyle = "classic" }: { initialStyl
     }, durationMs);
 
     return () => window.clearTimeout(timeout);
-  }, [currentAlert, durationMs, soundUrl, volume]);
+  }, [currentAlert, durationMs, muted, soundUrl, volume]);
 
   if (isObscurStyle) {
     return (

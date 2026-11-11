@@ -20,7 +20,7 @@ const overlays = [
   {
     id: "stickers",
     name: "Super Stickers no OBS",
-    description: "Mostra o sticker original enviado pelo YouTube, com nome e valor, um por vez.",
+    description: "Mostra o sticker original enviado pelo YouTube, com nome, valor e som de alerta, um por vez.",
     liveHref: "/obs/stickers",
     demoHref: "/obs/stickers?demo=1",
     minimalHref: "/obs/stickers?style=obscur",
@@ -30,7 +30,7 @@ const overlays = [
   {
     id: "gifts",
     name: "Presentes com joias no OBS",
-    description: "Mostra o presente enviado com joias no YouTube, com nome, joias e combos agrupados num só alerta.",
+    description: "Mostra o presente enviado com joias no YouTube, com nome, joias, som de alerta e combos agrupados num só alerta.",
     liveHref: "/obs/gifts",
     demoHref: "/obs/gifts?demo=1",
     minimalHref: "/obs/gifts?style=obscur",

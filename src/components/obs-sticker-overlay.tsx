@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { readAlertSoundSettings, useAlertSound } from "@/lib/obs-alert-sound";
 import { normalizeObsOverlayStyle, type ObsOverlayStyle } from "@/lib/obs-overlay-style";
 import { safeYoutubeStickerUrl, type StickerAlert } from "@/lib/youtube-stickers";
 import { readOverlayDuration, useObsAlertQueue } from "./use-obs-alert-queue";
@@ -35,6 +36,7 @@ export function ObsStickerOverlay({ creatorSlug, initialStyle = "classic" }: { c
     id: "demo", receivedAt: "", displayName: "Teste de Super Sticker", amount: "R$ 10,00",
     stickerAltText: "A imagem enviada pelo YouTube aparece aqui", stickerImageUrl: null,
   } : active;
+  useAlertSound(alert?.id ?? null, readAlertSoundSettings(params));
   if (!alert) return null;
   return <main className="pointer-events-none fixed inset-0 flex items-end justify-center bg-transparent p-10">
     <section aria-live="polite" className={`flex max-w-2xl flex-col items-center gap-4 rounded-3xl px-8 py-6 text-white ${minimal ? "bg-black/75" : "bg-black/85"}`}>

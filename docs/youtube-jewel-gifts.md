@@ -1,6 +1,6 @@
 # Presentes com joias do YouTube no OBS
 
-A fonte `/obs/gifts` mostra a imagem do presente enviado com joias (estrelas, "F no chat" e os outros), o nome de quem enviou e quantas joias foram usadas. Um combo, ou seja, a mesma pessoa mandando o mesmo presente várias vezes seguidas, vira um único alerta com `×2`, `×3`… e o tempo na tela recomeça a cada repetição. Sem URL de imagem válida, ou se o download falhar, aparece o nome do presente.
+A fonte `/obs/gifts` mostra a imagem do presente enviado com joias (estrelas, "F no chat" e os outros), o nome de quem enviou e quantas joias foram usadas. Um combo, ou seja, a mesma pessoa mandando o mesmo presente várias vezes seguidas, vira um único alerta com `×2`, `×3`… e o tempo na tela recomeça a cada repetição. O som toca uma vez quando o alerta aparece, não a cada repetição do combo. Sem URL de imagem válida, ou se o download falhar, aparece o nome do presente.
 
 As joias só podem ser enviadas em lives verticais, pelo app do YouTube no celular. A animação que o YouTube mostra no app não entra no vídeo enviado pelo OBS; é esta fonte que coloca o presente na tela.
 
@@ -28,6 +28,8 @@ Parâmetros opcionais:
 
 - `duration=6000`: duração de cada alerta em milissegundos, entre 3000 e 30000; padrão 6000.
 - `style=obscur`: apresentação escura com destaque dourado.
+- `sound=https://…/arquivo.mp3`: troca o som do alerta por um arquivo próprio. Sem o parâmetro, toca o mesmo "plim" do alerta de novos inscritos; `sound=off` deixa o alerta sem som.
+- `volume=0.8`: volume do som, de 0 a 1; padrão 0.8.
 - `demo=1`: prévia do enquadramento com texto de exemplo, sem gravar eventos.
 
 Exemplo: `/obs/gifts?duration=8000&style=obscur`.
